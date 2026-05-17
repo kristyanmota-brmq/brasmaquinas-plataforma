@@ -236,32 +236,22 @@ export const ADESIVO_PVC: Produto = {
 // ============================================================
 // SELEÇÃO DE TUBO POR DIÂMETRO MÍNIMO (Hazen-Williams V = 1.5 m/s)
 // ============================================================
-export function selectTubo(vazaoM3PorHora: number): TuboPVC {
+export function selectTubo(vazaoM3PorHora: number): (typeof TUBOS_PVC_RIGIDO)[number] {
   const Q_m3s = vazaoM3PorHora / 3600;
   const V = 1.5;
-  const D_m = Math.sqrt((4 * Q_m3s) / (Math.PI * V));
-  const D_mm = D_m * 1000;
+  const D_mm = Math.sqrt((4 * Q_m3s) / (Math.PI * V)) * 1000;
 
-  // Procura tubo PN40 com Ø ≥ calculado
-  const ordenados = [...TUBOS_PVC].sort(
-    (a, b) => a.diametroNominalMm - b.diametroNominalMm
-  );
-  const candidato = ordenados.find(
-    (t) => t.diametroNominalMm >= D_mm && t.pn === 40
-  );
-  if (candidato) return candidato;
-
-  // Se nenhum PN40 atende, vai para PN60 maior
+  const ordenados = [...TUBOS_PVC_RIGIDO].sort((a, b) => a.diametroMm - b.diametroMm);
   return (
-    ordenados.find((t) => t.diametroNominalMm >= D_mm) ??
+    ordenados.find((t) => t.diametroMm >= D_mm) ??
     ordenados[ordenados.length - 1]
   );
 }
 
 export function selectCurva(diametroMm: number): Conexao {
   return (
-    CURVAS_90.find((c) => c.diametroMm === diametroMm) ??
-    CURVAS_90.reduce((closest, c) =>
+    CURVAS_90_RIGIDAS.find((c) => c.diametroMm === diametroMm) ??
+    CURVAS_90_RIGIDAS.reduce((closest, c) =>
       Math.abs(c.diametroMm - diametroMm) < Math.abs(closest.diametroMm - diametroMm)
         ? c
         : closest
@@ -321,6 +311,62 @@ export const TUBOS_PVC_RIGIDO = [
   { sku: "TIGRE_R_125_PN80", descricao: "Tubo PVC rígido Ø125mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 125, diametroNominalMm: 125, pressaoMca: 80, metrosPorBarra: 6, custo: 178.4, precoVenda: 322.0, coefC: 145 },
   { sku: "TIGRE_R_150_PN80", descricao: "Tubo PVC rígido Ø150mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, pressaoMca: 80, metrosPorBarra: 6, custo: 248.9, precoVenda: 448.0, coefC: 145 },
 ] as const;
+
+// ============================================================
+// CONEXÕES RÍGIDAS (soldável PN80) — principal e adutora
+// ============================================================
+export const CURVAS_90_RIGIDAS: Conexao[] = [
+  {
+    sku: "TIGRE_CR_50_PN80",
+    descricao: "Curva 90 PVC rígido sold. Ø50mm PN80 - Tigre", // TODO: confirmar preço
+    marca: "TIGRE",
+    unidade: "UN",
+    custo: 0,
+    precoVenda: 22.0,
+    diametroMm: 50,
+    tipo: "curva90",
+  },
+  {
+    sku: "TIGRE_CR_75_PN80",
+    descricao: "Curva 90 PVC rígido sold. Ø75mm PN80 - Tigre", // TODO: confirmar preço
+    marca: "TIGRE",
+    unidade: "UN",
+    custo: 0,
+    precoVenda: 38.0,
+    diametroMm: 75,
+    tipo: "curva90",
+  },
+  {
+    sku: "TIGRE_CR_100_PN80",
+    descricao: "Curva 90 PVC rígido sold. Ø100mm PN80 - Tigre", // TODO: confirmar preço
+    marca: "TIGRE",
+    unidade: "UN",
+    custo: 0,
+    precoVenda: 68.0,
+    diametroMm: 100,
+    tipo: "curva90",
+  },
+  {
+    sku: "1000310",
+    descricao: "CURVA 90 PTA/BSA IRRIGA-LF PN80 125MM - TIGRE",
+    marca: "TIGRE",
+    unidade: "UN",
+    custo: 0,
+    precoVenda: 116.3,
+    diametroMm: 125,
+    tipo: "curva90",
+  },
+  {
+    sku: "1118000",
+    descricao: "CURVA 90 PTA/BSA IRRIGA-LF PN80 150MM - TIGRE",
+    marca: "TIGRE",
+    unidade: "UN",
+    custo: 0,
+    precoVenda: 130.0,
+    diametroMm: 150,
+    tipo: "curva90",
+  },
+];
 
 // Tês de derivação para laterais (PVC LF)
 export const TES_DERIVACAO_LATERAL = [
