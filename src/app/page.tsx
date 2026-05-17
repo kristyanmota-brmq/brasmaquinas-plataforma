@@ -1,65 +1,63 @@
-import Image from "next/image";
+import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
+import { Logo } from "@/components/brand/Logo";
 
-export default function Home() {
+export default async function Home() {
+  const { userId } = await auth();
+  const isSignedIn = !!userId;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen flex flex-col bg-background">
+      <header className="px-8 py-6">
+        <Logo size={32} />
+      </header>
+
+      <div className="flex-1 flex items-center justify-center px-6">
+        <div className="max-w-2xl text-center -mt-24">
+          <div className="inline-block text-[11px] uppercase tracking-[0.18em] text-ink-3 mb-10 font-mono">
+            Aspersão Convencional · V0.5-RC
+          </div>
+
+          <h1 className="text-5xl md:text-6xl font-semibold tracking-tight text-ink mb-6 leading-[1.05]">
+            Projetos de irrigação,
+            <br />
+            <span className="text-ink-2">do levantamento à proposta.</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+          <p className="text-lg text-ink-2 mb-12 max-w-xl mx-auto leading-relaxed">
+            Plataforma técnica e comercial da Brasmáquinas. Travas
+            metodológicas aplicadas, propostas auditáveis, decisões em minutos.
           </p>
+
+          {!isSignedIn ? (
+            <div className="flex gap-3 justify-center">
+              <Link
+                href="/sign-up"
+                className="px-6 py-3 bg-brand hover:bg-brand-hover text-white rounded-md font-medium transition-colors"
+              >
+                Criar conta
+              </Link>
+              <Link
+                href="/sign-in"
+                className="px-6 py-3 border border-border hover:border-border-strong text-ink rounded-md font-medium transition-colors"
+              >
+                Entrar
+              </Link>
+            </div>
+          ) : (
+            <Link
+              href="/projetos"
+              className="inline-flex px-6 py-3 bg-brand hover:bg-brand-hover text-white rounded-md font-medium transition-colors"
+            >
+              Ir para meus projetos →
+            </Link>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </div>
+
+      <footer className="px-8 py-6 text-center text-[11px] uppercase tracking-[0.15em] text-ink-4 font-mono">
+        Brasmáquinas · Metodologia V0.5-RC
+      </footer>
+    </main>
   );
 }
