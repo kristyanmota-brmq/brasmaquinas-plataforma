@@ -47,6 +47,7 @@ export interface ProjectLayout {
     elevationStartM?: number;
     elevationEndM?: number;
     elevationDeltaM?: number;
+    source: "auto" | "manual";
   };
   center?: { lng: number; lat: number; zoom: number };
 }

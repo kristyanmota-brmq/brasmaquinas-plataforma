@@ -34,6 +34,7 @@ import {
   type ProjectLayout,
 } from "@/app/projetos/[id]/actions";
 import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
+import { buildBOM, type BOM } from "@/lib/bom";
 
 interface Props {
   projectId: string;
@@ -200,6 +201,22 @@ function calculatePipelineLength(coords: [number, number][]): number {
   return total * 1000;
 }
 
+function generateAutoPipeline(
+  waterSource: { lng: number; lat: number },
+  area: GeoJSON.Polygon
+): [number, number][] {
+  const sourcePt = turf.point([waterSource.lng, waterSource.lat]);
+  const polyLine = turf.polygonToLine(turf.polygon(area.coordinates));
+  const nearest = turf.nearestPointOnLine(
+    polyLine as GeoJSON.Feature<GeoJSON.LineString>,
+    sourcePt
+  );
+  return [
+    [waterSource.lng, waterSource.lat],
+    nearest.geometry.coordinates as [number, number],
+  ];
+}
+
 export function ProjectMap({ projectId, initialLayout }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [mode, setMode] = useState<Mode>("view");
@@ -235,7 +252,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     () => Math.round((LAMINA_MM / intensidadeMmPorHora) * 60),
     [intensidadeMmPorHora]
   );
-
+  const bom: BOM | null = useMemo(() => buildBOM(layout), [layout]);
   const coverageGeoJSON = useMemo(() => {
     if (!layout.sprinklers || !showCoverage) return null;
     const features = layout.sprinklers.positions
@@ -263,6 +280,41 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
   }, [layout, projectId]);
 
   // Reset seleção quando setorização muda
+  // Auto-sugestao de tubulacao principal: captacao -> ponto mais proximo da borda do poligono.
+  // Nao sobrescreve se vendedor desenhou manualmente.
+  useEffect(() => {
+    if (!layout.waterSource || !layout.area) return;
+    if (layout.mainPipeline?.source === "manual") return;
+
+    if (!layout.centroid) return;
+    const coords = generateAutoPipeline(layout.waterSource, layout.area, layout.centroid);
+    const lengthMeters = calculatePipelineLength(coords);
+    const elevationStartM = queryElevation(coords[0][0], coords[0][1]);
+    const elevationEndM = queryElevation(coords[1][0], coords[1][1]);
+    const elevationDeltaM =
+      elevationStartM !== undefined && elevationEndM !== undefined
+        ? elevationEndM - elevationStartM
+        : undefined;
+
+    setLayout((l) => ({
+      ...l,
+      mainPipeline: {
+        coordinates: coords,
+        lengthMeters,
+        segments: 1,
+        elevationStartM,
+        elevationEndM,
+        elevationDeltaM,
+        source: "auto",
+      },
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    layout.waterSource?.lng,
+    layout.waterSource?.lat,
+    layout.area,
+  ]);
+
   useEffect(() => {
     setSelectedSector(null);
   }, [layout.sectorization?.setoresCount]);
@@ -434,6 +486,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
         elevationStartM,
         elevationEndM,
         elevationDeltaM,
+        source: "manual",
       },
     }));
     setDrawingPipeline([]);
@@ -448,6 +501,30 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
   const undoPipelineVertex = useCallback(() => {
     setDrawingPipeline((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
   }, []);
+
+  const resetToAutoPipeline = useCallback(() => {
+    if (!layout.waterSource || !layout.area || !layout.centroid) return;
+    const coords = generateAutoPipeline(layout.waterSource, layout.area, layout.centroid);
+    const lengthMeters = calculatePipelineLength(coords);
+    const elevationStartM = queryElevation(coords[0][0], coords[0][1]);
+    const elevationEndM = queryElevation(coords[1][0], coords[1][1]);
+    const elevationDeltaM =
+      elevationStartM !== undefined && elevationEndM !== undefined
+        ? elevationEndM - elevationStartM
+        : undefined;
+    setLayout((l) => ({
+      ...l,
+      mainPipeline: {
+        coordinates: coords,
+        lengthMeters,
+        segments: 1,
+        elevationStartM,
+        elevationEndM,
+        elevationDeltaM,
+        source: "auto",
+      },
+    }));
+  }, [layout.waterSource, layout.area, queryElevation]);
 
   const clearPipeline = useCallback(() => {
     setLayout((l) => {
@@ -796,41 +873,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               >
                 <div className="w-3 h-3 bg-white border-2 border-[#094641] rounded-full shadow-sm" />
               </Marker>
-            ))}
-
-          {layout.mainPipeline && (
-            <Source
-              id="pipeline-src"
-              type="geojson"
-              data={{
-                type: "Feature",
-                properties: {},
-                geometry: {
-                  type: "LineString",
-                  coordinates: layout.mainPipeline.coordinates,
-                },
-              }}
-            >
-              <Layer
-                id="pipeline-casing"
-                type="line"
-                paint={{
-                  "line-color": "#FFFFFF",
-                  "line-width": 5,
-                  "line-opacity": 0.6,
-                }}
-                layout={{ "line-cap": "round", "line-join": "round" }}
-              />
-              <Layer
-                id="pipeline-line"
-                type="line"
-                paint={{ "line-color": "#1B5680", "line-width": 3 }}
-                layout={{ "line-cap": "round", "line-join": "round" }}
-              />
-            </Source>
-          )}
-
-          {isDrawingPipeline && drawingPipeline.length > 0 && (
+            ))}          {isDrawingPipeline && drawingPipeline.length > 0 && (
             <>
               <Source
                 id="pipeline-drawing-src"
@@ -912,9 +955,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                 }}
               />
             </Source>
-          )}
-
-          {sectorLabelsGeoJSON && (
+          )}          {sectorLabelsGeoJSON && (
             <Source
               id="sector-labels-src"
               type="geojson"
@@ -970,6 +1011,42 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                 paint={{
                   "text-color": "#FFFFFF",
                 }}
+              />
+            </Source>
+          )}
+
+
+
+
+
+          {layout.mainPipeline && (
+            <Source
+              id="pipeline-src"
+              type="geojson"
+              data={{
+                type: "Feature",
+                properties: {},
+                geometry: {
+                  type: "LineString",
+                  coordinates: layout.mainPipeline.coordinates,
+                },
+              }}
+            >
+              <Layer
+                id="pipeline-casing"
+                type="line"
+                paint={{
+                  "line-color": "#FFFFFF",
+                  "line-width": 5,
+                  "line-opacity": 0.6,
+                }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+              <Layer
+                id="pipeline-line"
+                type="line"
+                paint={{ "line-color": "#1B5680", "line-width": 3 }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
               />
             </Source>
           )}
@@ -1598,7 +1675,88 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
             )}
           </div>
         )}
+{bom && (
+          <div className="mt-8 pt-6 border-t border-border">
+            <div className="flex items-baseline justify-between mb-4">
+              <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em]">
+                Lista de materiais
+              </h3>
+              <span className="text-[10px] font-mono text-ink-4">
+                Ø {bom.meta.diametroPrincipalMm}mm ·{" "}
+                {bom.meta.diametroPrincipalCalculadoMm.toFixed(0)}mm calc
+              </span>
+            </div>
 
+            <div className="bg-background border border-border rounded-sm overflow-hidden">
+              {bom.itens.map((item, i) => (
+                <div
+                  key={item.sku}
+                  className={clsx(
+                    "px-3 py-2.5 text-xs",
+                    i > 0 && "border-t border-border"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-ink truncate">
+                        {item.descricao}
+                      </div>
+                      <div className="text-[10px] font-mono text-ink-4 mt-0.5">
+                        SKU {item.sku}
+                      </div>
+                    </div>
+                    <span
+                      className={clsx(
+                        "text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm shrink-0",
+                        item.categoria === "ASPERSOR" &&
+                          "bg-surface-2 text-ink-2",
+                        item.categoria === "TUBO" &&
+                          "bg-surface-2 text-ink-2",
+                        item.categoria === "CONEXAO" &&
+                          "bg-surface text-ink-3",
+                        item.categoria === "ACESSORIO" &&
+                          "bg-surface text-ink-3"
+                      )}
+                    >
+                      {item.categoria}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between font-mono text-[11px]">
+                    <span className="text-ink-3">
+                      {item.quantidade} {item.unidade} ×{" "}
+                      R$ {item.precoUnitario.toFixed(2)}
+                    </span>
+                    <span className="text-ink font-medium">
+                      R${" "}
+                      {item.total.toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              <div className="px-3 py-3 bg-ink text-white flex items-baseline justify-between">
+                <span className="text-[11px] uppercase tracking-[0.12em] font-semibold">
+                  Total
+                </span>
+                <span className="font-mono text-base font-semibold">
+                  R${" "}
+                  {bom.totalGeral.toLocaleString("pt-BR", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-3 text-[10px] text-ink-4 italic leading-relaxed">
+              Valores estimados conforme catálogo Brasmáquinas. Tubulação
+              secundária, bomba, filtros e instalação não inclusos nesta fase.
+            </div>
+          </div>
+        )}
         <div className="mt-8 pt-6 border-t border-border">
           <h4 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-3">
             Como usar
