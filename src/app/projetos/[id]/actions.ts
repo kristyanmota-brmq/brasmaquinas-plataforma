@@ -28,6 +28,17 @@ export interface ProjectLayout {
     count: number;
     vazaoProjetoM3PorHora: number;
     espacamentoM: number;
+    gridAngleDegrees: number;
+    angleMode: "auto" | "manual";
+  };
+  sectorization?: {
+    jornadaHoras: 9 | 14 | 21;
+    laminaMm: 10;
+    setoresCount: number;
+    tempoPorSetorMinutos: number;
+    aspersoresPorSetor: number;
+    vazaoPorSetorM3PorHora: number;
+    sectorIndices: number[];
   };
   center?: { lng: number; lat: number; zoom: number };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Map, {
   Marker,
   NavigationControl,
@@ -23,6 +23,9 @@ import {
   Ruler,
   Sparkles,
   Trash2,
+  RotateCcw,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -37,9 +40,23 @@ interface Props {
 }
 
 type Mode = "view" | "polygon" | "water" | "pump";
+type Jornada = 9 | 14 | 21;
 
 const DEFAULT_CENTER = { longitude: -45.0, latitude: -12.0, zoom: 14 };
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
+const LAMINA_MM = 10;
+
+// Paleta sóbria de setores — 8 cores cíclicas
+const SECTOR_PALETTE = [
+  "#094641",
+  "#4A6A55",
+  "#8B7355",
+  "#3D4E48",
+  "#6F8478",
+  "#A48B6F",
+  "#1A5A52",
+  "#5C5C5C",
+];
 
 async function reverseGeocode(lng: number, lat: number) {
   try {
@@ -61,19 +78,90 @@ async function reverseGeocode(lng: number, lat: number) {
   }
 }
 
-function generateSprinklerGrid(
+function findOptimalGridAngle(polygon: GeoJSON.Polygon): number {
+  const polyFeature = turf.polygon(polygon.coordinates);
+  const centroid = turf.centroid(polyFeature);
+  let minArea = Infinity;
+  let bestAngle = 0;
+
+  for (let angle = 0; angle < 90; angle++) {
+    const rotated = turf.transformRotate(polyFeature, -angle, {
+      pivot: centroid,
+    });
+    const bbox = turf.bbox(rotated);
+    const width = bbox[2] - bbox[0];
+    const height = bbox[3] - bbox[1];
+    const area = width * height;
+
+    if (area < minArea) {
+      minArea = area;
+      bestAngle = angle;
+    }
+  }
+
+  return bestAngle;
+}
+
+function generateRotatedSprinklerGrid(
   polygon: GeoJSON.Polygon,
-  spacingMeters: number
+  spacingMeters: number,
+  angleDegrees: number
 ): [number, number][] {
   const polyFeature = turf.polygon(polygon.coordinates);
-  const bbox = turf.bbox(polyFeature);
+  const centroid = turf.centroid(polyFeature);
+
+  const rotatedPoly = turf.transformRotate(polyFeature, -angleDegrees, {
+    pivot: centroid,
+  });
+
+  const bbox = turf.bbox(rotatedPoly);
   const grid = turf.pointGrid(bbox, spacingMeters / 1000, {
     units: "kilometers",
   });
-  const inside = turf.pointsWithinPolygon(grid, polyFeature);
-  return inside.features.map(
-    (f) => f.geometry.coordinates as [number, number]
+
+  const inside = turf.pointsWithinPolygon(grid, rotatedPoly);
+
+  const final = inside.features.map((f) =>
+    turf.transformRotate(f, angleDegrees, { pivot: centroid })
   );
+
+  return final.map(
+    (f) => (f.geometry as GeoJSON.Point).coordinates as [number, number]
+  );
+}
+
+// Divide aspersores em N setores balanceados, agrupando por linhas no espaço rotacionado
+function buildSectors(
+  positions: [number, number][],
+  n: number,
+  angleDegrees: number,
+  centroid: { lng: number; lat: number }
+): number[] {
+  const total = positions.length;
+  if (total === 0 || n <= 0) return [];
+
+  const pivot = turf.point([centroid.lng, centroid.lat]);
+
+  const indexed = positions.map((p, i) => {
+    const rotated = turf.transformRotate(turf.point(p), -angleDegrees, {
+      pivot,
+    });
+    return {
+      index: i,
+      x: rotated.geometry.coordinates[0],
+    };
+  });
+
+  indexed.sort((a, b) => a.x - b.x);
+
+  const perSector = Math.ceil(total / n);
+  const sectors: number[] = new Array(total).fill(0);
+
+  indexed.forEach((item, sortedIndex) => {
+    sectors[item.index] = Math.min(n - 1, Math.floor(sortedIndex / perSector));
+  });
+
+  return sectors;
 }
 
 export function ProjectMap({ projectId, initialLayout }: Props) {
@@ -83,10 +171,40 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
   const [drawingCoords, setDrawingCoords] = useState<[number, number][]>([]);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [showCoverage, setShowCoverage] = useState(false);
   const hasMounted = useRef(false);
 
   const isDrawingPolygon = mode === "polygon";
   const hasPolygonInProgress = isDrawingPolygon && drawingCoords.length > 0;
+
+  const optimalAngle = useMemo(
+    () => (layout.area ? findOptimalGridAngle(layout.area) : 0),
+    [layout.area]
+  );
+
+  const intensidadeMmPorHora = useMemo(
+    () =>
+      (1000 * ASPERSOR_PADRAO.vazaoM3PorHora) /
+      (ASPERSOR_PADRAO.espacamentoPadraoM * ASPERSOR_PADRAO.espacamentoPadraoM),
+    []
+  );
+
+  const tempoPorSetorMinutos = useMemo(
+    () => Math.round((LAMINA_MM / intensidadeMmPorHora) * 60),
+    [intensidadeMmPorHora]
+  );
+
+  const coverageGeoJSON = useMemo(() => {
+    if (!layout.sprinklers || !showCoverage) return null;
+    const features = layout.sprinklers.positions
+      .map(([lng, lat]) =>
+        turf.buffer(turf.point([lng, lat]), ASPERSOR_PADRAO.raioMolhadoM, {
+          units: "meters",
+        })
+      )
+      .filter((f): f is GeoJSON.Feature<GeoJSON.Polygon> => f !== undefined);
+    return turf.featureCollection(features);
+  }, [layout.sprinklers, showCoverage]);
 
   useEffect(() => {
     if (!hasMounted.current) {
@@ -212,7 +330,8 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
         centroid,
         areaElevation,
         geodetic,
-        sprinklers: undefined, // limpa aspersores antigos se polígono mudou
+        sprinklers: undefined,
+        sectorization: undefined,
       };
     });
     setDrawingCoords([]);
@@ -234,6 +353,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
       delete next.areaElevation;
       delete next.geodetic;
       delete next.sprinklers;
+      delete next.sectorization;
       return next;
     });
   }, []);
@@ -262,10 +382,11 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
   }, []);
 
   const positionSprinklers = useCallback(() => {
-    if (!layout.area) return;
-    const positions = generateSprinklerGrid(
+    if (!layout.area || !layout.centroid) return;
+    const positions = generateRotatedSprinklerGrid(
       layout.area,
-      ASPERSOR_PADRAO.espacamentoPadraoM
+      ASPERSOR_PADRAO.espacamentoPadraoM,
+      optimalAngle
     );
     const vazaoProjeto = positions.length * ASPERSOR_PADRAO.vazaoM3PorHora;
     setLayout((l) => ({
@@ -276,14 +397,86 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
         count: positions.length,
         vazaoProjetoM3PorHora: vazaoProjeto,
         espacamentoM: ASPERSOR_PADRAO.espacamentoPadraoM,
+        gridAngleDegrees: optimalAngle,
+        angleMode: "auto",
       },
+      sectorization: undefined,
     }));
-  }, [layout.area]);
+  }, [layout.area, layout.centroid, optimalAngle]);
+
+  const updateGridAngle = useCallback(
+    (newAngle: number, mode: "auto" | "manual") => {
+      if (!layout.area) return;
+      const positions = generateRotatedSprinklerGrid(
+        layout.area,
+        ASPERSOR_PADRAO.espacamentoPadraoM,
+        newAngle
+      );
+      const vazaoProjeto = positions.length * ASPERSOR_PADRAO.vazaoM3PorHora;
+      setLayout((l) => ({
+        ...l,
+        sprinklers: {
+          aspersorId: ASPERSOR_PADRAO.id,
+          positions,
+          count: positions.length,
+          vazaoProjetoM3PorHora: vazaoProjeto,
+          espacamentoM: ASPERSOR_PADRAO.espacamentoPadraoM,
+          gridAngleDegrees: newAngle,
+          angleMode: mode,
+        },
+        sectorization: undefined,
+      }));
+    },
+    [layout.area]
+  );
+
+  const resetToAutoAngle = useCallback(() => {
+    updateGridAngle(optimalAngle, "auto");
+  }, [optimalAngle, updateGridAngle]);
 
   const clearSprinklers = useCallback(() => {
     setLayout((l) => {
       const next = { ...l };
       delete next.sprinklers;
+      delete next.sectorization;
+      return next;
+    });
+    setShowCoverage(false);
+  }, []);
+
+  const applyJornada = useCallback(
+    (jornada: Jornada) => {
+      if (!layout.sprinklers || !layout.centroid) return;
+      const n = jornada;
+      const sectorIndices = buildSectors(
+        layout.sprinklers.positions,
+        n,
+        layout.sprinklers.gridAngleDegrees,
+        layout.centroid
+      );
+      const aspersoresPorSetor = Math.round(layout.sprinklers.count / n);
+      const vazaoPorSetor =
+        aspersoresPorSetor * ASPERSOR_PADRAO.vazaoM3PorHora;
+      setLayout((l) => ({
+        ...l,
+        sectorization: {
+          jornadaHoras: jornada,
+          laminaMm: 10,
+          setoresCount: n,
+          tempoPorSetorMinutos,
+          aspersoresPorSetor,
+          vazaoPorSetorM3PorHora: vazaoPorSetor,
+          sectorIndices,
+        },
+      }));
+    },
+    [layout.sprinklers, layout.centroid, tempoPorSetorMinutos]
+  );
+
+  const clearSectorization = useCallback(() => {
+    setLayout((l) => {
+      const next = { ...l };
+      delete next.sectorization;
       return next;
     });
   }, []);
@@ -296,16 +489,32 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
       }
     : DEFAULT_CENTER;
 
-  const sprinklerGeoJSON = layout.sprinklers
-    ? {
-        type: "FeatureCollection" as const,
-        features: layout.sprinklers.positions.map(([lng, lat]) => ({
-          type: "Feature" as const,
-          properties: {},
-          geometry: { type: "Point" as const, coordinates: [lng, lat] },
-        })),
-      }
-    : null;
+  const sprinklerGeoJSON = useMemo(() => {
+    if (!layout.sprinklers) return null;
+    return {
+      type: "FeatureCollection" as const,
+      features: layout.sprinklers.positions.map(([lng, lat], i) => ({
+        type: "Feature" as const,
+        properties: {
+          sector: layout.sectorization?.sectorIndices?.[i] ?? -1,
+        },
+        geometry: { type: "Point" as const, coordinates: [lng, lat] },
+      })),
+    };
+  }, [layout.sprinklers, layout.sectorization]);
+
+  const sprinklerColorExpression = useMemo(() => {
+    if (!layout.sectorization) return "#094641";
+    const matchExpr: (string | number | string[])[] = [
+      "match",
+      ["get", "sector"],
+    ];
+    for (let i = 0; i < layout.sectorization.setoresCount; i++) {
+      matchExpr.push(i, SECTOR_PALETTE[i % SECTOR_PALETTE.length]);
+    }
+    matchExpr.push("#094641");
+    return matchExpr;
+  }, [layout.sectorization]);
 
   return (
     <div className="grid grid-cols-[1fr_360px] gap-0 h-[calc(100vh-220px)] min-h-[600px] border border-border rounded-md overflow-hidden bg-background">
@@ -342,7 +551,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               <Layer
                 id="area-fill"
                 type="fill"
-                paint={{ "fill-color": "#094641", "fill-opacity": 0.25 }}
+                paint={{ "fill-color": "#094641", "fill-opacity": 0.14 }}
               />
               <Layer
                 id="area-line-outer"
@@ -391,7 +600,28 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               </Marker>
             ))}
 
-          {/* Aspersores via Layer (WebGL — escala) */}
+          {coverageGeoJSON && (
+            <Source id="coverage-src" type="geojson" data={coverageGeoJSON}>
+              <Layer
+                id="coverage-fill"
+                type="fill"
+                paint={{
+                  "fill-color": "#094641",
+                  "fill-opacity": 0.15,
+                }}
+              />
+              <Layer
+                id="coverage-line"
+                type="line"
+                paint={{
+                  "line-color": "#094641",
+                  "line-opacity": 0.3,
+                  "line-width": 0.6,
+                }}
+              />
+            </Source>
+          )}
+
           {sprinklerGeoJSON && (
             <Source id="sprinklers-src" type="geojson" data={sprinklerGeoJSON}>
               <Layer
@@ -407,9 +637,9 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                     16,
                     4,
                     20,
-                    6,
+                    7,
                   ],
-                  "circle-color": "#0A0A0A",
+                  "circle-color": sprinklerColorExpression,
                   "circle-stroke-color": "#FFFFFF",
                   "circle-stroke-width": 1.2,
                 }}
@@ -646,7 +876,6 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
           )}
         </div>
 
-        {/* SEÇÃO ASPERSORES */}
         <div className="mt-8 pt-6 border-t border-border">
           <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-4">
             Aspersores
@@ -698,6 +927,82 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                   </div>
                 </div>
               </div>
+
+              <div className="bg-background border border-border rounded-sm p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] uppercase tracking-[0.1em] text-ink-3">
+                      Orientação · {layout.sprinklers.gridAngleDegrees}°
+                    </span>
+                    <span
+                      className={clsx(
+                        "text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm",
+                        layout.sprinklers.angleMode === "auto"
+                          ? "bg-success-soft text-success"
+                          : "bg-surface-2 text-ink-2"
+                      )}
+                    >
+                      {layout.sprinklers.angleMode === "auto"
+                        ? "Auto"
+                        : "Manual"}
+                    </span>
+                  </div>
+                  {layout.sprinklers.angleMode === "manual" && (
+                    <button
+                      onClick={resetToAutoAngle}
+                      title="Voltar para automático"
+                      className="text-[11px] text-ink-3 hover:text-ink inline-flex items-center gap-1"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Auto
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="89"
+                  step="1"
+                  value={layout.sprinklers.gridAngleDegrees}
+                  onChange={(e) =>
+                    updateGridAngle(parseInt(e.target.value, 10), "manual")
+                  }
+                  className="w-full angle-slider"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-ink-4 mt-1">
+                  <span>0°</span>
+                  <span>45°</span>
+                  <span>89°</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowCoverage(!showCoverage)}
+                className={clsx(
+                  "w-full px-3 py-2.5 border rounded-sm text-sm flex items-center justify-between transition-colors",
+                  showCoverage
+                    ? "bg-ink text-white border-ink"
+                    : "bg-background text-ink-2 border-border hover:border-border-strong hover:text-ink"
+                )}
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  {showCoverage ? (
+                    <Eye className="w-3.5 h-3.5" />
+                  ) : (
+                    <EyeOff className="w-3.5 h-3.5" />
+                  )}
+                  Cobertura · raio {ASPERSOR_PADRAO.raioMolhadoM} m
+                </span>
+                <span
+                  className={clsx(
+                    "text-[10px] uppercase tracking-[0.1em]",
+                    showCoverage ? "text-white/60" : "text-ink-4"
+                  )}
+                >
+                  {showCoverage ? "Visível" : "Oculta"}
+                </span>
+              </button>
+
               <div className="flex gap-2">
                 <button
                   onClick={positionSprinklers}
@@ -717,6 +1022,79 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
           )}
         </div>
 
+        {/* SETORIZAÇÃO */}
+        {layout.sprinklers && (
+          <div className="mt-8 pt-6 border-t border-border">
+            <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-4">
+              Setorização
+            </h3>
+
+            <div className="mb-3">
+              <span className="text-[11px] uppercase tracking-[0.1em] text-ink-3 block mb-2">
+                Jornada operacional
+              </span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([9, 14, 21] as Jornada[]).map((h) => {
+                  const active = layout.sectorization?.jornadaHoras === h;
+                  return (
+                    <button
+                      key={h}
+                      onClick={() => applyJornada(h)}
+                      className={clsx(
+                        "px-3 py-2 rounded-sm text-sm font-medium border transition-colors",
+                        active
+                          ? "bg-ink text-white border-ink"
+                          : "bg-background text-ink-2 border-border hover:border-border-strong"
+                      )}
+                    >
+                      {h} h
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {layout.sectorization ? (
+              <div className="space-y-2">
+                <div className="bg-background border border-border rounded-sm p-3">
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-xs">
+                    <Row label="Lâmina bruta" value="10 mm" mono />
+                    <Row
+                      label="Tempo/setor"
+                      value={`${layout.sectorization.tempoPorSetorMinutos} min`}
+                      mono
+                    />
+                    <Row
+                      label="Setores"
+                      value={String(layout.sectorization.setoresCount)}
+                    />
+                    <Row
+                      label="Aspersores/setor"
+                      value={String(layout.sectorization.aspersoresPorSetor)}
+                    />
+                    <Row
+                      label="Vazão/setor"
+                      value={`${layout.sectorization.vazaoPorSetorM3PorHora.toFixed(1)} m³/h`}
+                      mono
+                      span={2}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={clearSectorization}
+                  className="w-full px-3 py-1.5 text-[11px] text-ink-4 hover:text-danger rounded-sm uppercase tracking-wider"
+                >
+                  Limpar setorização
+                </button>
+              </div>
+            ) : (
+              <div className="text-xs text-ink-4 italic px-1">
+                Escolha uma jornada para dividir os aspersores em setores.
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-8 pt-6 border-t border-border">
           <h4 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-3">
             Como usar
@@ -731,13 +1109,42 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               <strong>captação</strong>.
             </li>
             <li>
-              <span className="font-mono text-ink-3">3.</span> Clique em{" "}
-              <strong>Posicionar grade</strong> para preencher a área com a
-              malha de aspersores.
+              <span className="font-mono text-ink-3">3.</span> Posicione a{" "}
+              <strong>grade</strong>.
+            </li>
+            <li>
+              <span className="font-mono text-ink-3">4.</span> Escolha a{" "}
+              <strong>jornada operacional</strong>. Os aspersores são
+              automaticamente agrupados em setores.
             </li>
           </ol>
         </div>
       </aside>
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  mono,
+  span,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  span?: 2;
+}) {
+  return (
+    <div className={span === 2 ? "col-span-2 pt-2 border-t border-border" : ""}>
+      <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-0.5">
+        {label}
+      </div>
+      <div
+        className={clsx("text-ink", mono ? "font-mono text-xs" : "text-sm font-medium")}
+      >
+        {value}
+      </div>
     </div>
   );
 }
