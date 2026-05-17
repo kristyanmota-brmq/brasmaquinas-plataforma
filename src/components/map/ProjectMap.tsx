@@ -1735,54 +1735,64 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
             </div>
 
             <div className="bg-background border border-border rounded-sm overflow-hidden">
-              {bom.itens.map((item, i) => (
-                <div
-                  key={item.sku}
-                  className={clsx(
-                    "px-3 py-2.5 text-xs",
-                    i > 0 && "border-t border-border"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-ink truncate">
-                        {item.descricao}
-                      </div>
-                      <div className="text-[10px] font-mono text-ink-4 mt-0.5">
-                        SKU {item.sku}
-                      </div>
+              {(["ASPERSOR", "TUBO", "CONEXAO", "ACESSORIO"] as const).map((cat) => {
+                const grupo = bom.itens.filter((it) => it.categoria === cat);
+                if (grupo.length === 0) return null;
+                const subtotal = grupo.reduce((s, it) => s + it.total, 0);
+                const nomesCat: Record<string, string> = {
+                  ASPERSOR: "Aspersores",
+                  TUBO: "Tubos",
+                  CONEXAO: "Conexões",
+                  ACESSORIO: "Acessórios",
+                };
+                return (
+                  <div key={cat} className="border-b border-border last:border-b-0">
+                    <div className="px-3 py-1.5 bg-surface flex items-baseline justify-between">
+                      <span className="text-[10px] font-semibold text-ink-3 uppercase tracking-[0.1em]">
+                        {nomesCat[cat]}
+                      </span>
+                      <span className="text-[10px] font-mono text-ink-3">
+                        R${" "}
+                        {subtotal.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
                     </div>
-                    <span
-                      className={clsx(
-                        "text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm shrink-0",
-                        item.categoria === "ASPERSOR" &&
-                          "bg-surface-2 text-ink-2",
-                        item.categoria === "TUBO" &&
-                          "bg-surface-2 text-ink-2",
-                        item.categoria === "CONEXAO" &&
-                          "bg-surface text-ink-3",
-                        item.categoria === "ACESSORIO" &&
-                          "bg-surface text-ink-3"
-                      )}
-                    >
-                      {item.categoria}
-                    </span>
+                    {grupo.map((item, i) => (
+                      <div
+                        key={item.sku}
+                        className={clsx(
+                          "px-3 py-2.5 text-xs",
+                          i > 0 && "border-t border-border"
+                        )}
+                      >
+                        <div className="flex-1 min-w-0 mb-1">
+                          <div className="font-medium text-ink truncate">
+                            {item.descricao}
+                          </div>
+                          <div className="text-[10px] font-mono text-ink-4 mt-0.5">
+                            SKU {item.sku}
+                          </div>
+                        </div>
+                        <div className="flex items-baseline justify-between font-mono text-[11px]">
+                          <span className="text-ink-3">
+                            {item.quantidade} {item.unidade} ×{" "}
+                            R$ {item.precoUnitario.toFixed(2)}
+                          </span>
+                          <span className="text-ink font-medium">
+                            R${" "}
+                            {item.total.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-baseline justify-between font-mono text-[11px]">
-                    <span className="text-ink-3">
-                      {item.quantidade} {item.unidade} ×{" "}
-                      R$ {item.precoUnitario.toFixed(2)}
-                    </span>
-                    <span className="text-ink font-medium">
-                      R${" "}
-                      {item.total.toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div className="px-3 py-3 bg-ink text-white flex items-baseline justify-between">
                 <span className="text-[11px] uppercase tracking-[0.12em] font-semibold">
