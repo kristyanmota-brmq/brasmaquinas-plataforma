@@ -33,8 +33,11 @@ import {
   saveProjectLayout,
   type ProjectLayout,
 } from "@/app/projetos/[id]/actions";
-import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
+import { ASPERSOR_PADRAO,
+  TUBOS_PVC_LF,
+} from "@/lib/catalog/aspersores";
 import { buildBOM, type BOM } from "@/lib/bom";
+import { generateLaterais, type Lateral } from "@/lib/layout/laterais";
 
 interface Props {
   projectId: string;
@@ -203,17 +206,12 @@ function calculatePipelineLength(coords: [number, number][]): number {
 
 function generateAutoPipeline(
   waterSource: { lng: number; lat: number },
-  area: GeoJSON.Polygon
+  _area: GeoJSON.Polygon,
+  centroid: { lng: number; lat: number }
 ): [number, number][] {
-  const sourcePt = turf.point([waterSource.lng, waterSource.lat]);
-  const polyLine = turf.polygonToLine(turf.polygon(area.coordinates));
-  const nearest = turf.nearestPointOnLine(
-    polyLine as GeoJSON.Feature<GeoJSON.LineString>,
-    sourcePt
-  );
   return [
     [waterSource.lng, waterSource.lat],
-    nearest.geometry.coordinates as [number, number],
+    [centroid.lng, centroid.lat],
   ];
 }
 
@@ -240,6 +238,22 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     () => (layout.area ? findOptimalGridAngle(layout.area) : 0),
     [layout.area]
   );
+
+  const laterais = useMemo<Lateral[]>(() => {
+    if (!layout.sprinklers || !layout.sectorization || !layout.centroid) return [];
+    return generateLaterais(
+      layout.sprinklers.positions,
+      layout.sectorization.sectorIndices,
+      layout.sprinklers.gridAngleDegrees,
+      layout.centroid,
+      layout.sprinklers.espacamentoM,
+      {
+        vazao: layout.sprinklers.vazaoProjetoM3PorHora / layout.sprinklers.count,
+        pressaoServico: 30,
+      },
+      TUBOS_PVC_LF,
+    );
+  }, [layout.sprinklers, layout.sectorization, layout.centroid]);
 
   const intensidadeMmPorHora = useMemo(
     () =>
@@ -584,7 +598,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     setLayout((l) => ({
       ...l,
       sprinklers: {
-        aspersorId: ASPERSOR_PADRAO.id,
+        aspersorId: ASPERSOR_PADRAO.sku,
         positions,
         count: positions.length,
         vazaoProjetoM3PorHora: vazaoProjeto,
@@ -608,7 +622,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
       setLayout((l) => ({
         ...l,
         sprinklers: {
-          aspersorId: ASPERSOR_PADRAO.id,
+          aspersorId: ASPERSOR_PADRAO.sku,
           positions,
           count: positions.length,
           vazaoProjetoM3PorHora: vazaoProjeto,
@@ -947,11 +961,11 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                     20,
                     7,
                   ],
-                  "circle-color": sprinklerColorExpression,
-                  "circle-opacity": sprinklerOpacityExpression,
+                  "circle-color": sprinklerColorExpression as any,
+                  "circle-opacity": sprinklerOpacityExpression as any,
                   "circle-stroke-color": "#FFFFFF",
-                  "circle-stroke-width": sprinklerStrokeWidthExpression,
-                  "circle-stroke-opacity": sprinklerOpacityExpression,
+                  "circle-stroke-width": sprinklerStrokeWidthExpression as any,
+                  "circle-stroke-opacity": sprinklerOpacityExpression as any,
                 }}
               />
             </Source>
@@ -1019,6 +1033,39 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
 
 
 
+          {laterais.length > 0 && (
+            <Source
+              id="laterais"
+              type="geojson"
+              data={{
+                type: "FeatureCollection",
+                features: laterais.map((lat) => ({
+                  type: "Feature",
+                  properties: {
+                    sectorId: lat.sectorId,
+                    comprimentoM: lat.comprimentoM,
+                    vazaoM3h: lat.vazaoM3h,
+                    diametroMm: lat.selecao.tubo.diametroMm,
+                  },
+                  geometry: {
+                    type: "LineString",
+                    coordinates: [lat.startLngLat, lat.endLngLat],
+                  },
+                })),
+              }}
+            >
+              <Layer
+                id="laterais-line"
+                type="line"
+                paint={{
+                  "line-color": "#3B82A6",
+                  "line-width": 1.5,
+                  "line-opacity": 0.85,
+                }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+            </Source>
+          )}
           {layout.mainPipeline && (
             <Source
               id="pipeline-src"
@@ -1418,7 +1465,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               Modelo selecionado
             </div>
             <div className="text-sm text-ink font-medium mb-2">
-              {ASPERSOR_PADRAO.manufacturer} {ASPERSOR_PADRAO.model}
+              {ASPERSOR_PADRAO.modelo}
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-ink-3">
               <span>Bocal · {ASPERSOR_PADRAO.bocal}</span>

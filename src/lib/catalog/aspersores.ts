@@ -285,3 +285,46 @@ export function calculatePipelineDiameterMm(vazaoM3PorHora: number): number {
   const V = 1.5;
   return Math.sqrt((4 * Q_m3s) / (Math.PI * V)) * 1000;
 }
+// ============================================================
+// SPRINT 7 — Tubos e conexões para rede secundária
+// ============================================================
+
+// PVC BR (Branco Roscável) — tubo de SUBIDA (riser do aspersor)
+// 1 por aspersor, comprimento útil 2,6 m. Barra de 6 m atende 2 aspersores.
+export const TUBO_SUBIDA_PVC_BR = {
+  sku: "PVC_BR_3_4_PN60",
+  descricao: 'Tubo PVC BR roscável 3/4" PN60 - barra 6m',
+  marca: "Tigre",
+  unidade: "barra",
+  diametroNominalMm: 25,
+  diametroPolegadas: '3/4"',
+  metrosPorBarra: 6,
+  comprimentoUtilPorAspersorM: 2.6,
+  aspersoresPorBarra: 2,
+  pressaoNominalMca: 60,
+  custo: 18.5,
+  precoVenda: 32.0,
+} as const;
+
+// PVC LF (Liga Fácil) — laterais (rede secundária)
+export const TUBOS_PVC_LF = [
+  { sku: "TIGRE_LF_50_PN40",  descricao: "Tubo PVC LF Ø50mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  pressaoMca: 40, metrosPorBarra: 6, custo: 28.4, precoVenda:  52.0, coefC: 145 },
+  { sku: "TIGRE_LF_75_PN40",  descricao: "Tubo PVC LF Ø75mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  pressaoMca: 40, metrosPorBarra: 6, custo: 58.9, precoVenda: 108.0, coefC: 145 },
+  { sku: "TIGRE_LF_100_PN40", descricao: "Tubo PVC LF Ø100mm PN40 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, pressaoMca: 40, metrosPorBarra: 6, custo: 98.7, precoVenda: 178.0, coefC: 145 },
+] as const;
+
+// PVC RÍGIDO (soldável) — principal e adutora (uso futuro no refactor bottom-up)
+export const TUBOS_PVC_RIGIDO = [
+  { sku: "TIGRE_R_50_PN80",  descricao: "Tubo PVC rígido Ø50mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  diametroNominalMm: 50,  pressaoMca: 80, metrosPorBarra: 6, custo:  34.2, precoVenda:  62.0, coefC: 145 },
+  { sku: "TIGRE_R_75_PN80",  descricao: "Tubo PVC rígido Ø75mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  diametroNominalMm: 75,  pressaoMca: 80, metrosPorBarra: 6, custo:  72.1, precoVenda: 132.0, coefC: 145 },
+  { sku: "TIGRE_R_100_PN80", descricao: "Tubo PVC rígido Ø100mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroNominalMm: 100, pressaoMca: 80, metrosPorBarra: 6, custo: 118.5, precoVenda: 215.0, coefC: 145 },
+  { sku: "TIGRE_R_125_PN80", descricao: "Tubo PVC rígido Ø125mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 125, diametroNominalMm: 125, pressaoMca: 80, metrosPorBarra: 6, custo: 178.4, precoVenda: 322.0, coefC: 145 },
+  { sku: "TIGRE_R_150_PN80", descricao: "Tubo PVC rígido Ø150mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, pressaoMca: 80, metrosPorBarra: 6, custo: 248.9, precoVenda: 448.0, coefC: 145 },
+] as const;
+
+// Tês de derivação para laterais (PVC LF)
+export const TES_DERIVACAO_LATERAL = [
+  { sku: "TIGRE_TE_50_LF",  descricao: "Tê PVC LF Ø50mm",  marca: "Tigre", unidade: "un", diametroMm: 50,  custo:  9.8, precoVenda: 18.0 },
+  { sku: "TIGRE_TE_75_LF",  descricao: "Tê PVC LF Ø75mm",  marca: "Tigre", unidade: "un", diametroMm: 75,  custo: 18.4, precoVenda: 34.0 },
+  { sku: "TIGRE_TE_100_LF", descricao: "Tê PVC LF Ø100mm", marca: "Tigre", unidade: "un", diametroMm: 100, custo: 32.6, precoVenda: 58.0 },
+] as const;
