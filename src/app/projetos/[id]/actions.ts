@@ -42,6 +42,7 @@ export interface ProjectLayout {
   };
   mainPipeline?: {
     coordinates: [number, number][];
+    adutora?: [number, number][];
     lengthMeters: number;
     segments: number;
     elevationStartM?: number;

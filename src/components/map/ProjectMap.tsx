@@ -38,6 +38,7 @@ import { ASPERSOR_PADRAO,
 } from "@/lib/catalog/aspersores";
 import { buildBOM, type BOM } from "@/lib/bom";
 import { generateLaterais, type Lateral } from "@/lib/layout/laterais";
+import { generatePrincipalAndAdutora } from "@/lib/layout/principal";
 
 interface Props {
   projectId: string;
@@ -204,16 +205,6 @@ function calculatePipelineLength(coords: [number, number][]): number {
   return total * 1000;
 }
 
-function generateAutoPipeline(
-  waterSource: { lng: number; lat: number },
-  _area: GeoJSON.Polygon,
-  centroid: { lng: number; lat: number }
-): [number, number][] {
-  return [
-    [waterSource.lng, waterSource.lat],
-    [centroid.lng, centroid.lat],
-  ];
-}
 
 export function ProjectMap({ projectId, initialLayout }: Props) {
   const mapRef = useRef<MapRef>(null);
@@ -293,18 +284,35 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     return () => clearTimeout(t);
   }, [layout, projectId]);
 
-  // Reset seleção quando setorização muda
-  // Auto-sugestao de tubulacao principal: captacao -> ponto mais proximo da borda do poligono.
+  // Auto-sugestao de tubulacao principal (bottom-up): percorre pontos de derivação das laterais.
   // Nao sobrescreve se vendedor desenhou manualmente.
   useEffect(() => {
     if (!layout.waterSource || !layout.area) return;
     if (layout.mainPipeline?.source === "manual") return;
-
     if (!layout.centroid) return;
-    const coords = generateAutoPipeline(layout.waterSource, layout.area, layout.centroid);
-    const lengthMeters = calculatePipelineLength(coords);
-    const elevationStartM = queryElevation(coords[0][0], coords[0][1]);
-    const elevationEndM = queryElevation(coords[1][0], coords[1][1]);
+
+    const { principal, adutora } =
+      laterais.length > 0 && layout.sprinklers
+        ? generatePrincipalAndAdutora(
+            layout.waterSource,
+            laterais,
+            layout.centroid,
+            layout.sprinklers.gridAngleDegrees,
+          )
+        : {
+            principal: [
+              [layout.waterSource.lng, layout.waterSource.lat],
+              [layout.centroid.lng, layout.centroid.lat],
+            ] as [number, number][],
+            adutora: [] as [number, number][],
+          };
+
+    const lengthMeters = calculatePipelineLength(principal);
+    const elevationStartM = queryElevation(principal[0][0], principal[0][1]);
+    const elevationEndM = queryElevation(
+      principal[principal.length - 1][0],
+      principal[principal.length - 1][1],
+    );
     const elevationDeltaM =
       elevationStartM !== undefined && elevationEndM !== undefined
         ? elevationEndM - elevationStartM
@@ -313,9 +321,10 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     setLayout((l) => ({
       ...l,
       mainPipeline: {
-        coordinates: coords,
+        coordinates: principal,
+        adutora,
         lengthMeters,
-        segments: 1,
+        segments: principal.length - 1,
         elevationStartM,
         elevationEndM,
         elevationDeltaM,
@@ -327,6 +336,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     layout.waterSource?.lng,
     layout.waterSource?.lat,
     layout.area,
+    laterais,
   ]);
 
   useEffect(() => {
@@ -517,11 +527,30 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
   }, []);
 
   const resetToAutoPipeline = useCallback(() => {
-    if (!layout.waterSource || !layout.area || !layout.centroid) return;
-    const coords = generateAutoPipeline(layout.waterSource, layout.area, layout.centroid);
-    const lengthMeters = calculatePipelineLength(coords);
-    const elevationStartM = queryElevation(coords[0][0], coords[0][1]);
-    const elevationEndM = queryElevation(coords[1][0], coords[1][1]);
+    if (!layout.waterSource || !layout.centroid) return;
+
+    const { principal, adutora } =
+      laterais.length > 0 && layout.sprinklers
+        ? generatePrincipalAndAdutora(
+            layout.waterSource,
+            laterais,
+            layout.centroid,
+            layout.sprinklers.gridAngleDegrees,
+          )
+        : {
+            principal: [
+              [layout.waterSource.lng, layout.waterSource.lat],
+              [layout.centroid.lng, layout.centroid.lat],
+            ] as [number, number][],
+            adutora: [] as [number, number][],
+          };
+
+    const lengthMeters = calculatePipelineLength(principal);
+    const elevationStartM = queryElevation(principal[0][0], principal[0][1]);
+    const elevationEndM = queryElevation(
+      principal[principal.length - 1][0],
+      principal[principal.length - 1][1],
+    );
     const elevationDeltaM =
       elevationStartM !== undefined && elevationEndM !== undefined
         ? elevationEndM - elevationStartM
@@ -529,16 +558,17 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     setLayout((l) => ({
       ...l,
       mainPipeline: {
-        coordinates: coords,
+        coordinates: principal,
+        adutora,
         lengthMeters,
-        segments: 1,
+        segments: principal.length - 1,
         elevationStartM,
         elevationEndM,
         elevationDeltaM,
         source: "auto",
       },
     }));
-  }, [layout.waterSource, layout.area, queryElevation]);
+  }, [layout.waterSource, layout.centroid, layout.sprinklers, laterais, queryElevation]);
 
   const clearPipeline = useCallback(() => {
     setLayout((l) => {
@@ -1093,6 +1123,27 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                 id="pipeline-line"
                 type="line"
                 paint={{ "line-color": "#1B5680", "line-width": 3 }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+            </Source>
+          )}
+          {layout.mainPipeline?.adutora && layout.mainPipeline.adutora.length >= 2 && (
+            <Source
+              id="adutora-src"
+              type="geojson"
+              data={{
+                type: "Feature",
+                properties: {},
+                geometry: {
+                  type: "LineString",
+                  coordinates: layout.mainPipeline.adutora,
+                },
+              }}
+            >
+              <Layer
+                id="adutora-line"
+                type="line"
+                paint={{ "line-color": "#1B5680", "line-width": 2.5 }}
                 layout={{ "line-cap": "round", "line-join": "round" }}
               />
             </Source>
