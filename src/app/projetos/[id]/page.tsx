@@ -66,7 +66,14 @@ export default async function ProjetoDetalhePage({ params }: Props) {
           </span>
         </div>
 
-        <ProjectMap projectId={project.id} initialLayout={layout} />
+        <ProjectMap
+          projectId={project.id}
+          initialLayout={layout}
+          projectName={project.name}
+          client={project.client ?? undefined}
+          city={project.city ?? undefined}
+          state={project.state ?? undefined}
+        />
       </div>
     </main>
   );

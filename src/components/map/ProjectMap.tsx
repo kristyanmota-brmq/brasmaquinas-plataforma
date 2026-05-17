@@ -27,6 +27,7 @@ import {
   Eye,
   EyeOff,
   Spline,
+  BookOpen,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -39,10 +40,15 @@ import { ASPERSOR_PADRAO,
 import { buildBOM, type BOM } from "@/lib/bom";
 import { generateLaterais, type Lateral } from "@/lib/layout/laterais";
 import { generatePrincipalAndAdutora } from "@/lib/layout/principal";
+import { MemorialPanel } from "@/components/map/MemorialPanel";
 
 interface Props {
   projectId: string;
   initialLayout?: ProjectLayout;
+  projectName?: string;
+  client?: string;
+  city?: string;
+  state?: string;
 }
 
 type Mode = "view" | "polygon" | "water" | "pump" | "pipeline";
@@ -206,7 +212,7 @@ function calculatePipelineLength(coords: [number, number][]): number {
 }
 
 
-export function ProjectMap({ projectId, initialLayout }: Props) {
+export function ProjectMap({ projectId, initialLayout, projectName, client, city, state }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [mode, setMode] = useState<Mode>("view");
   const [layout, setLayout] = useState<ProjectLayout>(initialLayout ?? {});
@@ -217,6 +223,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [showCoverage, setShowCoverage] = useState(false);
+  const [showMemorial, setShowMemorial] = useState(false);
   const [selectedSector, setSelectedSector] = useState<number | null>(null);
   const hasMounted = useRef(false);
 
@@ -1222,7 +1229,25 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                 : "Marque a captação antes de traçar a tubulação"
             }
           />
+          <div className="w-px h-5 bg-border mx-0.5" />
+          <ToolButton
+            active={showMemorial}
+            onClick={() => setShowMemorial((v) => !v)}
+            icon={<BookOpen className="w-4 h-4" />}
+            label="Memorial"
+          />
         </div>
+
+        {showMemorial && (
+          <MemorialPanel
+            laterais={laterais}
+            projectName={projectName}
+            client={client}
+            city={city}
+            state={state}
+            onClose={() => setShowMemorial(false)}
+          />
+        )}
 
         {hasPolygonInProgress && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-border rounded-md shadow-lg flex items-center gap-1 p-1">
