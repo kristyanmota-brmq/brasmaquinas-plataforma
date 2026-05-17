@@ -120,7 +120,7 @@ export function generateLaterais(
       const last = colSorted[colSorted.length - 1];
       const n = colSorted.length;
 
-      const comprimentoM = n * spacingMeters;
+      const comprimentoM = (n - 1) * spacingMeters + 0.5;
       const vazaoM3h = n * aspersor.vazao;
       const F = christiansenF(n);
 
