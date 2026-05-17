@@ -21,12 +21,15 @@ import {
   Loader2,
   Mountain,
   Ruler,
+  Sparkles,
+  Trash2,
 } from "lucide-react";
 import clsx from "clsx";
 import {
   saveProjectLayout,
   type ProjectLayout,
 } from "@/app/projetos/[id]/actions";
+import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
 
 interface Props {
   projectId: string;
@@ -50,14 +53,27 @@ async function reverseGeocode(lng: number, lat: number) {
     const city =
       ctx.find((c: { id: string }) => c.id.startsWith("place"))?.text ??
       place.text;
-    const region = ctx.find((c: { id: string }) =>
-      c.id.startsWith("region")
-    );
+    const region = ctx.find((c: { id: string }) => c.id.startsWith("region"));
     const state = region?.short_code?.replace("BR-", "") ?? region?.text ?? "";
     return { city, state, fullAddress: place.place_name };
   } catch {
     return null;
   }
+}
+
+function generateSprinklerGrid(
+  polygon: GeoJSON.Polygon,
+  spacingMeters: number
+): [number, number][] {
+  const polyFeature = turf.polygon(polygon.coordinates);
+  const bbox = turf.bbox(polyFeature);
+  const grid = turf.pointGrid(bbox, spacingMeters / 1000, {
+    units: "kilometers",
+  });
+  const inside = turf.pointsWithinPolygon(grid, polyFeature);
+  return inside.features.map(
+    (f) => f.geometry.coordinates as [number, number]
+  );
 }
 
 export function ProjectMap({ projectId, initialLayout }: Props) {
@@ -86,7 +102,6 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     return () => clearTimeout(t);
   }, [layout, projectId]);
 
-  // Helper para obter elevação de um ponto
   const queryElevation = useCallback(
     (lng: number, lat: number): number | undefined => {
       const map = mapRef.current?.getMap();
@@ -121,7 +136,6 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
             pumpLocation: l.pumpSeparate ? l.pumpLocation : null,
             geocoded: geocoded ?? l.geocoded,
           };
-          // Recalcula geodésicos se a área já existe
           if (l.centroid) {
             const distKm = turf.distance(
               turf.point([lng, lat]),
@@ -198,6 +212,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
         centroid,
         areaElevation,
         geodetic,
+        sprinklers: undefined, // limpa aspersores antigos se polígono mudou
       };
     });
     setDrawingCoords([]);
@@ -218,6 +233,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
       delete next.centroid;
       delete next.areaElevation;
       delete next.geodetic;
+      delete next.sprinklers;
       return next;
     });
   }, []);
@@ -245,6 +261,33 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     setLayout((l) => ({ ...l, pumpLocation: null, pumpSeparate: false }));
   }, []);
 
+  const positionSprinklers = useCallback(() => {
+    if (!layout.area) return;
+    const positions = generateSprinklerGrid(
+      layout.area,
+      ASPERSOR_PADRAO.espacamentoPadraoM
+    );
+    const vazaoProjeto = positions.length * ASPERSOR_PADRAO.vazaoM3PorHora;
+    setLayout((l) => ({
+      ...l,
+      sprinklers: {
+        aspersorId: ASPERSOR_PADRAO.id,
+        positions,
+        count: positions.length,
+        vazaoProjetoM3PorHora: vazaoProjeto,
+        espacamentoM: ASPERSOR_PADRAO.espacamentoPadraoM,
+      },
+    }));
+  }, [layout.area]);
+
+  const clearSprinklers = useCallback(() => {
+    setLayout((l) => {
+      const next = { ...l };
+      delete next.sprinklers;
+      return next;
+    });
+  }, []);
+
   const initialCenter = initialLayout?.center
     ? {
         longitude: initialLayout.center.lng,
@@ -253,14 +296,19 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
       }
     : DEFAULT_CENTER;
 
-  // Posição efetiva da bomba (= fonte se não estiver separada)
-  const effectivePumpPosition = layout.pumpSeparate
-    ? layout.pumpLocation
-    : layout.waterSource;
+  const sprinklerGeoJSON = layout.sprinklers
+    ? {
+        type: "FeatureCollection" as const,
+        features: layout.sprinklers.positions.map(([lng, lat]) => ({
+          type: "Feature" as const,
+          properties: {},
+          geometry: { type: "Point" as const, coordinates: [lng, lat] },
+        })),
+      }
+    : null;
 
   return (
     <div className="grid grid-cols-[1fr_360px] gap-0 h-[calc(100vh-220px)] min-h-[600px] border border-border rounded-md overflow-hidden bg-background">
-      {/* MAP */}
       <div className="relative">
         <Map
           ref={mapRef}
@@ -294,7 +342,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               <Layer
                 id="area-fill"
                 type="fill"
-                paint={{ "fill-color": "#094641", "fill-opacity": 0.35 }}
+                paint={{ "fill-color": "#094641", "fill-opacity": 0.25 }}
               />
               <Layer
                 id="area-line-outer"
@@ -343,13 +391,42 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               </Marker>
             ))}
 
+          {/* Aspersores via Layer (WebGL — escala) */}
+          {sprinklerGeoJSON && (
+            <Source id="sprinklers-src" type="geojson" data={sprinklerGeoJSON}>
+              <Layer
+                id="sprinklers-circles"
+                type="circle"
+                paint={{
+                  "circle-radius": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    12,
+                    2,
+                    16,
+                    4,
+                    20,
+                    6,
+                  ],
+                  "circle-color": "#0A0A0A",
+                  "circle-stroke-color": "#FFFFFF",
+                  "circle-stroke-width": 1.2,
+                }}
+              />
+            </Source>
+          )}
+
           {layout.waterSource && (
             <Marker
               longitude={layout.waterSource.lng}
               latitude={layout.waterSource.lat}
               anchor="bottom"
             >
-              <MarkerPin highlighted={mode === "water"} compound={!layout.pumpSeparate}>
+              <MarkerPin
+                highlighted={mode === "water"}
+                compound={!layout.pumpSeparate}
+              >
                 <Droplets className="w-4 h-4 text-white" strokeWidth={2.5} />
               </MarkerPin>
             </Marker>
@@ -368,7 +445,6 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
           )}
         </Map>
 
-        {/* Toolbar flutuante */}
         <div className="absolute top-4 left-4 flex items-center gap-1 bg-white/95 backdrop-blur-md border border-border rounded-md p-1 shadow-lg">
           <ToolButton
             active={mode === "view"}
@@ -429,7 +505,6 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
         <SaveStatus saving={saving} savedAt={savedAt} />
       </div>
 
-      {/* SIDEBAR */}
       <aside className="border-l border-border bg-surface p-6 overflow-y-auto">
         <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-5">
           Layout do projeto
@@ -467,7 +542,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
             extra={
               layout.waterSource?.elevation !== undefined ? (
                 <span className="font-mono text-[11px] text-ink-3 inline-flex items-center gap-1">
-                 <Mountain className="w-3 h-3" />
+                  <Mountain className="w-3 h-3" />
                   Cota · {layout.waterSource.elevation.toFixed(0)} m
                 </span>
               ) : null
@@ -483,7 +558,9 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                 onClick={togglePumpSeparate}
                 className="text-[11px] text-ink-3 hover:text-ink uppercase tracking-wider"
               >
-                {layout.pumpSeparate ? "Unificar com captação" : "Separar da captação"}
+                {layout.pumpSeparate
+                  ? "Unificar com captação"
+                  : "Separar da captação"}
               </button>
             </div>
             {!layout.pumpSeparate ? (
@@ -499,7 +576,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                 {layout.pumpLocation.elevation !== undefined && (
                   <span className="font-mono text-[11px] text-ink-3 inline-flex items-center gap-1 mt-0.5">
                     <Mountain className="w-3 h-3" />
-                    {layout.pumpLocation.elevation.toFixed(0)} m
+                    Cota · {layout.pumpLocation.elevation.toFixed(0)} m
                   </span>
                 )}
                 <button
@@ -569,29 +646,94 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
           )}
         </div>
 
+        {/* SEÇÃO ASPERSORES */}
+        <div className="mt-8 pt-6 border-t border-border">
+          <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-4">
+            Aspersores
+          </h3>
+
+          <div className="bg-background border border-border rounded-sm p-3 mb-3">
+            <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 mb-1">
+              Modelo selecionado
+            </div>
+            <div className="text-sm text-ink font-medium mb-2">
+              {ASPERSOR_PADRAO.manufacturer} {ASPERSOR_PADRAO.model}
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-ink-3">
+              <span>Bocal · {ASPERSOR_PADRAO.bocal}</span>
+              <span>P · {ASPERSOR_PADRAO.pressaoServicoMca} mca</span>
+              <span>Q · {ASPERSOR_PADRAO.vazaoM3PorHora} m³/h</span>
+              <span>R · {ASPERSOR_PADRAO.raioMolhadoM} m</span>
+            </div>
+          </div>
+
+          {!layout.sprinklers ? (
+            <button
+              onClick={positionSprinklers}
+              disabled={!layout.area}
+              className="w-full px-4 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-sm text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              Posicionar grade {ASPERSOR_PADRAO.espacamentoPadraoM}×
+              {ASPERSOR_PADRAO.espacamentoPadraoM} m
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-background border border-border rounded-sm p-3">
+                  <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 mb-1">
+                    Aspersores
+                  </div>
+                  <div className="text-lg font-semibold text-ink">
+                    {layout.sprinklers.count}
+                  </div>
+                </div>
+                <div className="bg-background border border-border rounded-sm p-3">
+                  <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 mb-1">
+                    Vazão de projeto
+                  </div>
+                  <div className="text-lg font-semibold text-ink font-mono">
+                    {layout.sprinklers.vazaoProjetoM3PorHora.toFixed(1)}{" "}
+                    <span className="text-xs text-ink-3 font-sans">m³/h</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={positionSprinklers}
+                  className="flex-1 px-3 py-2 border border-border hover:border-border-strong text-ink-2 rounded-sm text-xs font-medium transition-colors"
+                >
+                  Reposicionar
+                </button>
+                <button
+                  onClick={clearSprinklers}
+                  className="px-3 py-2 text-ink-3 hover:text-danger rounded-sm text-xs font-medium flex items-center gap-1.5 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Limpar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="mt-8 pt-6 border-t border-border">
           <h4 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-3">
             Como usar
           </h4>
           <ol className="space-y-2 text-xs text-ink-2 leading-relaxed">
             <li>
-              <span className="font-mono text-ink-3">1.</span> Selecione{" "}
-              <strong>Área irrigada</strong> e clique nos vértices do perímetro.
-              Finalize ao terminar.
+              <span className="font-mono text-ink-3">1.</span> Desenhe a{" "}
+              <strong>área irrigada</strong>.
             </li>
             <li>
-              <span className="font-mono text-ink-3">2.</span> Selecione{" "}
-              <strong>Captação</strong> e clique no ponto da fonte hídrica. A
-              bomba é posicionada no mesmo local automaticamente.
+              <span className="font-mono text-ink-3">2.</span> Marque a{" "}
+              <strong>captação</strong>.
             </li>
             <li>
-              <span className="font-mono text-ink-3">3.</span> Se houver{" "}
-              <strong>casa de bomba afastada</strong>, clique em &quot;Separar
-              da captação&quot; e marque o ponto.
-            </li>
-            <li>
-              <span className="font-mono text-ink-3">4.</span> Área, perímetro,
-              distância, desnível e município são calculados automaticamente.
+              <span className="font-mono text-ink-3">3.</span> Clique em{" "}
+              <strong>Posicionar grade</strong> para preencher a área com a
+              malha de aspersores.
             </li>
           </ol>
         </div>
@@ -736,6 +878,7 @@ function SidebarItem({
     </div>
   );
 }
+
 function ApplyCityButton({
   projectId,
   city,

@@ -22,6 +22,13 @@ export interface ProjectLayout {
     state?: string;
     fullAddress?: string;
   };
+  sprinklers?: {
+    aspersorId: string;
+    positions: [number, number][];
+    count: number;
+    vazaoProjetoM3PorHora: number;
+    espacamentoM: number;
+  };
   center?: { lng: number; lat: number; zoom: number };
 }
 
