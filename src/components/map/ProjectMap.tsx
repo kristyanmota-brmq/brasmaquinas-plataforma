@@ -1809,8 +1809,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
             </div>
 
             <div className="mt-3 text-[10px] text-ink-4 italic leading-relaxed">
-              Valores estimados conforme catálogo Brasmáquinas. Tubulação
-              secundária, bomba, filtros e instalação não inclusos nesta fase.
+              Valores estimados conforme catálogo Brasmáquinas. Bomba, filtros e instalação não inclusos nesta fase.
             </div>
           </div>
         )}
