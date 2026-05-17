@@ -26,6 +26,7 @@ import {
   RotateCcw,
   Eye,
   EyeOff,
+  Spline,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -39,23 +40,23 @@ interface Props {
   initialLayout?: ProjectLayout;
 }
 
-type Mode = "view" | "polygon" | "water" | "pump";
+type Mode = "view" | "polygon" | "water" | "pump" | "pipeline";
 type Jornada = 9 | 14 | 21;
 
 const DEFAULT_CENTER = { longitude: -45.0, latitude: -12.0, zoom: 14 };
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 const LAMINA_MM = 10;
 
-// Paleta sóbria de setores — 8 cores cíclicas
+// Paleta sóbria refinada — alternância verde/azul/bronze para máxima distinção entre vizinhos
 const SECTOR_PALETTE = [
   "#094641",
-  "#4A6A55",
-  "#8B7355",
-  "#3D4E48",
-  "#6F8478",
-  "#A48B6F",
-  "#1A5A52",
-  "#5C5C5C",
+  "#3C6E8F",
+  "#7B9A6F",
+  "#A07F4F",
+  "#4A6F7E",
+  "#6A8068",
+  "#8E7556",
+  "#3D5258",
 ];
 
 async function reverseGeocode(lng: number, lat: number) {
@@ -130,38 +131,73 @@ function generateRotatedSprinklerGrid(
   );
 }
 
-// Divide aspersores em N setores balanceados, agrupando por linhas no espaço rotacionado
 function buildSectors(
   positions: [number, number][],
   n: number,
   angleDegrees: number,
-  centroid: { lng: number; lat: number }
+  centroid: { lng: number; lat: number },
+  spacingMeters: number
 ): number[] {
   const total = positions.length;
   if (total === 0 || n <= 0) return [];
 
   const pivot = turf.point([centroid.lng, centroid.lat]);
 
-  const indexed = positions.map((p, i) => {
-    const rotated = turf.transformRotate(turf.point(p), -angleDegrees, {
-      pivot,
-    });
+  // Tolerância para considerar dois aspersores na mesma coluna
+  const metersPerDegreeLng =
+    111320 * Math.cos((centroid.lat * Math.PI) / 180);
+  const spacingDegrees = spacingMeters / metersPerDegreeLng;
+  const tolerance = spacingDegrees * 0.5;
+
+  // Rotacionar todos os pontos
+  const rotated = positions.map((p, i) => {
+    const rot = turf.transformRotate(turf.point(p), -angleDegrees, { pivot });
     return {
       index: i,
-      x: rotated.geometry.coordinates[0],
+      x: rot.geometry.coordinates[0],
     };
   });
 
-  indexed.sort((a, b) => a.x - b.x);
+  // Identificar colunas únicas por proximidade no eixo X
+  const sortedByX = [...rotated].sort((a, b) => a.x - b.x);
+  const columnByIndex: number[] = new Array(total);
+  let currentColumn = 0;
+  columnByIndex[sortedByX[0].index] = 0;
 
-  const perSector = Math.ceil(total / n);
-  const sectors: number[] = new Array(total).fill(0);
+  for (let i = 1; i < sortedByX.length; i++) {
+    if (sortedByX[i].x - sortedByX[i - 1].x > tolerance) {
+      currentColumn++;
+    }
+    columnByIndex[sortedByX[i].index] = currentColumn;
+  }
 
-  indexed.forEach((item, sortedIndex) => {
-    sectors[item.index] = Math.min(n - 1, Math.floor(sortedIndex / perSector));
-  });
+  const totalColumns = currentColumn + 1;
+  const effectiveN = Math.min(n, totalColumns);
 
-  return sectors;
+  // Distribuir colunas em setores: primeiros setores recebem 1 coluna a mais se houver resto
+  const baseColsPerSector = Math.floor(totalColumns / effectiveN);
+  const extraColumns = totalColumns - baseColsPerSector * effectiveN;
+  const cutoffCol = extraColumns * (baseColsPerSector + 1);
+
+  const columnToSector = (colId: number): number => {
+    if (colId < cutoffCol) {
+      return Math.floor(colId / (baseColsPerSector + 1));
+    }
+    return extraColumns + Math.floor((colId - cutoffCol) / baseColsPerSector);
+  };
+
+  return columnByIndex.map(columnToSector);
+}
+
+function calculatePipelineLength(coords: [number, number][]): number {
+  if (coords.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    total += turf.distance(turf.point(coords[i]), turf.point(coords[i + 1]), {
+      units: "kilometers",
+    });
+  }
+  return total * 1000;
 }
 
 export function ProjectMap({ projectId, initialLayout }: Props) {
@@ -169,13 +205,19 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
   const [mode, setMode] = useState<Mode>("view");
   const [layout, setLayout] = useState<ProjectLayout>(initialLayout ?? {});
   const [drawingCoords, setDrawingCoords] = useState<[number, number][]>([]);
+  const [drawingPipeline, setDrawingPipeline] = useState<[number, number][]>(
+    []
+  );
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [showCoverage, setShowCoverage] = useState(false);
+  const [selectedSector, setSelectedSector] = useState<number | null>(null);
   const hasMounted = useRef(false);
 
   const isDrawingPolygon = mode === "polygon";
+  const isDrawingPipeline = mode === "pipeline";
   const hasPolygonInProgress = isDrawingPolygon && drawingCoords.length > 0;
+  const hasPipelineInProgress = isDrawingPipeline && drawingPipeline.length > 1;
 
   const optimalAngle = useMemo(
     () => (layout.area ? findOptimalGridAngle(layout.area) : 0),
@@ -220,6 +262,11 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     return () => clearTimeout(t);
   }, [layout, projectId]);
 
+  // Reset seleção quando setorização muda
+  useEffect(() => {
+    setSelectedSector(null);
+  }, [layout.sectorization?.setoresCount]);
+
   const queryElevation = useCallback(
     (lng: number, lat: number): number | undefined => {
       const map = mapRef.current?.getMap();
@@ -234,13 +281,36 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     []
   );
 
+  const enterPipelineMode = useCallback(() => {
+    if (!layout.waterSource) return;
+    setDrawingPipeline([[layout.waterSource.lng, layout.waterSource.lat]]);
+    setMode("pipeline");
+  }, [layout.waterSource]);
+
   const handleMapClick = useCallback(
     async (e: MapMouseEvent) => {
       const lng = e.lngLat.lng;
       const lat = e.lngLat.lat;
 
+      // Em modo view: clique pode selecionar setor (se feature de aspersor clicada) ou desselecionar
+      if (mode === "view") {
+        const feature = e.features?.[0];
+        if (feature?.properties?.sector !== undefined) {
+          const s = feature.properties.sector as number;
+          setSelectedSector((prev) => (prev === s ? null : s));
+        } else {
+          setSelectedSector(null);
+        }
+        return;
+      }
+
       if (mode === "polygon") {
         setDrawingCoords((prev) => [...prev, [lng, lat]]);
+        return;
+      }
+
+      if (mode === "pipeline") {
+        setDrawingPipeline((prev) => [...prev, [lng, lat]]);
         return;
       }
 
@@ -343,6 +413,50 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     setMode("view");
   }, []);
 
+  const finishPipeline = useCallback(() => {
+    if (drawingPipeline.length < 2) return;
+    const lengthMeters = calculatePipelineLength(drawingPipeline);
+    const [startLng, startLat] = drawingPipeline[0];
+    const [endLng, endLat] = drawingPipeline[drawingPipeline.length - 1];
+    const elevationStartM = queryElevation(startLng, startLat);
+    const elevationEndM = queryElevation(endLng, endLat);
+    const elevationDeltaM =
+      elevationStartM !== undefined && elevationEndM !== undefined
+        ? elevationEndM - elevationStartM
+        : undefined;
+
+    setLayout((l) => ({
+      ...l,
+      mainPipeline: {
+        coordinates: drawingPipeline,
+        lengthMeters,
+        segments: drawingPipeline.length - 1,
+        elevationStartM,
+        elevationEndM,
+        elevationDeltaM,
+      },
+    }));
+    setDrawingPipeline([]);
+    setMode("view");
+  }, [drawingPipeline, queryElevation]);
+
+  const cancelPipeline = useCallback(() => {
+    setDrawingPipeline([]);
+    setMode("view");
+  }, []);
+
+  const undoPipelineVertex = useCallback(() => {
+    setDrawingPipeline((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+  }, []);
+
+  const clearPipeline = useCallback(() => {
+    setLayout((l) => {
+      const next = { ...l };
+      delete next.mainPipeline;
+      return next;
+    });
+  }, []);
+
   const clearArea = useCallback(() => {
     setLayout((l) => {
       const next = { ...l };
@@ -363,6 +477,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
       const next = { ...l };
       delete next.waterSource;
       delete next.geodetic;
+      delete next.mainPipeline;
       if (!l.pumpSeparate) next.pumpLocation = null;
       return next;
     });
@@ -442,6 +557,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
       return next;
     });
     setShowCoverage(false);
+    setSelectedSector(null);
   }, []);
 
   const applyJornada = useCallback(
@@ -452,7 +568,8 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
         layout.sprinklers.positions,
         n,
         layout.sprinklers.gridAngleDegrees,
-        layout.centroid
+        layout.centroid,
+        ASPERSOR_PADRAO.espacamentoPadraoM
       );
       const aspersoresPorSetor = Math.round(layout.sprinklers.count / n);
       const vazaoPorSetor =
@@ -479,6 +596,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
       delete next.sectorization;
       return next;
     });
+    setSelectedSector(null);
   }, []);
 
   const initialCenter = initialLayout?.center
@@ -516,6 +634,78 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
     return matchExpr;
   }, [layout.sectorization]);
 
+  // Opacity baseado em setor selecionado
+  const sprinklerOpacityExpression = useMemo(() => {
+    if (selectedSector === null) return 1;
+    return [
+      "case",
+      ["==", ["get", "sector"], selectedSector],
+      1,
+      0.25,
+    ];
+  }, [selectedSector]);
+
+  // Stroke baseado em setor selecionado
+  const sprinklerStrokeWidthExpression = useMemo(() => {
+    if (selectedSector === null) return 1.2;
+    return [
+      "case",
+      ["==", ["get", "sector"], selectedSector],
+      2,
+      1,
+    ];
+  }, [selectedSector]);
+
+  // Centroides dos setores para labels
+  const sectorLabelsGeoJSON = useMemo(() => {
+    if (!layout.sprinklers || !layout.sectorization) return null;
+    const byGroup: Record<number, [number, number][]> = {};
+    layout.sprinklers.positions.forEach((pos, i) => {
+      const s = layout.sectorization!.sectorIndices[i];
+      if (s === undefined) return;
+      if (!byGroup[s]) byGroup[s] = [];
+      byGroup[s].push(pos);
+    });
+
+    const features = Object.entries(byGroup).map(([s, points]) => {
+      const fc = turf.featureCollection(points.map((p) => turf.point(p)));
+      const centroid = turf.centroid(fc);
+      return {
+        type: "Feature" as const,
+        properties: {
+          label: String(parseInt(s) + 1),
+          sector: parseInt(s),
+          isSelected: parseInt(s) === selectedSector,
+        },
+        geometry: centroid.geometry,
+      };
+    });
+    return turf.featureCollection(features);
+  }, [layout.sprinklers, layout.sectorization, selectedSector]);
+
+  const pipelineCanStart = !!layout.waterSource;
+
+  // Dados do setor selecionado para o card
+  const selectedSectorData = useMemo(() => {
+    if (
+      selectedSector === null ||
+      !layout.sprinklers ||
+      !layout.sectorization
+    ) {
+      return null;
+    }
+    const indices = layout.sectorization.sectorIndices;
+    const count = indices.filter((s) => s === selectedSector).length;
+    const vazao = count * ASPERSOR_PADRAO.vazaoM3PorHora;
+    return {
+      number: selectedSector + 1,
+      total: layout.sectorization.setoresCount,
+      count,
+      vazao,
+      tempo: layout.sectorization.tempoPorSetorMinutos,
+    };
+  }, [selectedSector, layout.sprinklers, layout.sectorization]);
+
   return (
     <div className="grid grid-cols-[1fr_360px] gap-0 h-[calc(100vh-220px)] min-h-[600px] border border-border rounded-md overflow-hidden bg-background">
       <div className="relative">
@@ -526,6 +716,9 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
           mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
           onClick={handleMapClick}
           cursor={mode === "view" ? "grab" : "crosshair"}
+          interactiveLayerIds={
+            mode === "view" && layout.sprinklers ? ["sprinklers-circles"] : []
+          }
           terrain={{ source: "mapbox-dem", exaggeration: 1 }}
           onLoad={(e) => {
             const map = e.target;
@@ -595,20 +788,92 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
 
           {hasPolygonInProgress &&
             drawingCoords.map(([lng, lat], i) => (
-              <Marker key={i} longitude={lng} latitude={lat} anchor="center">
+              <Marker
+                key={`poly-${i}`}
+                longitude={lng}
+                latitude={lat}
+                anchor="center"
+              >
                 <div className="w-3 h-3 bg-white border-2 border-[#094641] rounded-full shadow-sm" />
               </Marker>
             ))}
+
+          {layout.mainPipeline && (
+            <Source
+              id="pipeline-src"
+              type="geojson"
+              data={{
+                type: "Feature",
+                properties: {},
+                geometry: {
+                  type: "LineString",
+                  coordinates: layout.mainPipeline.coordinates,
+                },
+              }}
+            >
+              <Layer
+                id="pipeline-casing"
+                type="line"
+                paint={{
+                  "line-color": "#FFFFFF",
+                  "line-width": 5,
+                  "line-opacity": 0.6,
+                }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+              <Layer
+                id="pipeline-line"
+                type="line"
+                paint={{ "line-color": "#1B5680", "line-width": 3 }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+            </Source>
+          )}
+
+          {isDrawingPipeline && drawingPipeline.length > 0 && (
+            <>
+              <Source
+                id="pipeline-drawing-src"
+                type="geojson"
+                data={{
+                  type: "Feature",
+                  properties: {},
+                  geometry: {
+                    type: "LineString",
+                    coordinates: drawingPipeline,
+                  },
+                }}
+              >
+                <Layer
+                  id="pipeline-drawing-line"
+                  type="line"
+                  paint={{
+                    "line-color": "#1B5680",
+                    "line-width": 2.5,
+                    "line-dasharray": [2, 2],
+                  }}
+                  layout={{ "line-cap": "round", "line-join": "round" }}
+                />
+              </Source>
+              {drawingPipeline.slice(1).map(([lng, lat], i) => (
+                <Marker
+                  key={`pipe-${i}`}
+                  longitude={lng}
+                  latitude={lat}
+                  anchor="center"
+                >
+                  <div className="w-2.5 h-2.5 bg-white border-2 border-[#1B5680] rounded-full shadow-sm" />
+                </Marker>
+              ))}
+            </>
+          )}
 
           {coverageGeoJSON && (
             <Source id="coverage-src" type="geojson" data={coverageGeoJSON}>
               <Layer
                 id="coverage-fill"
                 type="fill"
-                paint={{
-                  "fill-color": "#094641",
-                  "fill-opacity": 0.15,
-                }}
+                paint={{ "fill-color": "#094641", "fill-opacity": 0.15 }}
               />
               <Layer
                 id="coverage-line"
@@ -640,8 +905,70 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                     7,
                   ],
                   "circle-color": sprinklerColorExpression,
+                  "circle-opacity": sprinklerOpacityExpression,
                   "circle-stroke-color": "#FFFFFF",
-                  "circle-stroke-width": 1.2,
+                  "circle-stroke-width": sprinklerStrokeWidthExpression,
+                  "circle-stroke-opacity": sprinklerOpacityExpression,
+                }}
+              />
+            </Source>
+          )}
+
+          {sectorLabelsGeoJSON && (
+            <Source
+              id="sector-labels-src"
+              type="geojson"
+              data={sectorLabelsGeoJSON}
+            >
+              <Layer
+                id="sector-labels-circles"
+                type="circle"
+                minzoom={13}
+                paint={{
+                  "circle-radius": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    13,
+                    10,
+                    16,
+                    14,
+                    20,
+                    20,
+                  ],
+                  "circle-color": [
+                    "case",
+                    ["==", ["get", "isSelected"], true],
+                    "#0A0A0A",
+                    "rgba(10, 10, 10, 0.85)",
+                  ],
+                  "circle-stroke-color": "#FFFFFF",
+                  "circle-stroke-width": 1.5,
+                }}
+              />
+              <Layer
+                id="sector-labels-text"
+                type="symbol"
+                minzoom={13}
+                layout={{
+                  "text-field": ["get", "label"],
+                  "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+                  "text-size": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    13,
+                    11,
+                    16,
+                    13,
+                    20,
+                    16,
+                  ],
+                  "text-allow-overlap": true,
+                  "text-ignore-placement": true,
+                }}
+                paint={{
+                  "text-color": "#FFFFFF",
                 }}
               />
             </Source>
@@ -681,6 +1008,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
             onClick={() => {
               setMode("view");
               setDrawingCoords([]);
+              setDrawingPipeline([]);
             }}
             icon={<MousePointer2 className="w-4 h-4" />}
             label="Navegar"
@@ -706,6 +1034,19 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               label="Casa de bomba"
             />
           )}
+          <div className="w-px h-5 bg-border mx-0.5" />
+          <ToolButton
+            active={mode === "pipeline"}
+            onClick={enterPipelineMode}
+            disabled={!pipelineCanStart}
+            icon={<Spline className="w-4 h-4" />}
+            label="Tubulação"
+            tooltip={
+              pipelineCanStart
+                ? undefined
+                : "Marque a captação antes de traçar a tubulação"
+            }
+          />
         </div>
 
         {hasPolygonInProgress && (
@@ -728,6 +1069,43 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
             >
               <Check className="w-3.5 h-3.5" />
               Finalizar área
+            </button>
+          </div>
+        )}
+
+        {isDrawingPipeline && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-border rounded-md shadow-lg flex items-center gap-1 p-1">
+            <span className="px-3 text-xs text-ink-2 font-mono">
+              {drawingPipeline.length - 1} vértice
+              {drawingPipeline.length - 1 !== 1 ? "s" : ""}
+              {drawingPipeline.length >= 2 && (
+                <span className="ml-2 text-ink-3">
+                  · {calculatePipelineLength(drawingPipeline).toFixed(0)} m
+                </span>
+              )}
+            </span>
+            <button
+              onClick={undoPipelineVertex}
+              disabled={drawingPipeline.length <= 1}
+              className="px-3 py-1.5 text-xs text-ink-2 hover:bg-surface rounded-sm font-medium flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Desfazer
+            </button>
+            <button
+              onClick={cancelPipeline}
+              className="px-3 py-1.5 text-xs text-ink-2 hover:bg-surface rounded-sm font-medium flex items-center gap-1.5"
+            >
+              <X className="w-3.5 h-3.5" />
+              Cancelar
+            </button>
+            <button
+              onClick={finishPipeline}
+              disabled={!hasPipelineInProgress}
+              className="px-3 py-1.5 text-xs bg-brand hover:bg-brand-hover text-white rounded-sm font-medium flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Check className="w-3.5 h-3.5" />
+              Finalizar tubulação
             </button>
           </div>
         )}
@@ -872,6 +1250,83 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                 {layout.geocoded.city}
                 {layout.geocoded.state && ` / ${layout.geocoded.state}`}
               </span>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-border">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em]">
+              Tubulação principal
+            </h3>
+            {layout.mainPipeline && (
+              <button
+                onClick={clearPipeline}
+                className="text-[11px] text-ink-4 hover:text-danger uppercase tracking-wider"
+              >
+                Remover
+              </button>
+            )}
+          </div>
+
+          {!layout.mainPipeline ? (
+            <button
+              onClick={enterPipelineMode}
+              disabled={!pipelineCanStart}
+              className="w-full px-4 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-sm text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Spline className="w-4 h-4" />
+              Traçar caminho da captação até a área
+            </button>
+          ) : (
+            <div className="bg-background border border-border rounded-sm p-3 space-y-3">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-0.5">
+                    Comprimento
+                  </div>
+                  <div className="text-sm font-mono text-ink font-medium">
+                    {layout.mainPipeline.lengthMeters.toFixed(0)} m
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-0.5">
+                    Segmentos
+                  </div>
+                  <div className="text-sm text-ink font-medium">
+                    {layout.mainPipeline.segments}
+                  </div>
+                </div>
+                {layout.mainPipeline.elevationDeltaM !== undefined && (
+                  <div className="col-span-2 pt-2 border-t border-border">
+                    <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-0.5">
+                      Desnível percorrido
+                    </div>
+                    <span
+                      className={clsx(
+                        "text-sm font-mono inline-flex items-center gap-1.5",
+                        layout.mainPipeline.elevationDeltaM >= 0
+                          ? "text-ink"
+                          : "text-ink-2"
+                      )}
+                    >
+                      <Mountain className="w-3.5 h-3.5 text-ink-3" />
+                      {layout.mainPipeline.elevationDeltaM >= 0 ? "+" : ""}
+                      {layout.mainPipeline.elevationDeltaM.toFixed(1)} m
+                    </span>
+                    <span className="block text-[10px] font-mono text-ink-4 mt-0.5">
+                      Início {layout.mainPipeline.elevationStartM?.toFixed(0) ?? "—"} m
+                      → fim {layout.mainPipeline.elevationEndM?.toFixed(0) ?? "—"} m
+                    </span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={enterPipelineMode}
+                className="w-full px-3 py-2 border border-border hover:border-border-strong text-ink-2 rounded-sm text-xs font-medium transition-colors"
+              >
+                Refazer traçado
+              </button>
             </div>
           )}
         </div>
@@ -1022,7 +1477,6 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
           )}
         </div>
 
-        {/* SETORIZAÇÃO */}
         {layout.sprinklers && (
           <div className="mt-8 pt-6 border-t border-border">
             <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-4">
@@ -1054,7 +1508,7 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               </div>
             </div>
 
-            {layout.sectorization ? (
+            {layout.sectorization && (
               <div className="space-y-2">
                 <div className="bg-background border border-border rounded-sm p-3">
                   <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-xs">
@@ -1080,6 +1534,54 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                     />
                   </div>
                 </div>
+
+                {selectedSectorData && (
+                  <div className="bg-ink text-white rounded-sm p-3 space-y-2 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">
+                        Setor {selectedSectorData.number}{" "}
+                        <span className="text-white/50 font-normal">
+                          de {selectedSectorData.total}
+                        </span>
+                      </span>
+                      <button
+                        onClick={() => setSelectedSector(null)}
+                        className="text-[11px] text-white/60 hover:text-white uppercase tracking-wider"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.1em] text-white/50 mb-0.5">
+                          Aspersores
+                        </div>
+                        <div className="font-medium">
+                          {selectedSectorData.count}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.1em] text-white/50 mb-0.5">
+                          Vazão
+                        </div>
+                        <div className="font-mono">
+                          {selectedSectorData.vazao.toFixed(1)} m³/h
+                        </div>
+                      </div>
+                      <div className="col-span-2 pt-2 border-t border-white/15">
+                        <div className="text-[10px] uppercase tracking-[0.1em] text-white/50 mb-0.5">
+                          Tempo de operação
+                        </div>
+                        <div className="font-mono">
+                          {selectedSectorData.tempo} min · operação{" "}
+                          {selectedSectorData.number} de{" "}
+                          {selectedSectorData.total}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={clearSectorization}
                   className="w-full px-3 py-1.5 text-[11px] text-ink-4 hover:text-danger rounded-sm uppercase tracking-wider"
@@ -1087,7 +1589,9 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
                   Limpar setorização
                 </button>
               </div>
-            ) : (
+            )}
+
+            {!layout.sectorization && (
               <div className="text-xs text-ink-4 italic px-1">
                 Escolha uma jornada para dividir os aspersores em setores.
               </div>
@@ -1109,13 +1613,16 @@ export function ProjectMap({ projectId, initialLayout }: Props) {
               <strong>captação</strong>.
             </li>
             <li>
-              <span className="font-mono text-ink-3">3.</span> Posicione a{" "}
-              <strong>grade</strong>.
+              <span className="font-mono text-ink-3">3.</span> Trace a{" "}
+              <strong>tubulação principal</strong>.
             </li>
             <li>
-              <span className="font-mono text-ink-3">4.</span> Escolha a{" "}
-              <strong>jornada operacional</strong>. Os aspersores são
-              automaticamente agrupados em setores.
+              <span className="font-mono text-ink-3">4.</span> Posicione a{" "}
+              <strong>grade</strong> e escolha a <strong>jornada</strong>.
+            </li>
+            <li>
+              <span className="font-mono text-ink-3">5.</span> Clique num
+              setor no mapa para ver detalhes.
             </li>
           </ol>
         </div>
@@ -1141,7 +1648,10 @@ function Row({
         {label}
       </div>
       <div
-        className={clsx("text-ink", mono ? "font-mono text-xs" : "text-sm font-medium")}
+        className={clsx(
+          "text-ink",
+          mono ? "font-mono text-xs" : "text-sm font-medium"
+        )}
       >
         {value}
       </div>
@@ -1154,19 +1664,28 @@ function ToolButton({
   onClick,
   icon,
   label,
+  disabled,
+  tooltip,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
+  disabled?: boolean;
+  tooltip?: string;
 }) {
   return (
     <button
       onClick={onClick}
-      title={label}
+      disabled={disabled}
+      title={tooltip ?? label}
       className={clsx(
         "flex items-center gap-2 px-2.5 py-1.5 rounded-sm text-xs font-medium transition-colors",
-        active ? "bg-ink text-white" : "text-ink-2 hover:bg-surface"
+        disabled
+          ? "text-ink-4 cursor-not-allowed"
+          : active
+            ? "bg-ink text-white"
+            : "text-ink-2 hover:bg-surface"
       )}
     >
       {icon}

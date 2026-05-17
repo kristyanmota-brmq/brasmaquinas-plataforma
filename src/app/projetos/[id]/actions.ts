@@ -40,6 +40,14 @@ export interface ProjectLayout {
     vazaoPorSetorM3PorHora: number;
     sectorIndices: number[];
   };
+  mainPipeline?: {
+    coordinates: [number, number][];
+    lengthMeters: number;
+    segments: number;
+    elevationStartM?: number;
+    elevationEndM?: number;
+    elevationDeltaM?: number;
+  };
   center?: { lng: number; lat: number; zoom: number };
 }
 
