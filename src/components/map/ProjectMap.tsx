@@ -305,7 +305,6 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             laterais,
             layout.centroid,
             layout.sprinklers.gridAngleDegrees,
-            layout.sprinklers.espacamentoM,
           )
         : {
             principal: [
@@ -326,8 +325,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
         ? elevationEndM - elevationStartM
         : undefined;
 
-    // Critério 1 (terreno inclinado): se declive > 0,5% ao longo da principal,
-    // a adutora entra pela extremidade mais alta — menor AMT e melhor distribuição de pressão.
+    // Se declive > 0,5% ao longo da principal, adutora entra pela extremidade mais alta.
     let adutora = adutoraBase;
     if (
       elevationStartM !== undefined &&
@@ -558,7 +556,6 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             laterais,
             layout.centroid,
             layout.sprinklers.gridAngleDegrees,
-            layout.sprinklers.espacamentoM,
           )
         : {
             principal: [

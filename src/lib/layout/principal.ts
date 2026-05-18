@@ -12,102 +12,145 @@ function rotate(x: number, y: number, angleRad: number): [number, number] {
   return [x * c - y * s, x * s + y * c];
 }
 
-// Ponto da polilinha mais próximo de pt (em coordenadas geográficas).
-function nearestPointOnPolyline(
-  pt: [number, number],
-  poly: [number, number][],
-): [number, number] {
-  let bestDist = Infinity;
-  let best: [number, number] = poly[0];
-  for (let i = 0; i < poly.length - 1; i++) {
-    const a = poly[i], b = poly[i + 1];
-    const dx = b[0] - a[0], dy = b[1] - a[1];
-    const len2 = dx * dx + dy * dy;
-    if (len2 === 0) continue;
-    const t = Math.max(0, Math.min(1, ((pt[0] - a[0]) * dx + (pt[1] - a[1]) * dy) / len2));
-    const proj: [number, number] = [a[0] + t * dx, a[1] + t * dy];
-    const dist = (pt[0] - proj[0]) ** 2 + (pt[1] - proj[1]) ** 2;
-    if (dist < bestDist) { bestDist = dist; best = proj; }
-  }
-  return best;
+function dist2(a: [number, number], b: [number, number]): number {
+  return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
 }
 
+/**
+ * Gera principal (polilinha) e adutora (segmento captação → principal) de forma bottom-up.
+ *
+ * Implementa §3 do documento Logica_Topologia_Hidraulica.md passos A–G.
+ * Garante invariantes I1–I4 antes de retornar; lança erro se alguma falhar.
+ */
 export function generatePrincipalAndAdutora(
   waterSource: { lng: number; lat: number },
   laterais: Lateral[],
   centroid: { lng: number; lat: number },
   gridAngleDegrees: number,
-  spacingMeters: number = 12,
 ): { principal: [number, number][]; adutora: [number, number][] } {
+  const captacaoLngLat: [number, number] = [waterSource.lng, waterSource.lat];
+
   if (laterais.length === 0) {
-    return {
-      principal: [
-        [waterSource.lng, waterSource.lat],
-        [centroid.lng, centroid.lat],
-      ],
-      adutora: [],
-    };
+    return { principal: [captacaoLngLat], adutora: [captacaoLngLat, captacaoLngLat] };
   }
 
   const latRad = (centroid.lat * Math.PI) / 180;
   const mPerLng = metersPerDegLng(latRad);
   const angleRad = (gridAngleDegrees * Math.PI) / 180;
-  const tolerance = spacingMeters * 0.5;
 
-  const toLngLat = (x: number, y: number): [number, number] => {
-    const [drx, dry] = rotate(x, y, angleRad);
-    return [centroid.lng + drx / mPerLng, centroid.lat + dry / M_PER_DEG_LAT];
-  };
-
+  // Passo A — frame local: rotacionar por -gridAngleDegrees em torno do centroide.
+  // No frame local as laterais correm em Y e a principal corre em X.
   const toLocal = (lng: number, lat: number): [number, number] => {
     const dx = (lng - centroid.lng) * mPerLng;
     const dy = (lat - centroid.lat) * M_PER_DEG_LAT;
     return rotate(dx, dy, -angleRad);
   };
 
-  const ws: [number, number] = [waterSource.lng, waterSource.lat];
-  const [, wsLocalY] = toLocal(ws[0], ws[1]);
+  const toLngLat = (x: number, y: number): [number, number] => {
+    const [drx, dry] = rotate(x, y, angleRad);
+    return [centroid.lng + drx / mPerLng, centroid.lat + dry / M_PER_DEG_LAT];
+  };
 
-  // Para cada lateral, seleciona o extremo geograficamente mais próximo da captação.
-  // Evita qualquer suposição sobre qual lado do frame rotacionado corresponde à captação,
-  // tornando o cálculo correto para qualquer ângulo de grid.
-  const captSideLocal = laterais.map((lat) => {
-    const dStart =
-      (lat.startLngLat[0] - ws[0]) ** 2 + (lat.startLngLat[1] - ws[1]) ** 2;
-    const dEnd =
-      (lat.endLngLat[0] - ws[0]) ** 2 + (lat.endLngLat[1] - ws[1]) ** 2;
-    return toLocal(...(dStart <= dEnd ? lat.startLngLat : lat.endLngLat));
+  const wsLocal = toLocal(waterSource.lng, waterSource.lat);
+
+  // Passo A (cont.) — converter extremos de cada lateral para o frame local.
+  const lateraisLocal = laterais.map((lat) => {
+    const sLocal = toLocal(lat.startLngLat[0], lat.startLngLat[1]);
+    const eLocal = toLocal(lat.endLngLat[0], lat.endLngLat[1]);
+    return {
+      xLateral: sLocal[0], // X constante para todos os aspersores da coluna
+      yMin: Math.min(sLocal[1], eLocal[1]),
+      yMax: Math.max(sLocal[1], eLocal[1]),
+    };
   });
 
-  // principalY único: extremo dos pontos do lado da captação, deslocado spacing/2 na
-  // direção da captação. Usa wsLocalY para saber em qual direção deslocar.
-  const captSideYsSorted = [...captSideLocal.map((p) => p[1])].sort((a, b) => a - b);
-  const captSideYMedian = captSideYsSorted[Math.floor(captSideYsSorted.length / 2)];
-  const principalY =
-    wsLocalY <= captSideYMedian
-      ? captSideYsSorted[0] - spacingMeters / 2
-      : captSideYsSorted[captSideYsSorted.length - 1] + spacingMeters / 2;
+  // Passo B — de que lado da malha a captação fica (comparando Y local).
+  const yMinGlobal = Math.min(...lateraisLocal.map((l) => l.yMin));
+  const yMaxGlobal = Math.max(...lateraisLocal.map((l) => l.yMax));
 
-  // Ordena por X e colapsa em colunas físicas.
-  captSideLocal.sort((a, b) => a[0] - b[0]);
-  const colunas: [number, number][][] = [];
-  for (const pt of captSideLocal) {
-    const last = colunas[colunas.length - 1];
-    if (last && Math.abs(pt[0] - last[0][0]) <= tolerance) {
-      last.push(pt);
-    } else {
-      colunas.push([pt]);
-    }
+  let side: "min" | "max";
+  if (wsLocal[1] <= yMinGlobal) {
+    side = "min";
+  } else if (wsLocal[1] >= yMaxGlobal) {
+    side = "max";
+  } else {
+    // Captação dentro da faixa Y — escolher o lado mais próximo.
+    const distToMin = Math.abs(wsLocal[1] - yMinGlobal);
+    const distToMax = Math.abs(wsLocal[1] - yMaxGlobal);
+    side = distToMin <= distToMax ? "min" : "max";
+    console.warn("[principal] Captação dentro da faixa Y da malha — adutora cruza a área irrigada.");
   }
 
-  // X médio por coluna + principalY constante → linha reta.
-  const colXs = colunas.map((col) => col.reduce((sum, p) => sum + p[0], 0) / col.length);
-  const principal: [number, number][] = colXs.map((x) => toLngLat(x, principalY));
+  // Passo C — ponto de derivação de cada lateral.
+  // Usa Y da própria lateral (não Y global) para respeitar clipping de polígono irregular.
+  const derivacoesLocal: [number, number][] = lateraisLocal.map((l) => [
+    l.xLateral,
+    side === "min" ? l.yMin : l.yMax,
+  ]);
 
-  // Adutora: ponto da principal geograficamente mais próximo da captação.
-  // Quando a captação está alinhada com o centro da principal, conecta no centro;
-  // quando está deslocada para uma extremidade, conecta nessa extremidade.
-  const connectionPt = nearestPointOnPolyline(ws, principal);
+  // Passo D — ordenar por X local. Esta sequência é a principal.
+  derivacoesLocal.sort((a, b) => a[0] - b[0]);
 
-  return { principal, adutora: [ws, connectionPt] };
+  // Passo E — ponto de entrada da principal (extremidade mais próxima da captação).
+  const d1 = derivacoesLocal[0];
+  const dN = derivacoesLocal[derivacoesLocal.length - 1];
+
+  let entryLocal: [number, number];
+  if (wsLocal[0] <= d1[0]) {
+    entryLocal = d1;
+  } else if (wsLocal[0] >= dN[0]) {
+    entryLocal = dN;
+  } else {
+    entryLocal = dist2(wsLocal, d1) <= dist2(wsLocal, dN) ? d1 : dN;
+  }
+
+  // Passo F — rotacionar de volta para LngLat.
+  const principal: [number, number][] = derivacoesLocal.map(([x, y]) => toLngLat(x, y));
+  const entryLngLat = toLngLat(entryLocal[0], entryLocal[1]);
+  const adutora: [number, number][] = [captacaoLngLat, entryLngLat];
+
+  // Passo G — validar invariantes antes de retornar.
+  validateInvariants(principal, adutora, captacaoLngLat);
+
+  return { principal, adutora };
+}
+
+function validateInvariants(
+  principal: [number, number][],
+  adutora: [number, number][],
+  captacao: [number, number],
+): void {
+  // I1: adutora com exatamente 2 vértices, primeiro é a captação
+  if (adutora.length !== 2) {
+    throw new Error(`Topologia inválida (I1): adutora deve ter 2 vértices, tem ${adutora.length}`);
+  }
+  if (adutora[0][0] !== captacao[0] || adutora[0][1] !== captacao[1]) {
+    throw new Error("Topologia inválida (I1): adutora[0] não é a captação");
+  }
+  // I2: principal com pelo menos 1 vértice
+  if (principal.length < 1) {
+    throw new Error("Topologia inválida (I2): principal sem vértices");
+  }
+  // I4: adutora[1] é uma das extremidades da principal
+  const eps = 1e-9;
+  const p0 = principal[0];
+  const pN = principal[principal.length - 1];
+  const connIsP0 =
+    Math.abs(adutora[1][0] - p0[0]) < eps && Math.abs(adutora[1][1] - p0[1]) < eps;
+  const connIsPN =
+    Math.abs(adutora[1][0] - pN[0]) < eps && Math.abs(adutora[1][1] - pN[1]) < eps;
+  if (!connIsP0 && !connIsPN) {
+    throw new Error("Topologia inválida (I4): ponto de entrada não é extremidade da principal");
+  }
+  // I3: sem pontos duplicados consecutivos na principal
+  for (let i = 1; i < principal.length; i++) {
+    if (
+      Math.abs(principal[i][0] - principal[i - 1][0]) < eps &&
+      Math.abs(principal[i][1] - principal[i - 1][1]) < eps
+    ) {
+      throw new Error(
+        `Topologia inválida (I3): pontos duplicados na principal no índice ${i}`,
+      );
+    }
+  }
 }
