@@ -296,6 +296,13 @@ export const TUBO_SUBIDA_PVC_BR = {
   precoVenda: 32.0,
 } as const;
 
+// Coeficiente C de Hazen-Williams para PVC:
+//   - PVC novo (<= 2 anos): C = 150
+//   - PVC envelhecido (>= 10 anos): C = 140
+//   - V0.5-RC piloto: C = 145 (media, default neste catalogo)
+// Politica: campo editavel por linha do catalogo para permitir
+// ajuste fino quando o RT optar por C alternativo.
+
 // PVC LF (Liga Fácil) — laterais (rede secundária)
 export const TUBOS_PVC_LF = [
   { sku: "TIGRE_LF_50_PN40",  descricao: "Tubo PVC LF Ø50mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  pressaoMca: 40, metrosPorBarra: 6, custo: 28.4, precoVenda:  52.0, coefC: 145 },
