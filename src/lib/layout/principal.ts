@@ -39,34 +39,44 @@ export function generatePrincipalAndAdutora(
     return [centroid.lng + drx / mPerLng, centroid.lat + dry / M_PER_DEG_LAT];
   };
 
-  // Captação no frame rotacionado — mesma base do grid de aspersores.
-  const wsDx = (waterSource.lng - centroid.lng) * mPerLng;
-  const wsDy = (waterSource.lat - centroid.lat) * M_PER_DEG_LAT;
-  const [wsLocalX, wsLocalY] = rotate(wsDx, wsDy, -angleRad);
-
-  // Projeta cada derivação no frame rotacionado
-  const localPts = laterais.map(({ derivacaoLngLat: [lng, lat] }) => {
+  const toLocal = (lng: number, lat: number): [number, number] => {
     const dx = (lng - centroid.lng) * mPerLng;
     const dy = (lat - centroid.lat) * M_PER_DEG_LAT;
     return rotate(dx, dy, -angleRad);
-  });
+  };
 
-  // sortedY: mediana define o lado interior; extremo define onde assenta a principal.
-  const sortedY = [...localPts.map((p) => p[1])].sort((a, b) => a - b);
-  const medianY = sortedY[Math.floor(sortedY.length / 2)];
-  const captacaoIsMinSide = wsLocalY <= medianY;
+  // Captação no frame rotacionado — mesma base do grid de aspersores.
+  const [wsLocalX, wsLocalY] = toLocal(waterSource.lng, waterSource.lat);
 
-  // Y único global → principal reta independente da forma do talhão.
+  // Projeta início (primeiro aspersor, min-Y) e fim (último aspersor, max-Y) de cada lateral.
+  const localStartPts = laterais.map(({ derivacaoLngLat: [lng, lat] }) => toLocal(lng, lat));
+  const localEndPts   = laterais.map(({ endLngLat:       [lng, lat] }) => toLocal(lng, lat));
+
+  // Centro do campo em Y = mediana dos pontos médios de cada lateral.
+  // Mais robusto que usar só os primeiros aspersores como referência.
+  const midYs       = laterais.map((_, i) => (localStartPts[i][1] + localEndPts[i][1]) / 2);
+  const midYsSorted = [...midYs].sort((a, b) => a - b);
+  const fieldMidY   = midYsSorted[Math.floor(midYsSorted.length / 2)];
+  const captacaoIsMinSide = wsLocalY <= fieldMidY;
+
+  // principalY único global → linha reta.
+  // Bug anterior: sempre usava derivacaoLngLat (primeiro aspersor, min-Y) mesmo quando
+  // a captação está no lado max-Y → principal ficava no lado errado do campo.
+  // Correção: usa endLngLat (último aspersor, max-Y) quando captação está no lado max-Y.
+  const refYs     = captacaoIsMinSide
+    ? localStartPts.map((p) => p[1])
+    : localEndPts.map((p) => p[1]);
+  const refYSorted = [...refYs].sort((a, b) => a - b);
   const principalY = captacaoIsMinSide
-    ? sortedY[0] - spacingMeters / 2
-    : sortedY[sortedY.length - 1] + spacingMeters / 2;
+    ? refYSorted[0] - spacingMeters / 2
+    : refYSorted[refYSorted.length - 1] + spacingMeters / 2;
 
-  // Ordena por X (eixo ao longo da principal)
-  localPts.sort((a, b) => a[0] - b[0]);
+  // Ordena por X (eixo ao longo da principal) usando startPts (mesmo X que endPts).
+  localStartPts.sort((a, b) => a[0] - b[0]);
 
   // Colapsa pontos com X próximo (mesma coluna física, setores diferentes)
   const colunas: [number, number][][] = [];
-  for (const pt of localPts) {
+  for (const pt of localStartPts) {
     const last = colunas[colunas.length - 1];
     if (last && Math.abs(pt[0] - last[0][0]) <= tolerance) {
       last.push(pt);
@@ -79,11 +89,7 @@ export function generatePrincipalAndAdutora(
   const colXs = colunas.map((col) => col.reduce((sum, p) => sum + p[0], 0) / col.length);
   const principal: [number, number][] = colXs.map((x) => toLngLat(x, principalY));
 
-  // Adutora alinhada com o grid: mesma lógica do posicionamento de aspersores.
-  // - Se wsLocalX está dentro do range da principal: conexão perpendicular (paralela às laterais).
-  // - Se wsLocalX está fora do range: usa a extremidade geograficamente mais próxima,
-  //   pois o clamp simples pode conectar ao extremo oposto quando o ângulo do grid
-  //   inverte o eixo X em relação ao espaço geográfico (ex: gridAngle > 90°).
+  // Adutora alinhada ao grid: perpendicular se captação está inline, endpoint mais próximo caso contrário.
   const xMin = colXs[0];
   const xMax = colXs[colXs.length - 1];
   const ws: [number, number] = [waterSource.lng, waterSource.lat];
