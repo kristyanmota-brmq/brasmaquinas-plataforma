@@ -298,7 +298,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     if (layout.mainPipeline?.source === "manual") return;
     if (!layout.centroid) return;
 
-    const { principal, adutora } =
+    const { principal, adutora: adutoraBase } =
       laterais.length > 0 && layout.sprinklers
         ? generatePrincipalAndAdutora(
             layout.waterSource,
@@ -325,6 +325,20 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
       elevationStartM !== undefined && elevationEndM !== undefined
         ? elevationEndM - elevationStartM
         : undefined;
+
+    // Critério 1 (terreno inclinado): se declive > 0,5% ao longo da principal,
+    // a adutora entra pela extremidade mais alta — menor AMT e melhor distribuição de pressão.
+    let adutora = adutoraBase;
+    if (
+      elevationStartM !== undefined &&
+      elevationEndM !== undefined &&
+      lengthMeters > 0 &&
+      Math.abs(elevationEndM - elevationStartM) / lengthMeters > 0.005
+    ) {
+      const highEnd =
+        elevationStartM > elevationEndM ? principal[0] : principal[principal.length - 1];
+      adutora = [[layout.waterSource.lng, layout.waterSource.lat], highEnd];
+    }
 
     setLayout((l) => ({
       ...l,
@@ -537,7 +551,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   const resetToAutoPipeline = useCallback(() => {
     if (!layout.waterSource || !layout.centroid) return;
 
-    const { principal, adutora } =
+    const { principal, adutora: adutoraBase } =
       laterais.length > 0 && layout.sprinklers
         ? generatePrincipalAndAdutora(
             layout.waterSource,
@@ -564,6 +578,19 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
       elevationStartM !== undefined && elevationEndM !== undefined
         ? elevationEndM - elevationStartM
         : undefined;
+
+    let adutora = adutoraBase;
+    if (
+      elevationStartM !== undefined &&
+      elevationEndM !== undefined &&
+      lengthMeters > 0 &&
+      Math.abs(elevationEndM - elevationStartM) / lengthMeters > 0.005
+    ) {
+      const highEnd =
+        elevationStartM > elevationEndM ? principal[0] : principal[principal.length - 1];
+      adutora = [[layout.waterSource.lng, layout.waterSource.lat], highEnd];
+    }
+
     setLayout((l) => ({
       ...l,
       mainPipeline: {
