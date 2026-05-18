@@ -79,13 +79,25 @@ export function generatePrincipalAndAdutora(
   const colXs = colunas.map((col) => col.reduce((sum, p) => sum + p[0], 0) / col.length);
   const principal: [number, number][] = colXs.map((x) => toLngLat(x, principalY));
 
-  // Adutora alinhada com o grid: projeta a captação no eixo X da principal
-  // (paralela às laterais, mesma lógica do grid de aspersores).
-  // Se a captação estiver fora do alcance X, conecta à extremidade mais próxima.
+  // Adutora alinhada com o grid: mesma lógica do posicionamento de aspersores.
+  // - Se wsLocalX está dentro do range da principal: conexão perpendicular (paralela às laterais).
+  // - Se wsLocalX está fora do range: usa a extremidade geograficamente mais próxima,
+  //   pois o clamp simples pode conectar ao extremo oposto quando o ângulo do grid
+  //   inverte o eixo X em relação ao espaço geográfico (ex: gridAngle > 90°).
   const xMin = colXs[0];
   const xMax = colXs[colXs.length - 1];
-  const connectionX = Math.max(xMin, Math.min(xMax, wsLocalX));
-  const connectionPt = toLngLat(connectionX, principalY);
+  const ws: [number, number] = [waterSource.lng, waterSource.lat];
 
-  return { principal, adutora: [[waterSource.lng, waterSource.lat], connectionPt] };
+  let connectionPt: [number, number];
+  if (wsLocalX >= xMin && wsLocalX <= xMax) {
+    connectionPt = toLngLat(wsLocalX, principalY);
+  } else {
+    const d0 = (ws[0] - principal[0][0]) ** 2 + (ws[1] - principal[0][1]) ** 2;
+    const dN =
+      (ws[0] - principal[principal.length - 1][0]) ** 2 +
+      (ws[1] - principal[principal.length - 1][1]) ** 2;
+    connectionPt = d0 <= dN ? principal[0] : principal[principal.length - 1];
+  }
+
+  return { principal, adutora: [ws, connectionPt] };
 }
