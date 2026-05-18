@@ -12,30 +12,6 @@ function rotate(x: number, y: number, angleRad: number): [number, number] {
   return [x * c - y * s, x * s + y * c];
 }
 
-// Ponto médio de uma polilinha por comprimento de arco.
-function midpointPolyline(pts: [number, number][]): [number, number] {
-  let total = 0;
-  for (let i = 1; i < pts.length; i++) {
-    total += Math.sqrt((pts[i][0] - pts[i - 1][0]) ** 2 + (pts[i][1] - pts[i - 1][1]) ** 2);
-  }
-  const half = total / 2;
-  let acc = 0;
-  for (let i = 1; i < pts.length; i++) {
-    const seg = Math.sqrt(
-      (pts[i][0] - pts[i - 1][0]) ** 2 + (pts[i][1] - pts[i - 1][1]) ** 2,
-    );
-    if (acc + seg >= half) {
-      const t = (half - acc) / seg;
-      return [
-        pts[i - 1][0] + t * (pts[i][0] - pts[i - 1][0]),
-        pts[i - 1][1] + t * (pts[i][1] - pts[i - 1][1]),
-      ];
-    }
-    acc += seg;
-  }
-  return pts[pts.length - 1];
-}
-
 export function generatePrincipalAndAdutora(
   waterSource: { lng: number; lat: number },
   laterais: Lateral[],
@@ -63,10 +39,10 @@ export function generatePrincipalAndAdutora(
     return [centroid.lng + drx / mPerLng, centroid.lat + dry / M_PER_DEG_LAT];
   };
 
-  // Determina o lado da captação no frame local para posicionar a principal corretamente.
+  // Captação no frame rotacionado — mesma base do grid de aspersores.
   const wsDx = (waterSource.lng - centroid.lng) * mPerLng;
   const wsDy = (waterSource.lat - centroid.lat) * M_PER_DEG_LAT;
-  const [, wsLocalY] = rotate(wsDx, wsDy, -angleRad);
+  const [wsLocalX, wsLocalY] = rotate(wsDx, wsDy, -angleRad);
 
   // Projeta cada derivação no frame rotacionado
   const localPts = laterais.map(({ derivacaoLngLat: [lng, lat] }) => {
@@ -75,14 +51,12 @@ export function generatePrincipalAndAdutora(
     return rotate(dx, dy, -angleRad);
   });
 
-  // sortedY contém todos os Y das derivações — usado para mediana e extremos globais.
+  // sortedY: mediana define o lado interior; extremo define onde assenta a principal.
   const sortedY = [...localPts.map((p) => p[1])].sort((a, b) => a - b);
   const medianY = sortedY[Math.floor(sortedY.length / 2)];
-  // A principal fica no lado da captação (min-Y se captação abaixo, max-Y se acima).
   const captacaoIsMinSide = wsLocalY <= medianY;
 
-  // Y único global para toda a principal — garante linha reta independente da forma do talhão.
-  // Posicionada a spacing/2 além do aspersor extremo no lado da captação.
+  // Y único global → principal reta independente da forma do talhão.
   const principalY = captacaoIsMinSide
     ? sortedY[0] - spacingMeters / 2
     : sortedY[sortedY.length - 1] + spacingMeters / 2;
@@ -101,16 +75,17 @@ export function generatePrincipalAndAdutora(
     }
   }
 
-  // X representativo = média dos X da coluna; Y fixo = principalY → principal reta.
-  const principal: [number, number][] = colunas.map((col) => {
-    const xRep = col.reduce((sum, p) => sum + p[0], 0) / col.length;
-    return toLngLat(xRep, principalY);
-  });
+  // X médio por coluna + principalY constante → linha reta.
+  const colXs = colunas.map((col) => col.reduce((sum, p) => sum + p[0], 0) / col.length);
+  const principal: [number, number][] = colXs.map((x) => toLngLat(x, principalY));
 
-  // Critério 1 (terreno plano): adutora conecta no ponto médio da principal.
-  // Minimiza a diferença de pressão entre o setor mais próximo e o mais distante.
-  // Para terreno inclinado, o chamador pode sobrescrever o ponto de conexão com
-  // base na elevação das extremidades (extremidade mais alta = menor AMT).
-  const midPt = midpointPolyline(principal);
-  return { principal, adutora: [[waterSource.lng, waterSource.lat], midPt] };
+  // Adutora alinhada com o grid: projeta a captação no eixo X da principal
+  // (paralela às laterais, mesma lógica do grid de aspersores).
+  // Se a captação estiver fora do alcance X, conecta à extremidade mais próxima.
+  const xMin = colXs[0];
+  const xMax = colXs[colXs.length - 1];
+  const connectionX = Math.max(xMin, Math.min(xMax, wsLocalX));
+  const connectionPt = toLngLat(connectionX, principalY);
+
+  return { principal, adutora: [[waterSource.lng, waterSource.lat], connectionPt] };
 }
