@@ -42,7 +42,7 @@ export const ASPERSOR_PADRAO: Aspersor = {
   unidade: "UN",
   custo: 15.06,
   precoVenda: 32.0,
-  pressaoServicoMca: 25,
+  pressaoServicoMca: 30, // V0.5-RC: Naan 5022-SD pressão de serviço = 30 mca
   vazaoM3PorHora: 1.5,
   raioMolhadoM: 14,
   espacamentoPadraoM: 12,

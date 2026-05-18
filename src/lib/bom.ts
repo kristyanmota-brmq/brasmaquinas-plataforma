@@ -38,8 +38,6 @@ export interface BOM {
   };
 }
 
-const PRESSAO_SERVICO_ASPERSOR_MCA = 30;
-
 export function buildBOM(layout: ProjectLayout): BOM | null {
   if (
     !layout.sprinklers ||
@@ -88,7 +86,7 @@ export function buildBOM(layout: ProjectLayout): BOM | null {
     layout.sprinklers.espacamentoM,
     {
       vazao: vazaoPorAspersorM3h,
-      pressaoServico: PRESSAO_SERVICO_ASPERSOR_MCA,
+      pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca,
     },
     TUBOS_PVC_LF,
   );

@@ -247,7 +247,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
       layout.sprinklers.espacamentoM,
       {
         vazao: layout.sprinklers.vazaoProjetoM3PorHora / layout.sprinklers.count,
-        pressaoServico: 30,
+        pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca,
       },
       TUBOS_PVC_LF,
     );
