@@ -1,9 +1,10 @@
 /**
  * Hazen-Williams — perda de carga em tubulações.
- * Fórmula (SI): hf = 10.643 * Q^1.852 / (C^1.852 * D^4.87) * L
+ * V0.5-RC §14 / Manual Técnico §14:
+ *   hf = 10,67 × Q^1,852 / (C^1,852 × D^4,871) × L
  *   hf [m]     — perda de carga distribuída
  *   Q  [m³/s]  — vazão
- *   C  [-]     — coeficiente do material (PVC = 145)
+ *   C  [-]     — coeficiente do material (PVC V0.5-RC = 145)
  *   D  [m]     — diâmetro interno
  *   L  [m]     — comprimento do trecho
  */
@@ -34,8 +35,9 @@ export function headLoss(
   const D = diametroMm / 1000;
   if (Q <= 0 || D <= 0 || comprimentoM <= 0) return 0;
   return (
-    (10.643 * Math.pow(Q, 1.852) * comprimentoM) /
-    (Math.pow(coefC, 1.852) * Math.pow(D, 4.87))
+    // V0.5-RC §14: constante 10,67; expoente de D = 4,871
+    (10.67 * Math.pow(Q, 1.852) * comprimentoM) /
+    (Math.pow(coefC, 1.852) * Math.pow(D, 4.871))
   );
 }
 
