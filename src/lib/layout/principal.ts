@@ -12,6 +12,26 @@ function rotate(x: number, y: number, angleRad: number): [number, number] {
   return [x * c - y * s, x * s + y * c];
 }
 
+// Ponto da polilinha mais próximo de pt (em coordenadas geográficas).
+function nearestPointOnPolyline(
+  pt: [number, number],
+  poly: [number, number][],
+): [number, number] {
+  let bestDist = Infinity;
+  let best: [number, number] = poly[0];
+  for (let i = 0; i < poly.length - 1; i++) {
+    const a = poly[i], b = poly[i + 1];
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) continue;
+    const t = Math.max(0, Math.min(1, ((pt[0] - a[0]) * dx + (pt[1] - a[1]) * dy) / len2));
+    const proj: [number, number] = [a[0] + t * dx, a[1] + t * dy];
+    const dist = (pt[0] - proj[0]) ** 2 + (pt[1] - proj[1]) ** 2;
+    if (dist < bestDist) { bestDist = dist; best = proj; }
+  }
+  return best;
+}
+
 export function generatePrincipalAndAdutora(
   waterSource: { lng: number; lat: number },
   laterais: Lateral[],
@@ -45,38 +65,33 @@ export function generatePrincipalAndAdutora(
     return rotate(dx, dy, -angleRad);
   };
 
-  // Captação no frame rotacionado — mesma base do grid de aspersores.
-  const [wsLocalX, wsLocalY] = toLocal(waterSource.lng, waterSource.lat);
+  const ws: [number, number] = [waterSource.lng, waterSource.lat];
+  const [, wsLocalY] = toLocal(ws[0], ws[1]);
 
-  // Projeta início (primeiro aspersor, min-Y) e fim (último aspersor, max-Y) de cada lateral.
-  const localStartPts = laterais.map(({ derivacaoLngLat: [lng, lat] }) => toLocal(lng, lat));
-  const localEndPts   = laterais.map(({ endLngLat:       [lng, lat] }) => toLocal(lng, lat));
+  // Para cada lateral, seleciona o extremo geograficamente mais próximo da captação.
+  // Evita qualquer suposição sobre qual lado do frame rotacionado corresponde à captação,
+  // tornando o cálculo correto para qualquer ângulo de grid.
+  const captSideLocal = laterais.map((lat) => {
+    const dStart =
+      (lat.startLngLat[0] - ws[0]) ** 2 + (lat.startLngLat[1] - ws[1]) ** 2;
+    const dEnd =
+      (lat.endLngLat[0] - ws[0]) ** 2 + (lat.endLngLat[1] - ws[1]) ** 2;
+    return toLocal(...(dStart <= dEnd ? lat.startLngLat : lat.endLngLat));
+  });
 
-  // Centro do campo em Y = mediana dos pontos médios de cada lateral.
-  // Mais robusto que usar só os primeiros aspersores como referência.
-  const midYs       = laterais.map((_, i) => (localStartPts[i][1] + localEndPts[i][1]) / 2);
-  const midYsSorted = [...midYs].sort((a, b) => a - b);
-  const fieldMidY   = midYsSorted[Math.floor(midYsSorted.length / 2)];
-  const captacaoIsMinSide = wsLocalY <= fieldMidY;
+  // principalY único: extremo dos pontos do lado da captação, deslocado spacing/2 na
+  // direção da captação. Usa wsLocalY para saber em qual direção deslocar.
+  const captSideYsSorted = [...captSideLocal.map((p) => p[1])].sort((a, b) => a - b);
+  const captSideYMedian = captSideYsSorted[Math.floor(captSideYsSorted.length / 2)];
+  const principalY =
+    wsLocalY <= captSideYMedian
+      ? captSideYsSorted[0] - spacingMeters / 2
+      : captSideYsSorted[captSideYsSorted.length - 1] + spacingMeters / 2;
 
-  // principalY único global → linha reta.
-  // Bug anterior: sempre usava derivacaoLngLat (primeiro aspersor, min-Y) mesmo quando
-  // a captação está no lado max-Y → principal ficava no lado errado do campo.
-  // Correção: usa endLngLat (último aspersor, max-Y) quando captação está no lado max-Y.
-  const refYs     = captacaoIsMinSide
-    ? localStartPts.map((p) => p[1])
-    : localEndPts.map((p) => p[1]);
-  const refYSorted = [...refYs].sort((a, b) => a - b);
-  const principalY = captacaoIsMinSide
-    ? refYSorted[0] - spacingMeters / 2
-    : refYSorted[refYSorted.length - 1] + spacingMeters / 2;
-
-  // Ordena por X (eixo ao longo da principal) usando startPts (mesmo X que endPts).
-  localStartPts.sort((a, b) => a[0] - b[0]);
-
-  // Colapsa pontos com X próximo (mesma coluna física, setores diferentes)
+  // Ordena por X e colapsa em colunas físicas.
+  captSideLocal.sort((a, b) => a[0] - b[0]);
   const colunas: [number, number][][] = [];
-  for (const pt of localStartPts) {
+  for (const pt of captSideLocal) {
     const last = colunas[colunas.length - 1];
     if (last && Math.abs(pt[0] - last[0][0]) <= tolerance) {
       last.push(pt);
@@ -89,21 +104,10 @@ export function generatePrincipalAndAdutora(
   const colXs = colunas.map((col) => col.reduce((sum, p) => sum + p[0], 0) / col.length);
   const principal: [number, number][] = colXs.map((x) => toLngLat(x, principalY));
 
-  // Adutora alinhada ao grid: perpendicular se captação está inline, endpoint mais próximo caso contrário.
-  const xMin = colXs[0];
-  const xMax = colXs[colXs.length - 1];
-  const ws: [number, number] = [waterSource.lng, waterSource.lat];
-
-  let connectionPt: [number, number];
-  if (wsLocalX >= xMin && wsLocalX <= xMax) {
-    connectionPt = toLngLat(wsLocalX, principalY);
-  } else {
-    const d0 = (ws[0] - principal[0][0]) ** 2 + (ws[1] - principal[0][1]) ** 2;
-    const dN =
-      (ws[0] - principal[principal.length - 1][0]) ** 2 +
-      (ws[1] - principal[principal.length - 1][1]) ** 2;
-    connectionPt = d0 <= dN ? principal[0] : principal[principal.length - 1];
-  }
+  // Adutora: ponto da principal geograficamente mais próximo da captação.
+  // Quando a captação está alinhada com o centro da principal, conecta no centro;
+  // quando está deslocada para uma extremidade, conecta nessa extremidade.
+  const connectionPt = nearestPointOnPolyline(ws, principal);
 
   return { principal, adutora: [ws, connectionPt] };
 }
