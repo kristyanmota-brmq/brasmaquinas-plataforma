@@ -305,6 +305,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             laterais,
             layout.centroid,
             layout.sprinklers.gridAngleDegrees,
+            layout.sprinklers.espacamentoM,
           )
         : {
             principal: [
@@ -543,6 +544,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             laterais,
             layout.centroid,
             layout.sprinklers.gridAngleDegrees,
+            layout.sprinklers.espacamentoM,
           )
         : {
             principal: [

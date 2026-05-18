@@ -21,6 +21,7 @@ export function generatePrincipalAndAdutora(
   laterais: Lateral[],
   centroid: { lng: number; lat: number },
   gridAngleDegrees: number,
+  spacingMeters: number = 12,
 ): { principal: [number, number][]; adutora: [number, number][] } {
   if (laterais.length === 0) {
     return {
@@ -35,23 +36,42 @@ export function generatePrincipalAndAdutora(
   const latRad = (centroid.lat * Math.PI) / 180;
   const mPerLng = metersPerDegLng(latRad);
   const angleRad = (gridAngleDegrees * Math.PI) / 180;
+  const tolerance = spacingMeters * 0.5;
 
   const toLngLat = (x: number, y: number): [number, number] => {
     const [drx, dry] = rotate(x, y, angleRad);
     return [centroid.lng + drx / mPerLng, centroid.lat + dry / M_PER_DEG_LAT];
   };
 
-  // Project each derivation point into the rotated frame and sort by X
+  // Projeta cada derivação no frame rotacionado
   const localPts = laterais.map(({ derivacaoLngLat: [lng, lat] }) => {
     const dx = (lng - centroid.lng) * mPerLng;
     const dy = (lat - centroid.lat) * M_PER_DEG_LAT;
-    return rotate(dx, dy, -angleRad);
+    return rotate(dx, dy, -angleRad); // [x, y] em metros
   });
+
+  // Ordena por X (eixo perpendicular às laterais)
   localPts.sort((a, b) => a[0] - b[0]);
 
-  const principal: [number, number][] = localPts.map(([x, y]) => toLngLat(x, y));
+  // Colapsa pontos com X próximo (mesma coluna física, setores diferentes)
+  // para um único ponto representativo (menor Y = extremidade mais próxima da captação).
+  const colunas: [number, number][][] = [];
+  for (const pt of localPts) {
+    const last = colunas[colunas.length - 1];
+    if (last && Math.abs(pt[0] - last[0][0]) <= tolerance) {
+      last.push(pt);
+    } else {
+      colunas.push([pt]);
+    }
+  }
 
-  // Adutora: waterSource → nearest endpoint of principal
+  // Representante de cada coluna: ponto com menor Y absoluto
+  const principal: [number, number][] = colunas.map((col) => {
+    const rep = col.reduce((a, b) => (Math.abs(a[1]) < Math.abs(b[1]) ? a : b));
+    return toLngLat(rep[0], rep[1]);
+  });
+
+  // Adutora: captação → extremidade da principal mais próxima
   const ws: [number, number] = [waterSource.lng, waterSource.lat];
   const nearestEndpoint =
     dist2(ws, principal[0]) <= dist2(ws, principal[principal.length - 1])
