@@ -76,6 +76,10 @@ export interface BOMResult {
     pendingControlPointsCount: number;
     independentFeedRequiredCount: number;
     constructabilityStatus: ConstructabilityStatus;
+    /** TASK-005: válvulas de seção identificadas pela construtibilidade. */
+    valvulasCount: number;
+    /** TASK-005: válvulas de seção sem SKU/preço no catálogo — não entram na BOM precificada. */
+    valvulasSemCatalogoCount: number;
   };
 }
 
@@ -444,6 +448,14 @@ export function buildBOM(input: BOMInput): BOMResult {
     0,
   );
 
+  // ── TASK-005: Válvulas de seção ───────────────────────────────────────────
+  // Conta section_valve CPs — não entra na BOM precificada (catálogo inexistente).
+  const valvulasCount = constructability.controlPoints.filter(
+    (cp) => cp.type === "section_valve",
+  ).length;
+  // Nesta versão não há catálogo de válvulas; toda válvula identificada está sem SKU.
+  const valvulasSemCatalogoCount = valvulasCount;
+
   const totalGeral = itens.reduce((sum, item) => sum + item.total, 0);
 
   return {
@@ -478,6 +490,8 @@ export function buildBOM(input: BOMInput): BOMResult {
       pendingControlPointsCount: constructability.pendingControlPointsCount,
       independentFeedRequiredCount: constructability.independentFeedRequiredCount,
       constructabilityStatus: constructability.constructabilityStatus,
+      valvulasCount,
+      valvulasSemCatalogoCount,
     },
   };
 }
@@ -670,6 +684,21 @@ export function generateProposalDiagnostics(
       `Existem ${independentFeedRequiredCount} trecho${independentFeedRequiredCount > 1 ? "s" : ""} operacional${independentFeedRequiredCount > 1 ? "is" : ""} ` +
       `sem alimentação física modelada (independent_feed_required). ` +
       `Exige ramal próprio, válvula de alimentação independente ou redesenho da setorização.`,
+    );
+  }
+
+  // ── TASK-005: Válvulas de seção sem catálogo ─────────────────────────────
+  const { valvulasCount, valvulasSemCatalogoCount } = bom.meta;
+  if (valvulasCount > 0) {
+    warnings.push(
+      `${valvulasCount} válvula${valvulasCount > 1 ? "s" : ""} de seção identificada${valvulasCount > 1 ? "s" : ""} ` +
+      `pela construtibilidade. Selecionar família de válvulas com projetista/RT/suprimentos.`,
+    );
+  }
+  if (valvulasSemCatalogoCount > 0) {
+    blockers.push(
+      `${valvulasSemCatalogoCount} válvula${valvulasSemCatalogoCount > 1 ? "s" : ""} de seção necessária${valvulasSemCatalogoCount > 1 ? "s" : ""} sem SKU/preço no catálogo. ` +
+      `A proposta final não deve ser emitida até cadastro ou inclusão comercial manual.`,
     );
   }
 

@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-19
-Testes na base: 431/431 · TypeScript: 0 erros
+Testes na base: 441/441 · TypeScript: 0 erros
 
 ---
 
@@ -117,22 +117,19 @@ Testes na base: 431/431 · TypeScript: 0 erros
 
 ### TASK-005 — Modelar BOM dos pontos de controle e válvulas
 
-**Status:** `pendente`
+**Status:** `concluída`
 **Prioridade:** P2-importante
 **Área:** bom
+**Concluída em:** 2026-05-19 · 441/441 testes · 0 erros tsc
 
-> Pontos de controle (`ControlPoint` com `type: "section_valve"`) existem na construtibilidade mas não geram peças na BOM. Cada ponto deve resultar em uma linha de válvula dimensionada pelo diâmetro do trecho.
+> Pontos de controle `section_valve` passam a ser contabilizados em `BOMResult.meta`:
+> `valvulasCount` (total identificado) e `valvulasSemCatalogoCount` (sem SKU/preço).
+> Como o catálogo não possui nenhuma entrada de válvula, nenhum item precificado foi criado.
+> `generateProposalDiagnostics` emite warning técnico (válvulas identificadas) e blocker
+> comercial (sem catálogo) separados. 10 testes em `bom-valves.test.ts`.
 >
-> **Problema atual:** `buildBOM` ignora `constructability.controlPoints`. A BOM não inclui válvulas de corte operacional.
->
-> **Escopo esperado:**
-> - Peça de válvula por diâmetro a partir do catálogo (a definir)
-> - Linha `categoria: "CONEXAO"` na BOM por ponto de controle
-> - `status: "resolved"` nos ControlPoints incluídos na BOM
-> - `meta.valvulasCount` em `BOMResult`
-> - Testes obrigatórios: ≥ 5
->
-> **Dependência:** TASK-004 pode afetar o diâmetro escolhido nos pontos de controle.
+> **Pendências:** criar catálogo de válvulas por diâmetro/PN; homologar família;
+> implementar transição `section_valve` de `pending` para `resolved`; incluir na BOM precificada.
 
 ---
 

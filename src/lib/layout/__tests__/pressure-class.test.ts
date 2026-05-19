@@ -166,6 +166,8 @@ function makeMinimalBOM(): BOMResult {
       pendingControlPointsCount: 0,
       independentFeedRequiredCount: 0,
       constructabilityStatus: "ok",
+      valvulasCount: 0,
+      valvulasSemCatalogoCount: 0,
     },
   };
 }
