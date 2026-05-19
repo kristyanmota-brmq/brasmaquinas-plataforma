@@ -28,18 +28,22 @@ import {
   EyeOff,
   Spline,
   BookOpen,
+  FileDown,
 } from "lucide-react";
 import clsx from "clsx";
 import {
   saveProjectLayout,
   type ProjectLayout,
 } from "@/app/projetos/[id]/actions";
-import { ASPERSOR_PADRAO,
-  TUBOS_PVC_LF,
-} from "@/lib/catalog/aspersores";
-import { buildBOM, type BOM } from "@/lib/bom";
-import { generateLaterais, type Lateral } from "@/lib/layout/laterais";
-import { generatePrincipalAndAdutora } from "@/lib/layout/principal";
+import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
+import type { BOMResult } from "@/lib/bom";
+import type { Lateral, PhysicalColumn } from "@/lib/layout/laterais";
+import { calculateIrrigationProject } from "@/lib/layout/irrigation-project";
+import {
+  buildAutoPipelineCoords,
+  buildMainPipelineUpdate,
+  buildSectorizationForJornada,
+} from "@/lib/layout/layout-use-cases";
 import { MemorialPanel } from "@/components/map/MemorialPanel";
 
 interface Props {
@@ -142,63 +146,6 @@ function generateRotatedSprinklerGrid(
   );
 }
 
-function buildSectors(
-  positions: [number, number][],
-  n: number,
-  angleDegrees: number,
-  centroid: { lng: number; lat: number },
-  spacingMeters: number
-): number[] {
-  const total = positions.length;
-  if (total === 0 || n <= 0) return [];
-
-  const pivot = turf.point([centroid.lng, centroid.lat]);
-
-  // Tolerância para considerar dois aspersores na mesma coluna
-  const metersPerDegreeLng =
-    111320 * Math.cos((centroid.lat * Math.PI) / 180);
-  const spacingDegrees = spacingMeters / metersPerDegreeLng;
-  const tolerance = spacingDegrees * 0.5;
-
-  // Rotacionar todos os pontos
-  const rotated = positions.map((p, i) => {
-    const rot = turf.transformRotate(turf.point(p), -angleDegrees, { pivot });
-    return {
-      index: i,
-      x: rot.geometry.coordinates[0],
-    };
-  });
-
-  // Identificar colunas únicas por proximidade no eixo X
-  const sortedByX = [...rotated].sort((a, b) => a.x - b.x);
-  const columnByIndex: number[] = new Array(total);
-  let currentColumn = 0;
-  columnByIndex[sortedByX[0].index] = 0;
-
-  for (let i = 1; i < sortedByX.length; i++) {
-    if (sortedByX[i].x - sortedByX[i - 1].x > tolerance) {
-      currentColumn++;
-    }
-    columnByIndex[sortedByX[i].index] = currentColumn;
-  }
-
-  const totalColumns = currentColumn + 1;
-  const effectiveN = Math.min(n, totalColumns);
-
-  // Distribuir colunas em setores: primeiros setores recebem 1 coluna a mais se houver resto
-  const baseColsPerSector = Math.floor(totalColumns / effectiveN);
-  const extraColumns = totalColumns - baseColsPerSector * effectiveN;
-  const cutoffCol = extraColumns * (baseColsPerSector + 1);
-
-  const columnToSector = (colId: number): number => {
-    if (colId < cutoffCol) {
-      return Math.floor(colId / (baseColsPerSector + 1));
-    }
-    return extraColumns + Math.floor((colId - cutoffCol) / baseColsPerSector);
-  };
-
-  return columnByIndex.map(columnToSector);
-}
 
 function calculatePipelineLength(coords: [number, number][]): number {
   if (coords.length < 2) return 0;
@@ -225,6 +172,8 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   const [showCoverage, setShowCoverage] = useState(false);
   const [showMemorial, setShowMemorial] = useState(false);
   const [selectedSector, setSelectedSector] = useState<number | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<{ kind: "blocked"; blockers: string[] } | { kind: "technical" } | null>(null);
   const hasMounted = useRef(false);
 
   const isDrawingPolygon = mode === "polygon";
@@ -237,21 +186,26 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     [layout.area]
   );
 
-  const laterais = useMemo<Lateral[]>(() => {
-    if (!layout.sprinklers || !layout.sectorization || !layout.centroid) return [];
-    return generateLaterais(
-      layout.sprinklers.positions,
-      layout.sectorization.sectorIndices,
-      layout.sprinklers.gridAngleDegrees,
-      layout.centroid,
-      layout.sprinklers.espacamentoM,
-      {
-        vazao: layout.sprinklers.vazaoProjetoM3PorHora / layout.sprinklers.count,
-        pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca,
-      },
-      TUBOS_PVC_LF,
-    );
-  }, [layout.sprinklers, layout.sectorization, layout.centroid]);
+  // ── Resultado completo do projeto — única fonte de verdade para display ────
+  const projectResult = useMemo(
+    () => calculateIrrigationProject(layout),
+    [layout],
+  );
+
+  // Colunas físicas com deps restritas (sprinklers+centroid) para estabilidade
+  // em operações de edição: applyJornada e auto-pipeline não devem re-executar
+  // quando sectorization ou mainPipeline mudam.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const physicalColumns = useMemo<PhysicalColumn[]>(
+    () => projectResult.physical?.physicalColumns ?? [],
+    [layout.sprinklers, layout.centroid],
+  );
+
+  const laterais: Lateral[] = projectResult.distribution?.laterais ?? [];
+  const bom: BOMResult | null = projectResult.bom;
+  const controlPoints = projectResult.constructability?.controlPoints ?? [];
+  const secondaries = projectResult.hydraulic?.secondaries ?? [];
+  const connectivityReport = projectResult.hydraulic?.connectivityReport ?? null;
 
   const intensidadeMmPorHora = useMemo(
     () =>
@@ -264,7 +218,16 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     () => Math.round((LAMINA_MM / intensidadeMmPorHora) * 60),
     [intensidadeMmPorHora]
   );
-  const bom: BOM | null = useMemo(() => buildBOM(layout), [layout]);
+
+  const secondariesGeoJSON = useMemo(() => ({
+    type: "FeatureCollection" as const,
+    features: secondaries.map((s) => ({
+      type: "Feature" as const,
+      properties: { physicalColumnId: s.physicalColumnId, lengthM: s.lengthM },
+      geometry: { type: "LineString" as const, coordinates: [s.fromCoord, s.toCoord] },
+    })),
+  }), [secondaries]);
+
   const coverageGeoJSON = useMemo(() => {
     if (!layout.sprinklers || !showCoverage) return null;
     const features = layout.sprinklers.positions
@@ -298,65 +261,32 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     if (layout.mainPipeline?.source === "manual") return;
     if (!layout.centroid) return;
 
-    const { principal, adutora: adutoraBase } =
-      laterais.length > 0 && layout.sprinklers
-        ? generatePrincipalAndAdutora(
-            layout.waterSource,
-            laterais,
-            layout.centroid,
-            layout.sprinklers.gridAngleDegrees,
-          )
-        : {
-            principal: [
-              [layout.waterSource.lng, layout.waterSource.lat],
-              [layout.centroid.lng, layout.centroid.lat],
-            ] as [number, number][],
-            adutora: [] as [number, number][],
-          };
+    const { principal, adutora, lengthMeters } = buildAutoPipelineCoords(
+      layout.waterSource,
+      physicalColumns,
+      layout.centroid,
+      layout.sprinklers?.gridAngleDegrees ?? 0,
+    );
 
-    const lengthMeters = calculatePipelineLength(principal);
+    // Adutora conecta sempre ao endpoint mais próximo da captação (nearest, via principal.ts).
+    // O desnível é registrado em elevationDeltaM para dimensionamento da bomba — não muda o traçado.
     const elevationStartM = queryElevation(principal[0][0], principal[0][1]);
     const elevationEndM = queryElevation(
       principal[principal.length - 1][0],
       principal[principal.length - 1][1],
     );
-    const elevationDeltaM =
-      elevationStartM !== undefined && elevationEndM !== undefined
-        ? elevationEndM - elevationStartM
-        : undefined;
-
-    // Se declive > 0,5% ao longo da principal, adutora entra pela extremidade mais alta.
-    let adutora = adutoraBase;
-    if (
-      elevationStartM !== undefined &&
-      elevationEndM !== undefined &&
-      lengthMeters > 0 &&
-      Math.abs(elevationEndM - elevationStartM) / lengthMeters > 0.005
-    ) {
-      const highEnd =
-        elevationStartM > elevationEndM ? principal[0] : principal[principal.length - 1];
-      adutora = [[layout.waterSource.lng, layout.waterSource.lat], highEnd];
-    }
 
     setLayout((l) => ({
       ...l,
-      mainPipeline: {
-        coordinates: principal,
-        adutora,
-        lengthMeters,
-        segments: principal.length - 1,
-        elevationStartM,
-        elevationEndM,
-        elevationDeltaM,
-        source: "auto",
-      },
+      mainPipeline: buildMainPipelineUpdate(principal, adutora, lengthMeters, elevationStartM, elevationEndM),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     layout.waterSource?.lng,
     layout.waterSource?.lat,
     layout.area,
-    laterais,
+    layout.sprinklers,
+    layout.centroid,
   ]);
 
   useEffect(() => {
@@ -549,59 +479,24 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   const resetToAutoPipeline = useCallback(() => {
     if (!layout.waterSource || !layout.centroid) return;
 
-    const { principal, adutora: adutoraBase } =
-      laterais.length > 0 && layout.sprinklers
-        ? generatePrincipalAndAdutora(
-            layout.waterSource,
-            laterais,
-            layout.centroid,
-            layout.sprinklers.gridAngleDegrees,
-          )
-        : {
-            principal: [
-              [layout.waterSource.lng, layout.waterSource.lat],
-              [layout.centroid.lng, layout.centroid.lat],
-            ] as [number, number][],
-            adutora: [] as [number, number][],
-          };
+    const { principal, adutora, lengthMeters } = buildAutoPipelineCoords(
+      layout.waterSource,
+      physicalColumns,
+      layout.centroid,
+      layout.sprinklers?.gridAngleDegrees ?? 0,
+    );
 
-    const lengthMeters = calculatePipelineLength(principal);
     const elevationStartM = queryElevation(principal[0][0], principal[0][1]);
     const elevationEndM = queryElevation(
       principal[principal.length - 1][0],
       principal[principal.length - 1][1],
     );
-    const elevationDeltaM =
-      elevationStartM !== undefined && elevationEndM !== undefined
-        ? elevationEndM - elevationStartM
-        : undefined;
-
-    let adutora = adutoraBase;
-    if (
-      elevationStartM !== undefined &&
-      elevationEndM !== undefined &&
-      lengthMeters > 0 &&
-      Math.abs(elevationEndM - elevationStartM) / lengthMeters > 0.005
-    ) {
-      const highEnd =
-        elevationStartM > elevationEndM ? principal[0] : principal[principal.length - 1];
-      adutora = [[layout.waterSource.lng, layout.waterSource.lat], highEnd];
-    }
 
     setLayout((l) => ({
       ...l,
-      mainPipeline: {
-        coordinates: principal,
-        adutora,
-        lengthMeters,
-        segments: principal.length - 1,
-        elevationStartM,
-        elevationEndM,
-        elevationDeltaM,
-        source: "auto",
-      },
+      mainPipeline: buildMainPipelineUpdate(principal, adutora, lengthMeters, elevationStartM, elevationEndM),
     }));
-  }, [layout.waterSource, layout.centroid, layout.sprinklers, laterais, queryElevation]);
+  }, [layout.waterSource, layout.centroid, layout.sprinklers, physicalColumns, queryElevation]);
 
   const clearPipeline = useCallback(() => {
     setLayout((l) => {
@@ -610,6 +505,100 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
       return next;
     });
   }, []);
+
+  const validateCorridor = useCallback(() => {
+    setLayout((l) => {
+      if (!l.mainPipeline) return l;
+      return {
+        ...l,
+        mainPipeline: { ...l.mainPipeline, corridorValidated: true },
+      };
+    });
+  }, []);
+
+  const invalidateCorridor = useCallback(() => {
+    setLayout((l) => {
+      if (!l.mainPipeline) return l;
+      return {
+        ...l,
+        mainPipeline: { ...l.mainPipeline, corridorValidated: false },
+      };
+    });
+  }, []);
+
+  const handleExportPDF = useCallback(async () => {
+    if (!bom || pdfLoading) return;
+    setPdfLoading(true);
+    setPdfError(null);
+    try {
+      const map = mapRef.current?.getMap();
+      let mapImage: string | null = null;
+
+      if (map) {
+        let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+        const extend = (lng: number, lat: number) => {
+          if (lng < minLng) minLng = lng;
+          if (lng > maxLng) maxLng = lng;
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+        };
+
+        // Usa apenas o polígono da área para o zoom — incluir captação (128m+ da área)
+        // puxaria o zoom pra fora demais e esconderia os detalhes do layout.
+        layout.area?.coordinates[0]?.forEach(([lng, lat]) => extend(lng as number, lat as number));
+        layout.sprinklers?.positions.forEach(([lng, lat]) => extend(lng, lat));
+
+        if (minLng !== Infinity) {
+          const prevCenter = map.getCenter();
+          const prevZoom = map.getZoom();
+          await new Promise<void>((resolve) => {
+            map.once("idle", () => resolve());
+            map.fitBounds(
+              [[minLng, minLat], [maxLng, maxLat]] as [[number, number], [number, number]],
+              { padding: 80, animate: false },
+            );
+          });
+          mapImage = map.getCanvas().toDataURL("image/jpeg", 0.88);
+          map.jumpTo({ center: prevCenter, zoom: prevZoom });
+        } else {
+          mapImage = map.getCanvas().toDataURL("image/jpeg", 0.88);
+        }
+      }
+
+      const res = await fetch(`/api/projetos/${projectId}/pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mapImage }),
+      });
+      if (!res.ok) {
+        let parsed: unknown;
+        try { parsed = await res.json(); } catch { parsed = null; }
+        if (
+          parsed !== null &&
+          typeof parsed === "object" &&
+          (parsed as Record<string, unknown>).error === "PDF_BLOCKED"
+        ) {
+          const body = parsed as { blockers: string[] };
+          setPdfError({ kind: "blocked", blockers: body.blockers ?? [] });
+        } else {
+          setPdfError({ kind: "technical" });
+        }
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `proposta-${projectName ?? projectId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[PDF]", err);
+      setPdfError({ kind: "technical" });
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [bom, pdfLoading, projectId, projectName, layout]);
 
   const clearArea = useCallback(() => {
     setLayout((l) => {
@@ -717,31 +706,16 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   const applyJornada = useCallback(
     (jornada: Jornada) => {
       if (!layout.sprinklers || !layout.centroid) return;
-      const n = jornada;
-      const sectorIndices = buildSectors(
-        layout.sprinklers.positions,
-        n,
-        layout.sprinklers.gridAngleDegrees,
-        layout.centroid,
-        ASPERSOR_PADRAO.espacamentoPadraoM
+      const sectorization = buildSectorizationForJornada(
+        physicalColumns,
+        jornada,
+        layout.sprinklers.positions.length,
+        ASPERSOR_PADRAO.vazaoM3PorHora,
+        tempoPorSetorMinutos,
       );
-      const aspersoresPorSetor = Math.round(layout.sprinklers.count / n);
-      const vazaoPorSetor =
-        aspersoresPorSetor * ASPERSOR_PADRAO.vazaoM3PorHora;
-      setLayout((l) => ({
-        ...l,
-        sectorization: {
-          jornadaHoras: jornada,
-          laminaMm: 10,
-          setoresCount: n,
-          tempoPorSetorMinutos,
-          aspersoresPorSetor,
-          vazaoPorSetorM3PorHora: vazaoPorSetor,
-          sectorIndices,
-        },
-      }));
+      setLayout((l) => ({ ...l, sectorization }));
     },
-    [layout.sprinklers, layout.centroid, tempoPorSetorMinutos]
+    [layout.sprinklers, layout.centroid, physicalColumns, tempoPorSetorMinutos]
   );
 
   const clearSectorization = useCallback(() => {
@@ -874,6 +848,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             mode === "view" && layout.sprinklers ? ["sprinklers-circles"] : []
           }
           terrain={{ source: "mapbox-dem", exaggeration: 1 }}
+          preserveDrawingBuffer={true}
           onLoad={(e) => {
             const map = e.target;
             if (!map.getSource("mapbox-dem")) {
@@ -1007,37 +982,38 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             </Source>
           )}
 
-          {sprinklerGeoJSON && (
-            <Source id="sprinklers-src" type="geojson" data={sprinklerGeoJSON}>
-              <Layer
-                id="sprinklers-circles"
-                type="circle"
-                paint={{
-                  "circle-radius": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    12,
-                    2,
-                    16,
-                    4,
-                    20,
-                    7,
-                  ],
-                  "circle-color": sprinklerColorExpression as any,
-                  "circle-opacity": sprinklerOpacityExpression as any,
-                  "circle-stroke-color": "#FFFFFF",
-                  "circle-stroke-width": sprinklerStrokeWidthExpression as any,
-                  "circle-stroke-opacity": sprinklerOpacityExpression as any,
-                }}
-              />
-            </Source>
-          )}          {sectorLabelsGeoJSON && (
-            <Source
-              id="sector-labels-src"
-              type="geojson"
-              data={sectorLabelsGeoJSON}
-            >
+          <Source
+            id="sprinklers-src"
+            type="geojson"
+            data={sprinklerGeoJSON ?? { type: "FeatureCollection", features: [] }}
+          >
+            <Layer
+              id="sprinklers-circles"
+              type="circle"
+              paint={{
+                "circle-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  12,
+                  1.5,
+                  16,
+                  2.5,
+                  20,
+                  4,
+                ],
+                "circle-color": sprinklerColorExpression as any,
+                "circle-opacity": sprinklerOpacityExpression as any,
+                "circle-stroke-color": "#FFFFFF",
+                "circle-stroke-width": sprinklerStrokeWidthExpression as any,
+                "circle-stroke-opacity": sprinklerOpacityExpression as any,
+              }}
+            />
+          </Source>          <Source
+            id="sector-labels-src"
+            type="geojson"
+            data={sectorLabelsGeoJSON ?? { type: "FeatureCollection", features: [] }}
+          >
               <Layer
                 id="sector-labels-circles"
                 type="circle"
@@ -1089,98 +1065,170 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                   "text-color": "#FFFFFF",
                 }}
               />
-            </Source>
-          )}
+          </Source>
 
 
 
 
 
-          {laterais.length > 0 && (
-            <Source
-              id="laterais"
-              type="geojson"
-              data={{
-                type: "FeatureCollection",
-                features: laterais.map((lat) => ({
-                  type: "Feature",
-                  properties: {
-                    sectorId: lat.sectorId,
-                    comprimentoM: lat.comprimentoM,
-                    vazaoM3h: lat.vazaoM3h,
-                    diametroMm: lat.selecao.tubo.diametroMm,
-                  },
-                  geometry: {
-                    type: "LineString",
-                    coordinates: [lat.startLngLat, lat.endLngLat],
-                  },
+          <Source
+            id="laterais"
+            type="geojson"
+            data={{
+              type: "FeatureCollection",
+              features: laterais.map((lat) => ({
+                type: "Feature",
+                properties: {
+                  sectorId: lat.sectorId,
+                  comprimentoM: lat.comprimentoM,
+                  vazaoM3h: lat.vazaoM3h,
+                  diametroMm: lat.selecao.tubo.diametroMm,
+                },
+                geometry: {
+                  type: "LineString",
+                  coordinates: [lat.startLngLat, lat.endLngLat],
+                },
+              })),
+            }}
+          >
+            <Layer
+              id="laterais-line"
+              type="line"
+              paint={{
+                "line-color": "#3B82A6",
+                "line-width": 1.5,
+                "line-opacity": 0.85,
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+          </Source>
+          <Source
+            id="pipeline-src"
+            type="geojson"
+            data={layout.mainPipeline ? {
+              type: "Feature" as const,
+              properties: {},
+              geometry: {
+                type: "LineString" as const,
+                coordinates: layout.mainPipeline.coordinates,
+              },
+            } : { type: "FeatureCollection" as const, features: [] }}
+          >
+            <Layer
+              id="principal-casing"
+              type="line"
+              paint={{ "line-color": "#FFFFFF", "line-width": 6, "line-opacity": 0.85 }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
+              id="principal-line"
+              type="line"
+              paint={{ "line-color": "#1B5680", "line-width": 3 }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+          </Source>
+          <Source
+            id="adutora-src"
+            type="geojson"
+            data={layout.mainPipeline?.adutora && layout.mainPipeline.adutora.length >= 2 ? {
+              type: "Feature" as const,
+              properties: {},
+              geometry: {
+                type: "LineString" as const,
+                coordinates: layout.mainPipeline.adutora,
+              },
+            } : { type: "FeatureCollection" as const, features: [] }}
+          >
+            <Layer
+              id="adutora-casing"
+              type="line"
+              paint={{ "line-color": "#FFFFFF", "line-width": 5, "line-opacity": 0.85 }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
+              id="adutora-line"
+              type="line"
+              paint={{ "line-color": "#E07B00", "line-width": 2.5 }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+          </Source>
+
+          {/* Camada de ramais (principal → lateral_inlet) — teal, apenas quando existem */}
+          <Source id="secondaries-src" type="geojson" data={secondariesGeoJSON}>
+            <Layer
+              id="secondaries-casing"
+              type="line"
+              paint={{ "line-color": "#FFFFFF", "line-width": 4, "line-opacity": 0.8 }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
+              id="secondaries-line"
+              type="line"
+              paint={{ "line-color": "#0D9F6E", "line-width": 2, "line-dasharray": [3, 1.5] }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+          </Source>
+
+          {/* Laterais físicas órfãs (sem conexão hidráulica) — vermelho de alerta */}
+          <Source
+            id="orphan-laterais-src"
+            type="geojson"
+            data={{
+              type: "FeatureCollection" as const,
+              features: physicalColumns
+                .filter((col) => connectivityReport?.orphanPhysicalColumns.includes(col.id))
+                .map((col) => ({
+                  type: "Feature" as const,
+                  properties: { id: col.id },
+                  geometry: { type: "LineString" as const, coordinates: [col.startLngLat, col.endLngLat] },
                 })),
+            }}
+          >
+            <Layer
+              id="orphan-laterais-line"
+              type="line"
+              paint={{ "line-color": "#EF4444", "line-width": 3, "line-opacity": 0.9 }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+          </Source>
+
+          {/* Camada de pontos de controle — válvulas pendentes (section_valve) */}
+          <Source
+            id="control-points-src"
+            type="geojson"
+            data={{
+              type: "FeatureCollection",
+              features: controlPoints
+                .filter((cp) => cp.type === "section_valve")
+                .map((cp) => ({
+                  type: "Feature" as const,
+                  properties: { status: cp.status, type: cp.type },
+                  geometry: { type: "Point" as const, coordinates: cp.coordinate },
+                })),
+            }}
+          >
+            <Layer
+              id="control-points-halo"
+              type="circle"
+              minzoom={13}
+              paint={{
+                "circle-radius": 7,
+                "circle-color": "#FFFFFF",
+                "circle-opacity": 0.9,
               }}
-            >
-              <Layer
-                id="laterais-line"
-                type="line"
-                paint={{
-                  "line-color": "#3B82A6",
-                  "line-width": 1.5,
-                  "line-opacity": 0.85,
-                }}
-                layout={{ "line-cap": "round", "line-join": "round" }}
-              />
-            </Source>
-          )}
-          {layout.mainPipeline && (
-            <Source
-              id="pipeline-src"
-              type="geojson"
-              data={{
-                type: "Feature",
-                properties: {},
-                geometry: {
-                  type: "LineString",
-                  coordinates: layout.mainPipeline.coordinates,
-                },
+            />
+            <Layer
+              id="control-points-dot"
+              type="circle"
+              minzoom={13}
+              paint={{
+                "circle-radius": 4,
+                "circle-color": "#E07B00",
+                "circle-stroke-color": "#B85C00",
+                "circle-stroke-width": 1.5,
               }}
-            >
-              <Layer
-                id="pipeline-casing"
-                type="line"
-                paint={{
-                  "line-color": "#FFFFFF",
-                  "line-width": 5,
-                  "line-opacity": 0.6,
-                }}
-                layout={{ "line-cap": "round", "line-join": "round" }}
-              />
-              <Layer
-                id="pipeline-line"
-                type="line"
-                paint={{ "line-color": "#1B5680", "line-width": 3 }}
-                layout={{ "line-cap": "round", "line-join": "round" }}
-              />
-            </Source>
-          )}
-          {layout.mainPipeline?.adutora && layout.mainPipeline.adutora.length >= 2 && (
-            <Source
-              id="adutora-src"
-              type="geojson"
-              data={{
-                type: "Feature",
-                properties: {},
-                geometry: {
-                  type: "LineString",
-                  coordinates: layout.mainPipeline.adutora,
-                },
-              }}
-            >
-              <Layer
-                id="adutora-line"
-                type="line"
-                paint={{ "line-color": "#1B5680", "line-width": 2.5 }}
-                layout={{ "line-cap": "round", "line-join": "round" }}
-              />
-            </Source>
-          )}
+            />
+          </Source>
 
           {layout.waterSource && (
             <Marker
@@ -1262,7 +1310,52 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             icon={<BookOpen className="w-4 h-4" />}
             label="Memorial"
           />
+          <button
+            onClick={handleExportPDF}
+            disabled={!bom || pdfLoading}
+            title={bom ? "Exportar proposta em PDF" : "Conclua a tubulação para exportar"}
+            className={clsx(
+              "flex flex-col items-center gap-0.5 px-2 py-1.5 rounded text-[10px] font-medium transition-colors select-none",
+              bom && !pdfLoading
+                ? "text-ink-2 hover:bg-surface-hover hover:text-ink cursor-pointer"
+                : "text-ink-4 cursor-not-allowed opacity-40",
+            )}
+          >
+            {pdfLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileDown className="w-4 h-4" />
+            )}
+            <span>{pdfLoading ? "…" : "PDF"}</span>
+          </button>
         </div>
+
+        {pdfError && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-red-300 rounded-md shadow-lg p-3 max-w-sm w-max">
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-xs text-red-700">
+                {pdfError.kind === "blocked" ? (
+                  <>
+                    <p className="font-semibold mb-1">Projeto bloqueado para emissão</p>
+                    <ul className="space-y-0.5 list-disc list-inside">
+                      {pdfError.blockers.map((b, i) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p>Erro técnico ao gerar o PDF. Tente novamente ou contacte o suporte.</p>
+                )}
+              </div>
+              <button
+                onClick={() => setPdfError(null)}
+                className="text-red-400 hover:text-red-600 flex-shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {showMemorial && (
           <MemorialPanel
@@ -1335,6 +1428,16 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             </button>
           </div>
         )}
+
+        {/* Badge de traçado automático não validado */}
+        {layout.mainPipeline?.source === "auto" &&
+          !layout.mainPipeline.corridorValidated && (
+            <div className="absolute bottom-14 left-1/2 -translate-x-1/2 pointer-events-none">
+              <div className="bg-amber-600/90 text-white text-[10px] font-medium uppercase tracking-wider px-3 py-1.5 rounded-full shadow-md whitespace-nowrap">
+                Traçado automático — validar corredor em campo antes da proposta final
+              </div>
+            </div>
+          )}
 
         <SaveStatus saving={saving} savedAt={savedAt} />
       </div>
@@ -1506,10 +1609,39 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             </button>
           ) : (
             <div className="bg-background border border-border rounded-sm p-3 space-y-3">
+              {/* Badge de origem do traçado */}
+              <div className="flex items-center justify-between">
+                <span
+                  className={clsx(
+                    "text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium",
+                    layout.mainPipeline.source === "manual"
+                      ? "bg-success-soft text-success"
+                      : layout.mainPipeline.corridorValidated
+                        ? "bg-success-soft text-success"
+                        : "bg-amber-50 text-amber-700 border border-amber-200",
+                  )}
+                >
+                  {layout.mainPipeline.source === "manual"
+                    ? "Manual"
+                    : layout.mainPipeline.corridorValidated
+                      ? "Auto · Validado"
+                      : "Auto · Pendente"}
+                </span>
+                {layout.mainPipeline.source === "auto" && (
+                  <button
+                    onClick={resetToAutoPipeline}
+                    title="Recalcular traçado automático"
+                    className="text-[11px] text-ink-3 hover:text-ink inline-flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Auto
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-0.5">
-                    Comprimento
+                    Principal
                   </div>
                   <div className="text-sm font-mono text-ink font-medium">
                     {layout.mainPipeline.lengthMeters.toFixed(0)} m
@@ -1517,12 +1649,39 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                 </div>
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-0.5">
-                    Segmentos
+                    Adutora
                   </div>
-                  <div className="text-sm text-ink font-medium">
-                    {layout.mainPipeline.segments}
+                  <div className="text-sm font-mono text-ink font-medium">
+                    {bom?.meta.comprimentoAdutoraM
+                      ? `${bom.meta.comprimentoAdutoraM.toFixed(0)} m`
+                      : "—"}
                   </div>
                 </div>
+                {secondaries.length > 0 && (
+                  <div className="col-span-2">
+                    <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-0.5">
+                      Ramais de conexão
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-mono text-[#0D9F6E] font-medium">
+                        {secondaries.reduce((s, r) => s + r.lengthM, 0).toFixed(0)} m
+                      </div>
+                      <span className="text-[10px] text-ink-3">
+                        {secondaries.length} ramal{secondaries.length > 1 ? "is" : ""}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {connectivityReport && connectivityReport.disconnectedColumnsCount > 0 && (
+                  <div className="col-span-2 bg-red-50 border border-red-200 rounded-sm p-2">
+                    <div className="text-[10px] font-medium text-red-700 uppercase tracking-wider mb-0.5">
+                      Laterais desconectadas
+                    </div>
+                    <div className="text-xs text-red-600">
+                      {connectivityReport.disconnectedColumnsCount} lateral{connectivityReport.disconnectedColumnsCount > 1 ? "is" : ""} sem conexão hidráulica
+                    </div>
+                  </div>
+                )}
                 {layout.mainPipeline.elevationDeltaM !== undefined && (
                   <div className="col-span-2 pt-2 border-t border-border">
                     <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-0.5">
@@ -1547,11 +1706,30 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                   </div>
                 )}
               </div>
+              {/* Corredor: validar ou desfazer validação */}
+              {layout.mainPipeline.source === "auto" &&
+                !layout.mainPipeline.corridorValidated && (
+                  <button
+                    onClick={validateCorridor}
+                    className="w-full px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-sm text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Validar corredor em campo
+                  </button>
+                )}
+              {layout.mainPipeline.corridorValidated && (
+                <button
+                  onClick={invalidateCorridor}
+                  className="w-full px-3 py-2 border border-border text-ink-3 hover:text-danger hover:border-danger rounded-sm text-xs font-medium transition-colors"
+                >
+                  Desfazer validação
+                </button>
+              )}
               <button
                 onClick={enterPipelineMode}
                 className="w-full px-3 py-2 border border-border hover:border-border-strong text-ink-2 rounded-sm text-xs font-medium transition-colors"
               >
-                Refazer traçado
+                Refazer traçado (manual)
               </button>
             </div>
           )}
@@ -1863,7 +2041,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                     </div>
                     {grupo.map((item, i) => (
                       <div
-                        key={item.sku}
+                        key={`${item.sku}-${i}`}
                         className={clsx(
                           "px-3 py-2.5 text-xs",
                           i > 0 && "border-t border-border"

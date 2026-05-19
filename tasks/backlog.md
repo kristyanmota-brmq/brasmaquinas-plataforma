@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-19
-Testes na base: 400/400 · TypeScript: 0 erros
+Testes na base: 403/403 · TypeScript: 0 erros
 
 ---
 
@@ -57,6 +57,22 @@ Testes na base: 400/400 · TypeScript: 0 erros
 **Arquivo:** `tasks/TASK-002-classificacao-abc-projetos.md`
 
 > Implementar `ProjectClassificationEngine`: classificação A/B/C a partir de resultados do motor técnico + contexto comercial + diagnósticos. `calculateIrrigationProject` passa a incluir `projectClass: "A" | "B" | "C"` no resultado. A/B/C é governança — o Motor Comercial consume a classe para decidir tipo de proposta e gates de emissão.
+
+---
+
+### TASK-003 — Bloquear PDF quando há blockers ativos
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** pdf / governança
+**Arquivo:** `tasks/TASK-003-bloquear-pdf-com-blockers.md`
+**Concluída em:** 2026-05-19 · 403/403 testes · 0 erros tsc
+
+> Adicionado gate de governança na rota de PDF: se `diagnostics.blockers.length > 0`, a rota
+> retorna HTTP 422 com JSON `{error: "PDF_BLOCKED", message, blockers}` antes de chamar
+> `renderToBuffer`. Função pura `pdfEmissionBlockers()` extraída para `irrigation-project.ts`
+> (testável com vitest). `ProjectMap.tsx` trata `!res.ok` explicitamente e exibe painel
+> diferenciando bloqueio técnico de erro inesperado. 3 testes em `pdf-guard.test.ts`.
 
 ---
 
