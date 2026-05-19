@@ -29,7 +29,10 @@ import {
   Spline,
   BookOpen,
   FileDown,
+  Search,
+  MapPin,
 } from "lucide-react";
+import { MapSearchControl } from "@/components/map/MapSearchControl";
 import clsx from "clsx";
 import {
   saveProjectLayout,
@@ -174,11 +177,21 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   const [selectedSector, setSelectedSector] = useState<number | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<{ kind: "blocked"; blockers: string[] } | { kind: "technical" } | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchMarker, setSearchMarker] = useState<{ lng: number; lat: number } | null>(null);
   const hasMounted = useRef(false);
 
   const isDrawingPolygon = mode === "polygon";
   const isDrawingPipeline = mode === "pipeline";
   const hasPolygonInProgress = isDrawingPolygon && drawingCoords.length > 0;
+
+  // Limpa o marcador de busca e o painel ao entrar em qualquer modo de desenho.
+  useEffect(() => {
+    if (mode !== "view") {
+      setSearchMarker(null);
+      setShowSearch(false);
+    }
+  }, [mode]);
   const hasPipelineInProgress = isDrawingPipeline && drawingPipeline.length > 1;
 
   const optimalAngle = useMemo(
@@ -312,6 +325,42 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     setDrawingPipeline([[layout.waterSource.lng, layout.waterSource.lat]]);
     setMode("pipeline");
   }, [layout.waterSource]);
+
+  const handleLocationFound = useCallback((lng: number, lat: number) => {
+    setSearchMarker({ lng, lat });
+    mapRef.current?.getMap()?.flyTo({ center: [lng, lat], zoom: 15 });
+  }, []);
+
+  const handleUseAsWaterSource = useCallback(async (lng: number, lat: number) => {
+    const elevation = queryElevation(lng, lat);
+    const geocoded = await reverseGeocode(lng, lat);
+    setLayout((l) => {
+      const next: ProjectLayout = {
+        ...l,
+        waterSource: { lng, lat, elevation },
+        pumpLocation: l.pumpSeparate ? l.pumpLocation : null,
+        geocoded: geocoded ?? l.geocoded,
+      };
+      if (l.centroid) {
+        const distKm = turf.distance(
+          turf.point([lng, lat]),
+          turf.point([l.centroid.lng, l.centroid.lat]),
+          { units: "kilometers" }
+        );
+        const geodetic: ProjectLayout["geodetic"] = {
+          distanceSourceToAreaMeters: distKm * 1000,
+        };
+        if (elevation !== undefined && l.areaElevation !== undefined) {
+          geodetic.elevationDeltaMeters = l.areaElevation - elevation;
+        }
+        next.geodetic = geodetic;
+      }
+      return next;
+    });
+    setMode("view");
+    setShowSearch(false);
+    setSearchMarker(null);
+  }, [queryElevation, setLayout]);
 
   const handleMapClick = useCallback(
     async (e: MapMouseEvent) => {
@@ -1256,7 +1305,20 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
               </MarkerPin>
             </Marker>
           )}
+          {searchMarker && (
+            <Marker longitude={searchMarker.lng} latitude={searchMarker.lat} anchor="bottom">
+              <MapPin className="w-5 h-5 text-orange-500 drop-shadow" />
+            </Marker>
+          )}
         </Map>
+
+        {showSearch && (
+          <MapSearchControl
+            onLocationFound={handleLocationFound}
+            onUseAsWaterSource={handleUseAsWaterSource}
+            onClose={() => { setShowSearch(false); setSearchMarker(null); }}
+          />
+        )}
 
         <div className="absolute top-4 left-4 flex items-center gap-1 bg-white/95 backdrop-blur-md border border-border rounded-md p-1 shadow-lg">
           <ToolButton
@@ -1268,6 +1330,12 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             }}
             icon={<MousePointer2 className="w-4 h-4" />}
             label="Navegar"
+          />
+          <ToolButton
+            active={showSearch}
+            onClick={() => setShowSearch((v) => !v)}
+            icon={<Search className="w-4 h-4" />}
+            label="Localizar"
           />
           <div className="w-px h-5 bg-border mx-0.5" />
           <ToolButton

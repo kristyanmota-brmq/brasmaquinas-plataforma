@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-19
-Testes na base: 403/403 · TypeScript: 0 erros
+Testes na base: 416/416 · TypeScript: 0 erros
 
 ---
 
@@ -73,6 +73,25 @@ Testes na base: 403/403 · TypeScript: 0 erros
 > `renderToBuffer`. Função pura `pdfEmissionBlockers()` extraída para `irrigation-project.ts`
 > (testável com vitest). `ProjectMap.tsx` trata `!res.ok` explicitamente e exibe painel
 > diferenciando bloqueio técnico de erro inesperado. 3 testes em `pdf-guard.test.ts`.
+
+---
+
+### TASK-007 — Localizar projeto por endereço ou coordenadas no mapa
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** mapa / UI
+**Arquivo:** `tasks/TASK-007-pesquisa-endereco-coordenadas-mapa.md`
+**Concluída em:** 2026-05-19 · 416/416 testes · 0 erros tsc
+
+> Adicionada barra de busca geográfica ao mapa. O usuário pode digitar um endereço ou
+> coordenadas decimais; o mapa voa para o ponto e exibe um marcador temporário laranja.
+> Função pura `parseCoordinate()` em `geo-utils.ts` (sem chamada a API). Forward geocoding
+> via Mapbox (mesmo token já em uso). "Usar como captação" replica integralmente o fluxo
+> existente de captação (queryElevation + reverseGeocode + setLayout). Marcador temporário
+> não é salvo no ProjectLayout. 13 testes em `geo-utils.test.ts`.
+>
+> **Pendências:** suporte a vírgula decimal brasileira; validação manual em browser.
 
 ---
 
