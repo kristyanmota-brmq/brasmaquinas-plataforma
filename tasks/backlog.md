@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-19
-Testes na base: 416/416 · TypeScript: 0 erros
+Testes na base: 431/431 · TypeScript: 0 erros
 
 ---
 
@@ -97,20 +97,21 @@ Testes na base: 416/416 · TypeScript: 0 erros
 
 ### TASK-004 — Validar PN/classe de pressão por trecho
 
-**Status:** `pendente`
+**Status:** `concluída`
 **Prioridade:** P2-importante
 **Área:** hidráulica
+**Concluída em:** 2026-05-19 · 431/431 testes · 0 erros tsc
 
-> Cada trecho da rede (principal, adutora, ramal, lateral) deve ser validado quanto à classe de pressão do tubo selecionado vs. pressão operacional máxima naquele ponto.
+> Adicionada verificação de PN a cada segmento hidráulico. Novo tipo `PressureClassCheck`
+> (`"ok" | "violation_confirmed" | "violation_conservative" | "unknown"`). Adutora e
+> principal têm pressão de entrada calculada diretamente → `violation_confirmed` vira blocker.
+> Ramal e lateral usam HMT como limite conservativo → `violation_conservative` vira warning
+> (sem falso blocker). `HydraulicValidation` recebe `hasPressureClassViolations` e
+> `hasConservativePressureClassWarnings`. `generateProposalDiagnostics` diferencia
+> blocker confirmado de warning conservador. 15 testes em `pressure-class.test.ts`.
 >
-> **Problema atual:** o catálogo tem `pressaoMca` por tubo, mas o solver não verifica se a pressão operacional em cada ponto respeita o PN do tubo selecionado. Um ramal próximo à fonte pode operar a pressão maior do que o PN do tubo escolhido por critério de velocidade.
->
-> **Escopo esperado:**
-> - Calcular pressão máxima operacional em cada segmento (HMT − perdas acumuladas)
-> - Flag `pressaoExcedePn` em `HydraulicSegment`
-> - `hasPressureClassViolations` em `HydraulicValidation`
-> - Warning/blocker em `ProposalDiagnostics`
-> - Testes obrigatórios: ≥ 5
+> **Pendências:** pressão real por derivação para ramal/lateral (requer `cumPrincipalHfM`
+> no segmento); desnível por segmento quando elevações pontuais disponíveis.
 
 ---
 
