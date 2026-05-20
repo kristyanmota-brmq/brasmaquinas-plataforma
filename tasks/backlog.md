@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-19
-Testes na base: 441/441 · TypeScript: 0 erros
+Testes na base: 456/456 · TypeScript: 0 erros
 
 ---
 
@@ -130,6 +130,40 @@ Testes na base: 441/441 · TypeScript: 0 erros
 >
 > **Pendências:** criar catálogo de válvulas por diâmetro/PN; homologar família;
 > implementar transição `section_valve` de `pending` para `resolved`; incluir na BOM precificada.
+
+---
+
+### TASK-006A — Saneamento e homologação do catálogo de válvulas/registros de seção
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** catálogo / governança comercial
+**Arquivo:** `tasks/TASK-006A-catalogo-valvulas-registros-secao.md`
+**Concluída em:** 2026-05-19 · 441/441 testes · 0 erros tsc
+
+> Relatório em `docs/relatorios/catalogo-valvulas-candidatas.md`. 287 candidatos analisados.
+> **Regra interna Brasmáquinas:** todos os registros VIQUA na base interna recebem `classePressao: "PN80"`, `pressaoNominalMca: 80`, `fontePressao: "homologacao_interna_brasmaquinas"`.
+> **7 itens `aprovado_automatico`** (uso manual): SKUs 4209000/32mm, 1000962/32mm, 4208000/35mm, 1002326/50mm, 1003768/50mm, 1001994/75mm, 1002327/100mm.
+> Família VIQUA soldável. Controle automático bloqueado (sem catálogo).
+
+---
+
+### TASK-006B — BOM automática de registro manual de seção
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico (desbloqueia blocker de `section_valve` na proposta)
+**Área:** bom / catálogo
+**Arquivo:** `tasks/TASK-006B-bom-registro-manual-secao.md`
+**Concluída em:** 2026-05-19 · 456/456 testes · 0 erros tsc
+
+> 7 SKUs VIQUA soldáveis (DN32/35/50/75/100, PN80 por homologação interna) adicionados a `REGISTROS_SECAO_MANUAL` em `aspersores.ts`.
+> Interface `RegistroSecao` com campos `classePressao`, `pressaoNominalMca`, `fontePressao`, `prioridade`, `usoPermitido`.
+> `selectRegistroSecao(diametroMm)` retorna somente o primário para o DN (tolerância ±2mm).
+> `buildBOM` mapeia `physicalColumnId → diâmetro lateral` (fallback: ramal), seleciona SKU por diâmetro, cria itens `CONEXAO` agrupados por SKU.
+> `BOMResult.meta` ganha `valvulasResolvidasCount` e `registrosManuaisSecaoCount`.
+> `valvulasSemCatalogoCount` passa a 0 para DNs resolvidos; blocker residual para DN sem SKU aprovado.
+> Warning "Registros manuais de seção incluídos na BOM" quando `valvulasResolvidasCount > 0`.
+> Controle automático fora do escopo. 15 novos testes em `bom-registro-secao.test.ts`.
 
 ---
 

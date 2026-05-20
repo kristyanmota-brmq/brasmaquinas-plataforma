@@ -304,19 +304,21 @@ export const TUBO_SUBIDA_PVC_BR = {
 // ajuste fino quando o RT optar por C alternativo.
 
 // PVC LF (Liga Fácil) — laterais (rede secundária)
+// diametroMm = diâmetro nominal/externo (OD). Espessuras PN40 ABNT NBR 5648.
 export const TUBOS_PVC_LF = [
-  { sku: "TIGRE_LF_50_PN40",  descricao: "Tubo PVC LF Ø50mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  pressaoMca: 40, metrosPorBarra: 6, custo: 28.4, precoVenda:  52.0, coefC: 145 },
-  { sku: "TIGRE_LF_75_PN40",  descricao: "Tubo PVC LF Ø75mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  pressaoMca: 40, metrosPorBarra: 6, custo: 58.9, precoVenda: 108.0, coefC: 145 },
-  { sku: "TIGRE_LF_100_PN40", descricao: "Tubo PVC LF Ø100mm PN40 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, pressaoMca: 40, metrosPorBarra: 6, custo: 98.7, precoVenda: 178.0, coefC: 145 },
+  { sku: "TIGRE_LF_50_PN40",  descricao: "Tubo PVC LF Ø50mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  diametroExternoMm: 50,  espessuraParedeMm: 2.0, diametroInternoMm: 46,  pressaoMca: 40, metrosPorBarra: 6, custo: 28.4, precoVenda:  52.0, coefC: 145 },
+  { sku: "TIGRE_LF_75_PN40",  descricao: "Tubo PVC LF Ø75mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  diametroExternoMm: 75,  espessuraParedeMm: 3.0, diametroInternoMm: 69,  pressaoMca: 40, metrosPorBarra: 6, custo: 58.9, precoVenda: 108.0, coefC: 145 },
+  { sku: "TIGRE_LF_100_PN40", descricao: "Tubo PVC LF Ø100mm PN40 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroExternoMm: 100, espessuraParedeMm: 4.0, diametroInternoMm: 92,  pressaoMca: 40, metrosPorBarra: 6, custo: 98.7, precoVenda: 178.0, coefC: 145 },
 ] as const;
 
-// PVC RÍGIDO (soldável) — principal e adutora (uso futuro no refactor bottom-up)
+// PVC RÍGIDO (soldável) — principal e adutora
+// diametroMm = diâmetro nominal = externo (OD). Espessuras PN80 ABNT NBR 5647.
 export const TUBOS_PVC_RIGIDO = [
-  { sku: "TIGRE_R_50_PN80",  descricao: "Tubo PVC rígido Ø50mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  diametroNominalMm: 50,  pressaoMca: 80, metrosPorBarra: 6, custo:  34.2, precoVenda:  62.0, coefC: 145 },
-  { sku: "TIGRE_R_75_PN80",  descricao: "Tubo PVC rígido Ø75mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  diametroNominalMm: 75,  pressaoMca: 80, metrosPorBarra: 6, custo:  72.1, precoVenda: 132.0, coefC: 145 },
-  { sku: "TIGRE_R_100_PN80", descricao: "Tubo PVC rígido Ø100mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroNominalMm: 100, pressaoMca: 80, metrosPorBarra: 6, custo: 118.5, precoVenda: 215.0, coefC: 145 },
-  { sku: "TIGRE_R_125_PN80", descricao: "Tubo PVC rígido Ø125mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 125, diametroNominalMm: 125, pressaoMca: 80, metrosPorBarra: 6, custo: 178.4, precoVenda: 322.0, coefC: 145 },
-  { sku: "TIGRE_R_150_PN80", descricao: "Tubo PVC rígido Ø150mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, pressaoMca: 80, metrosPorBarra: 6, custo: 248.9, precoVenda: 448.0, coefC: 145 },
+  { sku: "TIGRE_R_50_PN80",  descricao: "Tubo PVC rígido Ø50mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  diametroNominalMm: 50,  diametroExternoMm: 50,  espessuraParedeMm: 3.0, diametroInternoMm: 44,  pressaoMca: 80, metrosPorBarra: 6, custo:  34.2, precoVenda:  62.0, coefC: 145 },
+  { sku: "TIGRE_R_75_PN80",  descricao: "Tubo PVC rígido Ø75mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  diametroNominalMm: 75,  diametroExternoMm: 75,  espessuraParedeMm: 4.5, diametroInternoMm: 66,  pressaoMca: 80, metrosPorBarra: 6, custo:  72.1, precoVenda: 132.0, coefC: 145 },
+  { sku: "TIGRE_R_100_PN80", descricao: "Tubo PVC rígido Ø100mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroNominalMm: 100, diametroExternoMm: 100, espessuraParedeMm: 6.0, diametroInternoMm: 88,  pressaoMca: 80, metrosPorBarra: 6, custo: 118.5, precoVenda: 215.0, coefC: 145 },
+  { sku: "TIGRE_R_125_PN80", descricao: "Tubo PVC rígido Ø125mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 125, diametroNominalMm: 125, diametroExternoMm: 125, espessuraParedeMm: 7.0, diametroInternoMm: 111, pressaoMca: 80, metrosPorBarra: 6, custo: 178.4, precoVenda: 322.0, coefC: 145 },
+  { sku: "TIGRE_R_150_PN80", descricao: "Tubo PVC rígido Ø150mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, diametroExternoMm: 150, espessuraParedeMm: 8.5, diametroInternoMm: 133, pressaoMca: 80, metrosPorBarra: 6, custo: 248.9, precoVenda: 448.0, coefC: 145 },
 ] as const;
 
 // ============================================================
@@ -381,3 +383,136 @@ export const TES_DERIVACAO_LATERAL = [
   { sku: "TIGRE_TE_75_LF",  descricao: "Tê PVC LF Ø75mm",  marca: "Tigre", unidade: "un", diametroMm: 75,  custo: 18.4, precoVenda: 34.0 },
   { sku: "TIGRE_TE_100_LF", descricao: "Tê PVC LF Ø100mm", marca: "Tigre", unidade: "un", diametroMm: 100, custo: 32.6, precoVenda: 58.0 },
 ] as const;
+
+// ── TASK-006B: Registros manuais de seção ────────────────────────────────────
+// VIQUA soldável — PN80 por homologação interna Brasmáquinas.
+
+export interface RegistroSecao {
+  sku: string;
+  descricao: string;
+  marca: string;
+  tipo: "registro_manual_secao";
+  diametroNominalMm: number;
+  classePressao: "PN80";
+  pressaoNominalMca: 80;
+  unidade: "un";
+  custo: number;
+  precoVenda: number;
+  prioridade: "primario" | "alternativa";
+  fontePressao: "homologacao_interna_brasmaquinas";
+  usoPermitido: "registro_manual_secao";
+}
+
+export const REGISTROS_SECAO_MANUAL: RegistroSecao[] = [
+  {
+    sku: "4209000",
+    descricao: "REGIST PVC ESF.SOLD. AZUL 32MM - VIQUA",
+    marca: "VIQUA",
+    tipo: "registro_manual_secao",
+    diametroNominalMm: 32,
+    classePressao: "PN80",
+    pressaoNominalMca: 80,
+    unidade: "un",
+    custo: 10.816,
+    precoVenda: 18.10,
+    prioridade: "primario",
+    fontePressao: "homologacao_interna_brasmaquinas",
+    usoPermitido: "registro_manual_secao",
+  },
+  {
+    sku: "1000962",
+    descricao: "REGIST PVC ESF.SOLD. PREDIALL 32MM - VIQUA",
+    marca: "VIQUA",
+    tipo: "registro_manual_secao",
+    diametroNominalMm: 32,
+    classePressao: "PN80",
+    pressaoNominalMca: 80,
+    unidade: "un",
+    custo: 5.33,
+    precoVenda: 20.10,
+    prioridade: "alternativa",
+    fontePressao: "homologacao_interna_brasmaquinas",
+    usoPermitido: "registro_manual_secao",
+  },
+  {
+    sku: "4208000",
+    descricao: "REGIST PVC ESF.SOLD. AZUL 35MM - VIQUA",
+    marca: "VIQUA",
+    tipo: "registro_manual_secao",
+    diametroNominalMm: 35,
+    classePressao: "PN80",
+    pressaoNominalMca: 80,
+    unidade: "un",
+    custo: 13.9748,
+    precoVenda: 24.20,
+    prioridade: "primario",
+    fontePressao: "homologacao_interna_brasmaquinas",
+    usoPermitido: "registro_manual_secao",
+  },
+  {
+    sku: "1002326",
+    descricao: "REGIST PVC ESF.SOLD. AZUL 50MM - VIQUA",
+    marca: "VIQUA",
+    tipo: "registro_manual_secao",
+    diametroNominalMm: 50,
+    classePressao: "PN80",
+    pressaoNominalMca: 80,
+    unidade: "un",
+    custo: 14.575,
+    precoVenda: 24.96,
+    prioridade: "primario",
+    fontePressao: "homologacao_interna_brasmaquinas",
+    usoPermitido: "registro_manual_secao",
+  },
+  {
+    sku: "1003768",
+    descricao: "REGIST PVC ESF.SOLD. MARRON 50MM - VIQUA",
+    marca: "VIQUA",
+    tipo: "registro_manual_secao",
+    diametroNominalMm: 50,
+    classePressao: "PN80",
+    pressaoNominalMca: 80,
+    unidade: "un",
+    custo: 22.83,
+    precoVenda: 48.50,
+    prioridade: "alternativa",
+    fontePressao: "homologacao_interna_brasmaquinas",
+    usoPermitido: "registro_manual_secao",
+  },
+  {
+    sku: "1001994",
+    descricao: "REGIST PVC ESF.SOLD. AZUL 75MM - VIQUA",
+    marca: "VIQUA",
+    tipo: "registro_manual_secao",
+    diametroNominalMm: 75,
+    classePressao: "PN80",
+    pressaoNominalMca: 80,
+    unidade: "un",
+    custo: 84.7046,
+    precoVenda: 135.30,
+    prioridade: "primario",
+    fontePressao: "homologacao_interna_brasmaquinas",
+    usoPermitido: "registro_manual_secao",
+  },
+  {
+    sku: "1002327",
+    descricao: "REGIST PVC ESF.SOLD. AZUL 100MM - VIQUA",
+    marca: "VIQUA",
+    tipo: "registro_manual_secao",
+    diametroNominalMm: 100,
+    classePressao: "PN80",
+    pressaoNominalMca: 80,
+    unidade: "un",
+    custo: 240.514,
+    precoVenda: 404.50,
+    prioridade: "primario",
+    fontePressao: "homologacao_interna_brasmaquinas",
+    usoPermitido: "registro_manual_secao",
+  },
+];
+
+export function selectRegistroSecao(diametroMm: number): RegistroSecao | undefined {
+  return REGISTROS_SECAO_MANUAL.find(
+    (r) => r.prioridade === "primario" && Math.abs(r.diametroNominalMm - diametroMm) <= 2,
+  );
+}

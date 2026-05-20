@@ -105,24 +105,24 @@ describe("buildBOM — valvulasCount e valvulasSemCatalogoCount", () => {
     expect(bom.meta.valvulasCount).toBe(2);
   });
 
-  it("valvulasSemCatalogoCount = valvulasCount (sem catálogo nesta versão)", () => {
+  it("valvulasResolvidasCount = N quando há match no catálogo", () => {
     const bom = buildBOM(makeBOMInput(3));
-    expect(bom.meta.valvulasSemCatalogoCount).toBe(bom.meta.valvulasCount);
-    expect(bom.meta.valvulasSemCatalogoCount).toBe(3);
+    expect(bom.meta.valvulasResolvidasCount).toBe(3);
+    expect(bom.meta.valvulasSemCatalogoCount).toBe(0);
   });
 
-  it("nenhum item precificado de válvula é criado na BOM", () => {
+  it("itens de registro de seção são criados na BOM quando há match no catálogo", () => {
     const bom = buildBOM(makeBOMInput(2));
-    const valveItems = bom.itens.filter(
-      (i) => i.descricao.toLowerCase().includes("válvula") || i.descricao.toLowerCase().includes("valvula"),
-    );
-    expect(valveItems).toHaveLength(0);
+    const registerItems = bom.itens.filter((i) => i.categoria === "CONEXAO" && i.marca === "VIQUA");
+    expect(registerItems.length).toBeGreaterThan(0);
+    expect(registerItems.reduce((s, i) => s + i.quantidade, 0)).toBe(2);
   });
 
-  it("valvulasCount = 1 quando há exatamente 1 section_valve", () => {
+  it("valvulasCount = 1 quando há exatamente 1 section_valve e valvulasResolvidasCount = 1", () => {
     const bom = buildBOM(makeBOMInput(1));
     expect(bom.meta.valvulasCount).toBe(1);
-    expect(bom.meta.valvulasSemCatalogoCount).toBe(1);
+    expect(bom.meta.valvulasResolvidasCount).toBe(1);
+    expect(bom.meta.valvulasSemCatalogoCount).toBe(0);
   });
 });
 
@@ -144,7 +144,7 @@ function makeMinimalLayout(): ProjectLayout {
   } as unknown as ProjectLayout;
 }
 
-function makeMinimalBOM(valvulasCount: number): BOMResult {
+function makeMinimalBOM(valvulasCount: number, valvulasResolvidasCount = 0): BOMResult {
   return {
     itens: [],
     totalGeral: 0,
@@ -178,15 +178,17 @@ function makeMinimalBOM(valvulasCount: number): BOMResult {
       independentFeedRequiredCount: 0,
       constructabilityStatus: valvulasCount > 0 ? "pending_control_validation" : "ok",
       valvulasCount,
-      valvulasSemCatalogoCount: valvulasCount,
+      valvulasResolvidasCount,
+      valvulasSemCatalogoCount: valvulasCount - valvulasResolvidasCount,
+      registrosManuaisSecaoCount: valvulasResolvidasCount,
     },
   };
 }
 
 describe("generateProposalDiagnostics — válvulas de seção", () => {
-  it("gera warning técnico quando valvulasCount > 0", () => {
-    const diag = generateProposalDiagnostics(makeMinimalLayout(), makeMinimalBOM(2));
-    expect(diag.warnings.some((w) => w.includes("válvula") && w.includes("seção"))).toBe(true);
+  it("gera warning quando valvulasResolvidasCount > 0", () => {
+    const diag = generateProposalDiagnostics(makeMinimalLayout(), makeMinimalBOM(2, 2));
+    expect(diag.warnings.some((w) => w.includes("Registros manuais"))).toBe(true);
   });
 
   it("gera blocker quando valvulasSemCatalogoCount > 0", () => {
@@ -194,9 +196,9 @@ describe("generateProposalDiagnostics — válvulas de seção", () => {
     expect(diag.blockers.some((b) => b.includes("SKU") || b.includes("catálogo"))).toBe(true);
   });
 
-  it("sem warning de válvula quando valvulasCount = 0", () => {
+  it("sem warning de registro manual quando valvulasResolvidasCount = 0", () => {
     const diag = generateProposalDiagnostics(makeMinimalLayout(), makeMinimalBOM(0));
-    expect(diag.warnings.some((w) => w.includes("válvula") && w.includes("seção"))).toBe(false);
+    expect(diag.warnings.some((w) => w.includes("Registros manuais"))).toBe(false);
   });
 
   it("sem blocker de válvula quando valvulasSemCatalogoCount = 0", () => {
@@ -205,9 +207,10 @@ describe("generateProposalDiagnostics — válvulas de seção", () => {
   });
 
   it("blocker e warning são mensagens distintas", () => {
-    const diag = generateProposalDiagnostics(makeMinimalLayout(), makeMinimalBOM(1));
+    // 3 valves total, 1 resolved → warning fires; 2 unresolved → blocker fires
+    const diag = generateProposalDiagnostics(makeMinimalLayout(), makeMinimalBOM(3, 1));
     const blockerTexts = diag.blockers.filter((b) => b.includes("SKU") || b.includes("catálogo"));
-    const warningTexts = diag.warnings.filter((w) => w.includes("válvula") && w.includes("seção"));
+    const warningTexts = diag.warnings.filter((w) => w.includes("Registros manuais"));
     expect(blockerTexts.length).toBeGreaterThan(0);
     expect(warningTexts.length).toBeGreaterThan(0);
     expect(blockerTexts[0]).not.toBe(warningTexts[0]);

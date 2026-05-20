@@ -167,7 +167,9 @@ function makeMinimalBOM(): BOMResult {
       independentFeedRequiredCount: 0,
       constructabilityStatus: "ok",
       valvulasCount: 0,
+      valvulasResolvidasCount: 0,
       valvulasSemCatalogoCount: 0,
+      registrosManuaisSecaoCount: 0,
     },
   };
 }

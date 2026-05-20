@@ -9,6 +9,8 @@ import {
   selectCurva,
   selectTe,
   calculatePipelineDiameterMm,
+  selectRegistroSecao,
+  type RegistroSecao,
 } from "@/lib/catalog/aspersores";
 import {
   generateLateraisLegacyForDebug,
@@ -78,8 +80,12 @@ export interface BOMResult {
     constructabilityStatus: ConstructabilityStatus;
     /** TASK-005: válvulas de seção identificadas pela construtibilidade. */
     valvulasCount: number;
-    /** TASK-005: válvulas de seção sem SKU/preço no catálogo — não entram na BOM precificada. */
+    /** TASK-006B: válvulas resolvidas com SKU de registro manual de seção. */
+    valvulasResolvidasCount: number;
+    /** TASK-005: válvulas de seção sem SKU compatível — não entram na BOM precificada. */
     valvulasSemCatalogoCount: number;
+    /** TASK-006B: itens de registro manual de seção incluídos na BOM (= valvulasResolvidasCount). */
+    registrosManuaisSecaoCount: number;
   };
 }
 
@@ -448,13 +454,58 @@ export function buildBOM(input: BOMInput): BOMResult {
     0,
   );
 
-  // ── TASK-005: Válvulas de seção ───────────────────────────────────────────
-  // Conta section_valve CPs — não entra na BOM precificada (catálogo inexistente).
+  // ── TASK-006B: Registros manuais de seção ────────────────────────────────────
   const valvulasCount = constructability.controlPoints.filter(
     (cp) => cp.type === "section_valve",
   ).length;
-  // Nesta versão não há catálogo de válvulas; toda válvula identificada está sem SKU.
-  const valvulasSemCatalogoCount = valvulasCount;
+
+  // Mapa physicalColumnId → diâmetro lateral (fonte primária) ou ramal (fallback)
+  const colDiamMap = new Map<string, number>();
+  for (const col of physicalColumns) {
+    colDiamMap.set(col.id, col.selecao.tubo.diametroMm);
+  }
+  if (sizedSecondaries) {
+    for (const sec of sizedSecondaries) {
+      if (!colDiamMap.has(sec.physicalColumnId)) {
+        colDiamMap.set(sec.physicalColumnId, sec.diametroMm);
+      }
+    }
+  }
+
+  // Seleciona registro por diâmetro e agrupa por SKU
+  const registroBySkuQty = new Map<string, { registro: RegistroSecao; qty: number }>();
+  let valvulasResolvidasCount = 0;
+
+  for (const cp of constructability.controlPoints) {
+    if (cp.type !== "section_valve") continue;
+    const diamMm = colDiamMap.get(cp.physicalColumnId);
+    if (diamMm === undefined) continue;
+    const registro = selectRegistroSecao(diamMm);
+    if (!registro) continue;
+    valvulasResolvidasCount++;
+    const entry = registroBySkuQty.get(registro.sku);
+    if (entry) {
+      entry.qty++;
+    } else {
+      registroBySkuQty.set(registro.sku, { registro, qty: 1 });
+    }
+  }
+
+  for (const { registro, qty } of registroBySkuQty.values()) {
+    itens.push({
+      sku: registro.sku,
+      descricao: registro.descricao,
+      marca: registro.marca,
+      unidade: registro.unidade,
+      quantidade: qty,
+      precoUnitario: registro.precoVenda,
+      total: qty * registro.precoVenda,
+      categoria: "CONEXAO",
+    });
+  }
+
+  const valvulasSemCatalogoCount = valvulasCount - valvulasResolvidasCount;
+  const registrosManuaisSecaoCount = valvulasResolvidasCount;
 
   const totalGeral = itens.reduce((sum, item) => sum + item.total, 0);
 
@@ -491,7 +542,9 @@ export function buildBOM(input: BOMInput): BOMResult {
       independentFeedRequiredCount: constructability.independentFeedRequiredCount,
       constructabilityStatus: constructability.constructabilityStatus,
       valvulasCount,
+      valvulasResolvidasCount,
       valvulasSemCatalogoCount,
+      registrosManuaisSecaoCount,
     },
   };
 }
@@ -687,18 +740,17 @@ export function generateProposalDiagnostics(
     );
   }
 
-  // ── TASK-005: Válvulas de seção sem catálogo ─────────────────────────────
-  const { valvulasCount, valvulasSemCatalogoCount } = bom.meta;
-  if (valvulasCount > 0) {
+  // ── TASK-006B: Registros manuais de seção ────────────────────────────────────
+  const { valvulasSemCatalogoCount, valvulasResolvidasCount } = bom.meta;
+  if (valvulasResolvidasCount > 0) {
     warnings.push(
-      `${valvulasCount} válvula${valvulasCount > 1 ? "s" : ""} de seção identificada${valvulasCount > 1 ? "s" : ""} ` +
-      `pela construtibilidade. Selecionar família de válvulas com projetista/RT/suprimentos.`,
+      `Registros manuais de seção incluídos na BOM. Controle automático não contemplado.`,
     );
   }
   if (valvulasSemCatalogoCount > 0) {
     blockers.push(
-      `${valvulasSemCatalogoCount} válvula${valvulasSemCatalogoCount > 1 ? "s" : ""} de seção necessária${valvulasSemCatalogoCount > 1 ? "s" : ""} sem SKU/preço no catálogo. ` +
-      `A proposta final não deve ser emitida até cadastro ou inclusão comercial manual.`,
+      `Existem ${valvulasSemCatalogoCount} válvula${valvulasSemCatalogoCount > 1 ? "s" : ""}/registro${valvulasSemCatalogoCount > 1 ? "s" : ""} de seção sem SKU compatível no catálogo. ` +
+      `A proposta final não deve ser emitida até inclusão manual ou homologação.`,
     );
   }
 
