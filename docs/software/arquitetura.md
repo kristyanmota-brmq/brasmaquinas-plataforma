@@ -92,7 +92,46 @@ src/lib/ → src/app/          (domínio não depende de rotas)
 
 ---
 
-## 5. Evolução arquitetural planejada
+## 5. Política de ADR (Architectural Decision Record)
+
+ADRs ficam em `docs/decisoes/`. O template canônico é `ADR-000-template.md`.
+
+### ADR obrigatório quando a decisão:
+
+- muda arquitetura ou define fonte de verdade
+- define regra técnica relevante (velocidade máxima, PN, modelo hidráulico, fórmula de cálculo)
+- altera governança de emissão ou proposta (gate de PDF, blocker, override)
+- altera modelo de dados persistido (`ProjectLayout`, `IrrigationProjectResult`)
+- cria premissa provisória usada no cálculo (peso de score, constante sem calibração de campo)
+- muda regra de bloqueio ou warning
+- afeta rastreabilidade futura (SKU aprovado, classificação de PN, tipo de ponto de controle)
+
+### ADR não obrigatório para:
+
+- bug fix local sem impacto em contrato público
+- ajuste visual simples (cor, texto, layout de UI)
+- teste novo sem mudança de comportamento
+- refatoração sem mudança de comportamento externo
+- relatório de task
+- texto de UI ou mensagem de diagnóstico
+- melhoria pequena sem decisão estrutural
+
+### ADRs existentes
+
+| ADR | Título | Status |
+|-----|--------|--------|
+| [ADR-001](../decisoes/ADR-001-orquestrador-unico-calculate-irrigation-project.md) | Orquestrador único `calculateIrrigationProject` | Aceito |
+| [ADR-002](../decisoes/ADR-002-diametro-interno-calculos-hidraulicos.md) | Diâmetro interno real nos cálculos hidráulicos | Aceito |
+| [ADR-003](../decisoes/ADR-003-bloqueio-pdf-com-blockers.md) | Bloqueio de PDF quando há blockers ativos | Aceito |
+| [ADR-004](../decisoes/ADR-004-lateral-fisica-vs-trecho-operacional.md) | Lateral física vs. trecho operacional | Aceito |
+| [ADR-005](../decisoes/ADR-005-registros-manuais-secao-viqua-pn80.md) | Registros manuais de seção VIQUA PN80 | Aceito |
+| [ADR-006](../decisoes/ADR-006-motor-layout-candidatos-preliminar.md) | Motor de candidatos de layout como ferramenta preliminar | Provisório |
+| [ADR-007](../decisoes/ADR-007-premissas-provisorias-mercado-revisao-brasmaquinas.md) | Premissas provisórias de mercado e revisão Brasmáquinas | Provisório |
+| [ADR-008](../decisoes/ADR-008-validacao-pn-classe-pressao-tubos.md) | Validação de PN/classe de pressão dos tubos por segmento | Aceito |
+
+---
+
+## 6. Evolução arquitetural planejada
 
 | Item | Status | Referência |
 |------|--------|-----------|
