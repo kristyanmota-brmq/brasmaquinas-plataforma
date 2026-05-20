@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   calculateIrrigationProject,
   pdfEmissionBlockers,
+  generateInvalidHydraulicSegmentsReport,
 } from "@/lib/layout/irrigation-project";
 import { PropostaPDF } from "@/lib/pdf/PropostaPDF";
 import { migrateLayout } from "@/app/projetos/[id]/layout-schema";
@@ -38,6 +39,7 @@ export async function POST(
         error: "PDF_BLOCKED",
         message: "Projeto bloqueado para emissão final.",
         blockers,
+        invalidHydraulicSegments: generateInvalidHydraulicSegmentsReport(result),
       },
       { status: 422 },
     );

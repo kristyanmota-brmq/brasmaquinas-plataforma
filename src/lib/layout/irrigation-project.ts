@@ -49,7 +49,10 @@ import {
 } from "@/lib/bom";
 import {
   sizeHydraulics,
+  HYDRAULIC_LIMITS,
   type HydraulicSizingReport,
+  type HydraulicSegment,
+  type PressureClassCheck,
 } from "@/lib/layout/hydraulic-sizing";
 import type { ProjectLayout } from "@/app/projetos/[id]/actions";
 export type { ProjectLayout };
@@ -319,6 +322,8 @@ export function calculateIrrigationProject(
     physicalColumns,
     sectorIndices,
     sprinklers.positions,
+    principalCoords,
+    centroid,
   );
 
   // ── Entradas validadas (input block) ──────────────────────────────────────
@@ -414,4 +419,90 @@ export function calculateIrrigationProject(
  */
 export function pdfEmissionBlockers(result: IrrigationProjectResult): string[] {
   return result.diagnostics?.blockers ?? [];
+}
+
+// ── TASK-008A: Diagnóstico de segmentos hidráulicos inválidos ─────────────────
+
+export type RejectionReason =
+  | "velocity"
+  | "lateral_headloss"
+  | "secondary_headloss"
+  | "pressure_class"
+  | "multiple"
+  | "unknown";
+
+export interface InvalidSegmentRow {
+  id: string;
+  type: HydraulicSegment["type"];
+  sectorId: number | undefined;
+  physicalColumnId: string | undefined;
+  operationalSegmentId: string | undefined;
+  lengthM: number;
+  flowM3h: number;
+  diameterNominalMm: number;
+  internalDiameterMm: number | undefined;
+  velocityMs: number;
+  maxVelocityMs: number;
+  headLossMca: number;
+  maxHeadLossMca: number | undefined;
+  rejectionReason: RejectionReason;
+  pressureClassCheck: PressureClassCheck | undefined;
+}
+
+/**
+ * Transforma `hydraulics.validation.invalidSegments` em linhas de diagnóstico
+ * com todos os campos relevantes. Retorna `[]` quando não há segmentos inválidos
+ * ou quando o solver não foi executado.
+ */
+export function generateInvalidHydraulicSegmentsReport(
+  result: IrrigationProjectResult,
+): InvalidSegmentRow[] {
+  const hydraulics = result.hydraulics;
+  const invalidSegments = hydraulics?.validation.invalidSegments;
+  if (!hydraulics || !invalidSegments || invalidSegments.length === 0) return [];
+
+  const pressaoServico = hydraulics.hmt.pressaoServicoMca;
+  const latMaxHf  = pressaoServico * HYDRAULIC_LIMITS.maxLateralLossFraction;
+  const secMaxHf  = pressaoServico * HYDRAULIC_LIMITS.maxSecondaryLossFraction;
+
+  return invalidSegments.map((seg): InvalidSegmentRow => {
+    const reasons: RejectionReason[] = [];
+    if (seg.velocityExceeds) reasons.push("velocity");
+    if (seg.lateralLossExceeds === true) reasons.push("lateral_headloss");
+    if (seg.secondaryLossExceeds === true) reasons.push("secondary_headloss");
+    if (seg.pressureClassCheck === "violation_confirmed") reasons.push("pressure_class");
+
+    const rejectionReason: RejectionReason =
+      reasons.length === 0 ? "unknown"
+      : reasons.length > 1 ? "multiple"
+      : reasons[0];
+
+    const maxVelocityMs =
+      seg.type === "lateral"
+        ? HYDRAULIC_LIMITS.maxVelocityLateralMs
+        : HYDRAULIC_LIMITS.maxVelocityPrincipalMs;
+
+    const maxHeadLossMca =
+      seg.type === "lateral" ? latMaxHf
+      : seg.type === "secondary" ? secMaxHf
+      : undefined;
+
+    return {
+      id: seg.id,
+      type: seg.type,
+      sectorId: seg.sectorId,
+      physicalColumnId: seg.physicalColumnId,
+      operationalSegmentId: seg.operationalSegmentId,
+      lengthM: seg.lengthM,
+      flowM3h: seg.flowM3h,
+      diameterNominalMm: seg.diametroMm,
+      internalDiameterMm: seg.internalDiameterMm,
+      velocityMs: seg.velocityMs,
+      maxVelocityMs,
+      headLossMca: seg.headLossM,
+      maxHeadLossMca,
+      rejectionReason,
+      pressureClassCheck: seg.pressureClassCheck,
+    };
+  });
 }
