@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-20
-Testes na base: 573/573 · TypeScript: 0 erros
+Testes na base: 597/597 · TypeScript: 0 erros
 
 ---
 
@@ -350,9 +350,49 @@ Testes na base: 573/573 · TypeScript: 0 erros
 
 ---
 
+### TASK-010E-B — Métricas de rede de distribuição no motor de candidatos
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** layout / domínio
+**Arquivo:** `tasks/TASK-010E-B-metricas-rede-distribuicao-motor-candidatos.md`
+**Concluída em:** 2026-05-20 · 584/584 testes · 0 erros tsc
+
+> 7 métricas geométricas da rede de distribuição adicionadas ao `LayoutScore`:
+> `principalLengthM`, `adutoraLengthM`, `secondaryLengthM`, `totalNetworkLengthM`,
+> `avgSecondaryLengthM`, `maxSecondaryLengthM`, `distributionLengthRatio`. Calculadas por
+> candidato via `generatePrincipalAndAdutora()` + `generateSecondaries()` quando `waterSource`
+> fornecido ao motor. 2 pesos provisionais ativos: `WEIGHT_SECONDARY_LENGTH = 0.10`,
+> `WEIGHT_TOTAL_NETWORK_LENGTH = 0.10` (PREMISSA_PROVISORIA_MERCADO). Premissas documentadas em
+> `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md`. Retrocompatibilidade total.
+> `hydraulicBlockers` permanece `null` → TASK-010F. 11 novos testes em
+> `sprinkler-grid-optimizer.test.ts`.
+
+---
+
+### TASK-010F — Validação hidráulica Top-K dos candidatos de layout
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** layout / domínio / hidráulica
+**Arquivo:** `tasks/TASK-010F-validacao-hidraulica-top-k-candidatos.md`
+**Concluída em:** 2026-05-20 · 597/597 testes · 0 erros tsc
+
+> Função `runTopKHydraulicValidation(selectionResult, options)` criada — separada de
+> `findBestSprinklerLayout`. Avalia os Top K (= 5) candidatos geométricos usando exclusivamente
+> o solver oficial `calculateIrrigationProject()`. Blockers originam de `diagnostics.blockers`.
+> Penalidade `-WEIGHT_HYDRAULIC_BLOCKER` (= 0.50) aplicada por blocker; `best` re-eleito
+> restrito ao Top K. `HydraulicEvaluationStatus` (7 valores), `HydraulicBlockerReal` e
+> `TopKHydraulicOptions` exportados. `TOP_K_HYDRAULIC_CANDIDATES` e `WEIGHT_HYDRAULIC_BLOCKER`
+> documentados como `PREMISSA_PROVISORIA_MERCADO`. UI com botão explícito separado, spinner e
+> painel verde/vermelho por candidato. `estimateHydraulicBlockers()` NÃO implementado — solver
+> paralelo rejeitado arquiteturalmente. 13 novos testes em `sprinkler-grid-optimizer.test.ts`.
+
+---
+
 ## Próximas tarefas sugeridas (não formalizadas)
 
-- **TASK-010E-B — Métricas de principal, ramais/secundárias e captação**: preencher `secondaryLengthM` executando `generateSecondaries()` por candidato. Requer `waterSource` como parâmetro opcional do motor ou estimativa geométrica da principal a partir do polígono. Depende de TASK-010E-A ✅
-- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar `N_MIN_COLUMN`, `WEIGHT_SHORT_COLUMN`, `WEIGHT_EDGE`, `WEIGHT_SECTION_VALVE`, `WEIGHT_FRAGMENTATION`, `WEIGHT_IMBALANCE`, `WEIGHT_LATERAL_LENGTH` com dados de projetos homologados; remover marcadores `PENDENTE_CALIBRACAO_RT_CAMPO`. Depende de TASK-010E-A ✅
+- **TASK-010Z — Consolidação do motor de layout 12×12**: relatório consolidado documentando o fluxo completo (geração de malha → candidatos geométricos → métricas de setorização → comprimento de laterais → rede de distribuição → validação hidráulica Top-K), critérios homologados/provisórios/pendentes, todos os pesos do OPTIMIZER_PARAMS com origem, limitações atuais e próximas evoluções possíveis. Sem alteração de código.
+- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar pesos provisionais (PREMISSA_PROVISORIA_MERCADO) e pesos aguardando campo (PENDENTE_CALIBRACAO_RT_CAMPO) com dados de projetos homologados; remover marcadores. Depende de TASK-010E-B ✅
 - **Labels de setor no mapa**: marcadores de setor devem aparecer em `PhysicalColumn.startLngLat` da primeira lateral, não no centroide. Mudança em `ProjectMap.tsx`, bloco `sectorLabelsGeoJSON`.
 - **Diâmetro dos ramais no PDF**: `PropostaPDF.tsx` não exibe diâmetro individual dos ramais. Incluir coluna com SKU selecionado por `sizedSecondaries`.

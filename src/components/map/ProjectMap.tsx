@@ -17,6 +17,8 @@ import {
 } from "@/lib/layout/sprinkler-grid";
 import {
   findBestSprinklerLayout,
+  runTopKHydraulicValidation,
+  OPTIMIZER_PARAMS,
   type LayoutSelectionResult,
 } from "@/lib/layout/sprinkler-grid-optimizer";
 import { candidateToSprinklers } from "@/lib/layout/optimizer-integration";
@@ -40,6 +42,7 @@ import {
   FileDown,
   Search,
   MapPin,
+  Zap,
 } from "lucide-react";
 import { MapSearchControl } from "@/components/map/MapSearchControl";
 import clsx from "clsx";
@@ -73,6 +76,7 @@ type OptimizerState =
   | { status: "idle" }
   | { status: "running" }
   | { status: "ready"; result: LayoutSelectionResult }
+  | { status: "hydraulic_running"; result: LayoutSelectionResult }
   | { status: "error"; message: string };
 
 // ── TASK-008A: diagnóstico de segmentos inválidos ─────────────────────────────
@@ -786,10 +790,15 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
           typeof layout.sectorization?.setoresCount === "number"
             ? layout.sectorization.setoresCount
             : null;
+        const ws =
+          layout.waterSource
+            ? { lng: layout.waterSource.lng, lat: layout.waterSource.lat }
+            : null;
         const result = findBestSprinklerLayout(
           layout.area!,
           ASPERSOR_PADRAO.espacamentoPadraoM,
           nSetores,
+          ws,
         );
         setOptimizerState({ status: "ready", result });
       } catch (err) {
@@ -817,6 +826,42 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   const dismissOptimizer = useCallback(() => {
     setOptimizerState({ status: "idle" });
   }, []);
+
+  // Valida hidráulica dos Top K candidatos via solver oficial (ação explícita do usuário).
+  // Só disponível quando status === "ready" e há waterSource + pump.
+  const runHydraulicValidation = useCallback(() => {
+    if (optimizerState.status !== "ready") return;
+    const currentResult = optimizerState.result;
+    setOptimizerState({ status: "hydraulic_running", result: currentResult });
+
+    setTimeout(() => {
+      try {
+        const nSetores =
+          typeof layout.sectorization?.setoresCount === "number"
+            ? layout.sectorization.setoresCount
+            : null;
+        const ws =
+          layout.waterSource
+            ? { lng: layout.waterSource.lng, lat: layout.waterSource.lat }
+            : null;
+        const pump = layout.pump ?? null;
+        const validated = runTopKHydraulicValidation(currentResult, {
+          polygon: layout.area!,
+          spacingMeters: ASPERSOR_PADRAO.espacamentoPadraoM,
+          waterSource: ws,
+          pump,
+          geodetic: layout.geodetic,
+          nSetores,
+        });
+        setOptimizerState({ status: "ready", result: validated });
+      } catch (err) {
+        setOptimizerState({
+          status: "error",
+          message: err instanceof Error ? err.message : "Erro desconhecido na validação hidráulica.",
+        });
+      }
+    }, 0);
+  }, [optimizerState, layout]);
   // ─────────────────────────────────────────────────────────────────────────
 
   const applyJornada = useCallback(
@@ -2131,6 +2176,13 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             </div>
           )}
 
+          {optimizerState.status === "hydraulic_running" && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-ink-3 py-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+              Validando hidráulica dos melhores candidatos…
+            </div>
+          )}
+
           {optimizerState.status === "error" && (
             <div className="mt-3 bg-red-50 border border-red-200 rounded-sm p-3">
               <div className="flex items-start justify-between gap-2">
@@ -2191,6 +2243,75 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                     <span className="col-span-2"><span className="text-ink-4 font-sans">Por ha</span> {best.score.lateralLengthPerHectareM.toFixed(0)} m/ha</span>
                   </div>
                 </div>
+
+                {best.score.secondaryLengthM !== null ? (
+                  <div className="border-t border-amber-200 pt-2 space-y-1">
+                    <p className="text-[9px] uppercase tracking-wider text-amber-600 font-semibold">
+                      Rede de distribuição — preliminar
+                    </p>
+                    <p className="text-[9px] text-amber-500 leading-tight">
+                      Comprimentos geométricos. Não substitui hidráulica, BOM ou validação técnica.
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-ink-2">
+                      <span><span className="text-ink-4 font-sans">Principal</span> {best.score.principalLengthM!.toFixed(0)} m</span>
+                      <span><span className="text-ink-4 font-sans">Adutora</span> {best.score.adutoraLengthM!.toFixed(0)} m</span>
+                      <span><span className="text-ink-4 font-sans">Ramais</span> {best.score.secondaryLengthM.toFixed(0)} m</span>
+                      <span><span className="text-ink-4 font-sans">Rede total</span> {best.score.totalNetworkLengthM!.toFixed(0)} m</span>
+                      <span><span className="text-ink-4 font-sans">Dist/Lat</span> {best.score.distributionLengthRatio!.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-amber-600 italic">
+                    Defina a captação para incluir métricas de rede de distribuição.
+                  </p>
+                )}
+
+                {/* ── Validação hidráulica Top K ───────────────────────────── */}
+                {best.score.hydraulicEvaluationStatus !== null ? (
+                  <div className="border-t border-amber-200 pt-2 space-y-1">
+                    <p className="text-[9px] uppercase tracking-wider text-amber-600 font-semibold">
+                      Validação hidráulica — Top K candidatos
+                    </p>
+                    <p className="text-[9px] text-amber-500 leading-tight">
+                      Usa o mesmo solver do projeto final. Apenas os melhores candidatos foram avaliados.
+                    </p>
+                    {best.score.hydraulicEvaluationStatus === "evaluated_no_blockers" && (
+                      <p className="text-[11px] text-green-700 font-medium">
+                        ✓ Sem blockers. HMT: {best.score.hydraulicHmtRequiredMca !== null ? `${best.score.hydraulicHmtRequiredMca.toFixed(1)} mca` : "n/a"}
+                      </p>
+                    )}
+                    {best.score.hydraulicEvaluationStatus === "evaluated_has_blockers" && (
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] text-red-700 font-medium">
+                          ✗ {best.score.hydraulicBlockers!.length} blocker(s) encontrado(s).
+                        </p>
+                        {best.score.hydraulicBlockers!.slice(0, 3).map((b, idx) => (
+                          <p key={idx} className="text-[10px] text-red-600 leading-tight">{b.message}</p>
+                        ))}
+                      </div>
+                    )}
+                    {best.score.hydraulicEvaluationStatus.startsWith("not_evaluated") && (
+                      <p className="text-[10px] text-amber-600 italic">{best.score.hydraulicEvaluationStatus}</p>
+                    )}
+                  </div>
+                ) : layout.waterSource && layout.pump ? (
+                  <div className="border-t border-amber-200 pt-2">
+                    <button
+                      onClick={runHydraulicValidation}
+                      className="w-full px-3 py-1.5 border border-amber-300 hover:border-amber-500 text-amber-700 hover:text-amber-900 rounded-sm text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      Validar hidráulica dos melhores candidatos
+                    </button>
+                    <p className="text-[9px] text-amber-500 mt-1 leading-tight">
+                      Usa o mesmo solver do projeto final. Apenas Top {OPTIMIZER_PARAMS.TOP_K_HYDRAULIC_CANDIDATES} candidatos avaliados.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-amber-600 italic border-t border-amber-200 pt-2">
+                    Defina captação e bomba para validar hidráulica dos melhores candidatos.
+                  </p>
+                )}
 
                 {best.score.sectionValveCount !== null ? (
                   <div className="border-t border-amber-200 pt-2 space-y-1">

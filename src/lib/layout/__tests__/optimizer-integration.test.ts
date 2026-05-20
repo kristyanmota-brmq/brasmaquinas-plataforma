@@ -34,8 +34,17 @@ function makeCandidate(positions: [number, number][]): LayoutCandidate {
       maxLateralLengthM: 36,
       lateralLengthPerSprinklerM: 12,
       lateralLengthPerHectareM: 166,
+      principalLengthM: null,
+      adutoraLengthM: null,
       secondaryLengthM: null,
+      totalNetworkLengthM: null,
+      avgSecondaryLengthM: null,
+      maxSecondaryLengthM: null,
+      distributionLengthRatio: null,
       hydraulicBlockers: null,
+      hydraulicEvaluationStatus: null,
+      hydraulicHmtRequiredMca: null,
+      hydraulicInvalidSegmentsCount: null,
     },
   };
 }

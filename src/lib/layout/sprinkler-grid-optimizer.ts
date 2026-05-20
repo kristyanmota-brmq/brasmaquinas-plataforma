@@ -6,20 +6,23 @@
  * métricas operacionais de setorização (registros de seção, fragmentação,
  * desbalanceamento de vazão).
  *
- * Escopo desta versão (TASK-010E-A):
+ * Escopo desta versão (TASK-010E-B):
  *   ✅  Métricas geométricas: fillingRatio, shortColumnRatio, edgeQualityScore
  *   ✅  Métricas operacionais: sectionValveCount, fragmentedLateralRatio,
  *       operationalSegmentsCount, fragmentedColumnCount, maxSegmentsPerColumn,
  *       desbalanceamentoPercent — disponíveis quando nSetores é válido
  *   ✅  Métricas de comprimento de laterais: totalLateralLengthM, avgLateralLengthM,
  *       maxLateralLengthM, lateralLengthPerSprinklerM, lateralLengthPerHectareM
- *       (geométricas puras — não incluem principal, adutora nem ramais até captação)
- *   ❌  secondaryLengthM — PENDENTE TASK-010E-B: requer waterSource e principalCoords
+ *   ✅  Métricas de rede de distribuição: principalLengthM, adutoraLengthM,
+ *       secondaryLengthM, totalNetworkLengthM, avgSecondaryLengthM,
+ *       maxSecondaryLengthM — disponíveis quando waterSource é fornecido
+ *       (comprimentos geométricos preliminares — não substituem hidráulica nem BOM)
  *   ❌  hydraulicBlockers — PENDENTE: requer solver hidráulico
  *   ❌  Topografia — PENDENTE
  *
- * A captação (waterSource) não é parâmetro de nenhuma função deste módulo.
+ * waterSource é parâmetro opcional. Quando ausente, métricas de rede ficam null.
  * O motor não chama solver hidráulico nem BOM.
+ * Pesos de rede: PREMISSA_PROVISORIA_MERCADO — ver docs/metodologia/12-premissas-provisorias-e-revisao-rt.md
  * Todas as métricas são PRELIMINARES — não substituem validação hidráulica de campo.
  */
 
@@ -33,7 +36,45 @@ import {
   type PhysicalColumn,
 } from "@/lib/layout/laterais";
 import { buildSectorsByFlowWithColumnSplitting } from "@/lib/layout/sectorization";
+import { generatePrincipalAndAdutora } from "@/lib/layout/principal";
+import { generateSecondaries } from "@/lib/layout/hydraulic-connectivity";
 import { ASPERSOR_PADRAO, TUBOS_PVC_LF } from "@/lib/catalog/aspersores";
+import { calculateIrrigationProject } from "@/lib/layout/irrigation-project";
+import type { ProjectLayout } from "@/app/projetos/[id]/layout-schema";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tipos de validação hidráulica (Top K)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Status da avaliação hidráulica de um candidato de layout via solver oficial.
+ * null = avaliação ainda não executada (estado inicial de todos os candidatos).
+ */
+export type HydraulicEvaluationStatus =
+  | "not_evaluated_missing_waterSource"
+  | "not_evaluated_missing_pump"
+  | "not_evaluated_missing_sectorization"
+  | "not_evaluated_not_in_top_k"
+  | "not_evaluated_solver_error"
+  | "evaluated_no_blockers"
+  | "evaluated_has_blockers";
+
+/** Blocker real do solver oficial — não é estimativa própria do motor. */
+export interface HydraulicBlockerReal {
+  /** Origem do blocker: string de diagnostics.blockers do solver oficial. */
+  source: "diagnostics_blocker";
+  message: string;
+}
+
+/** Opções para runTopKHydraulicValidation. */
+export interface TopKHydraulicOptions {
+  polygon: GeoJSON.Polygon;
+  spacingMeters: number;
+  waterSource: { lng: number; lat: number } | null | undefined;
+  pump: { hmtMca: number; vazaoMaxM3h: number } | null | undefined;
+  geodetic?: { distanceSourceToAreaMeters?: number; elevationDeltaMeters?: number } | null;
+  nSetores?: number | null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de calibração
@@ -83,6 +124,44 @@ export const OPTIMIZER_PARAMS = {
    * PENDENTE_CALIBRACAO_RT_CAMPO
    */
   WEIGHT_LATERAL_LENGTH: 0,
+  /**
+   * Peso da penalidade de comprimento de ramais/secundárias (secondaryLengthM / totalLateralLengthM).
+   * PREMISSA_PROVISORIA_MERCADO — 0,10 baseado em heurística de redes de irrigação convencionais
+   * onde ramais excessivos indicam layout desfavorável à distribuição.
+   * PENDENTE_REVISAO_RT_BRASMAQUINAS | PENDENTE_REVISAO_CAMPO_BRASMAQUINAS
+   * Ver docs/metodologia/12-premissas-provisorias-e-revisao-rt.md
+   */
+  WEIGHT_SECONDARY_LENGTH: 0.10,
+  /**
+   * Peso da penalidade de comprimento total de distribuição relativo às laterais.
+   * distributionLengthRatio = (principalLengthM + adutoraLengthM + secondaryLengthM)
+   *                           / max(totalLateralLengthM, 1)
+   * PREMISSA_PROVISORIA_MERCADO — 0,10 baseado em heurística de que comprimento de
+   * distribuição superior ao de laterais indica layout penalizante.
+   * PENDENTE_REVISAO_RT_BRASMAQUINAS | PENDENTE_REVISAO_CAMPO_BRASMAQUINAS
+   * Ver docs/metodologia/12-premissas-provisorias-e-revisao-rt.md
+   */
+  WEIGHT_TOTAL_NETWORK_LENGTH: 0.10,
+  /**
+   * Número máximo de candidatos que recebem validação hidráulica via solver oficial
+   * em `runTopKHydraulicValidation`. Motor geométrico avalia todos os candidatos;
+   * apenas os melhores por score geométrico recebem o solver completo.
+   * PREMISSA_PROVISORIA_MERCADO — 5 baseado em heurística de balancear cobertura
+   * vs. custo computacional.
+   * PENDENTE_REVISAO_RT_BRASMAQUINAS | PENDENTE_REVISAO_CAMPO_BRASMAQUINAS
+   * Ver docs/metodologia/12-premissas-provisorias-e-revisao-rt.md
+   */
+  TOP_K_HYDRAULIC_CANDIDATES: 5,
+  /**
+   * Penalidade no score de candidatos com blockers reais do solver oficial.
+   * Aplicada apenas quando `hydraulicBlockers.length > 0` no resultado de
+   * `runTopKHydraulicValidation`. Blocker do solver oficial é critério significativo
+   * de eliminação — penalidade deliberadamente alta.
+   * PREMISSA_PROVISORIA_MERCADO
+   * PENDENTE_REVISAO_RT_BRASMAQUINAS | PENDENTE_REVISAO_CAMPO_BRASMAQUINAS
+   * Ver docs/metodologia/12-premissas-provisorias-e-revisao-rt.md
+   */
+  WEIGHT_HYDRAULIC_BLOCKER: 0.50,
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -171,14 +250,48 @@ export interface LayoutScore {
    */
   lateralLengthPerHectareM: number;
 
-  // ── Métricas pendentes de solver hidráulico ──────────────────────────────
+  // ── Métricas de rede de distribuição (geométricas preliminares) ─────────
+  // Disponíveis quando waterSource é fornecido a findBestSprinklerLayout.
+  // Calculadas via generatePrincipalAndAdutora() + generateSecondaries() — sem solver.
+  // NÃO substituem hidráulica, BOM ou validação técnica.
+  // Penalidades: PREMISSA_PROVISORIA_MERCADO — ver docs/metodologia/12-premissas-provisorias-e-revisao-rt.md
+  /** Comprimento da polyline da tubulação principal. null quando sem captação. */
+  principalLengthM: number | null;
+  /** Comprimento do segmento adutora (captação → entrada da principal). null quando sem captação. */
+  adutoraLengthM: number | null;
   /**
-   * PENDENTE TASK-010E-B: requer waterSource, principalCoords e generateSecondaries().
-   * Ramais/secundárias conectam colunas físicas à tubulação principal.
+   * Soma dos comprimentos de todos os ramais/secundárias gerados (SecondaryPipe.lengthM).
+   * null quando sem captação.
    */
-  secondaryLengthM: null;
-  /** PENDENTE: requer solver hidráulico para cálculo. */
-  hydraulicBlockers: null;
+  secondaryLengthM: number | null;
+  /**
+   * Comprimento total de rede de distribuição:
+   * totalLateralLengthM + principalLengthM + adutoraLengthM + secondaryLengthM.
+   * null quando sem captação.
+   */
+  totalNetworkLengthM: number | null;
+  /** secondaryLengthM / nRamais. null quando sem captação ou sem ramais. */
+  avgSecondaryLengthM: number | null;
+  /** Comprimento do ramal mais longo. null quando sem captação. */
+  maxSecondaryLengthM: number | null;
+  /**
+   * (principalLengthM + adutoraLengthM + secondaryLengthM) / max(totalLateralLengthM, 1).
+   * Razão entre rede de distribuição e laterais — normalização da penalidade.
+   * null quando sem captação. PREMISSA_PROVISORIA_MERCADO.
+   */
+  distributionLengthRatio: number | null;
+
+  // ── Métricas de validação hidráulica Top K (via solver oficial) ─────────
+  // Preenchidas por runTopKHydraulicValidation — não pelo motor geométrico.
+  // null = avaliação ainda não executada.
+  /** Blockers reais do solver oficial. null = não avaliado. [] = avaliado, sem blockers. */
+  hydraulicBlockers: HydraulicBlockerReal[] | null;
+  /** Status da avaliação hidráulica para este candidato. null = não avaliado. */
+  hydraulicEvaluationStatus: HydraulicEvaluationStatus | null;
+  /** HMT necessária calculada pelo solver oficial (mca). null = não avaliado. */
+  hydraulicHmtRequiredMca: number | null;
+  /** Número de segmentos hidráulicos inválidos. null = não avaliado. */
+  hydraulicInvalidSegmentsCount: number | null;
 }
 
 export interface LayoutCandidate {
@@ -232,6 +345,9 @@ function computeScore(
   physicalColumns: PhysicalColumn[],
   spacingMeters: number,
   nSetores: number | null,
+  waterSource: { lng: number; lat: number } | null,
+  centroid: { lng: number; lat: number },
+  angleDegrees: number,
 ): LayoutScore {
   const NULL = null as null;
 
@@ -257,8 +373,17 @@ function computeScore(
       maxLateralLengthM: 0,
       lateralLengthPerSprinklerM: 0,
       lateralLengthPerHectareM: 0,
+      principalLengthM: NULL,
+      adutoraLengthM: NULL,
       secondaryLengthM: NULL,
+      totalNetworkLengthM: NULL,
+      avgSecondaryLengthM: NULL,
+      maxSecondaryLengthM: NULL,
+      distributionLengthRatio: NULL,
       hydraulicBlockers: NULL,
+      hydraulicEvaluationStatus: NULL,
+      hydraulicHmtRequiredMca: NULL,
+      hydraulicInvalidSegmentsCount: NULL,
     };
   }
 
@@ -274,6 +399,8 @@ function computeScore(
     WEIGHT_SECTION_VALVE,
     WEIGHT_FRAGMENTATION,
     WEIGHT_IMBALANCE,
+    WEIGHT_SECONDARY_LENGTH,
+    WEIGHT_TOTAL_NETWORK_LENGTH,
   } = OPTIMIZER_PARAMS;
   const shortColumns = physicalColumns.filter((c) => c.sprinklerCount < N_MIN_COLUMN);
   const shortColumnCount = shortColumns.length;
@@ -345,11 +472,60 @@ function computeScore(
       + WEIGHT_IMBALANCE * (desbalanceamentoPercent / 100);
   }
 
+  // ── Métricas de rede de distribuição ────────────────────────────────────
+  // Calculadas apenas quando waterSource é fornecido.
+  // Usa generatePrincipalAndAdutora (geométrico puro) + generateSecondaries.
+  // Penalidades: PREMISSA_PROVISORIA_MERCADO — ver 12-premissas-provisorias-e-revisao-rt.md
+  let principalLengthM: number | null = NULL;
+  let adutoraLengthM: number | null = NULL;
+  let secondaryLengthM: number | null = NULL;
+  let totalNetworkLengthM: number | null = NULL;
+  let avgSecondaryLengthM: number | null = NULL;
+  let maxSecondaryLengthM: number | null = NULL;
+  let distributionLengthRatio: number | null = NULL;
+  let distributionPenalty = 0;
+
+  if (waterSource !== null) {
+    try {
+      const { principal, adutora } = generatePrincipalAndAdutora(
+        waterSource,
+        physicalColumns,
+        centroid,
+        angleDegrees,
+      );
+      const secondaries = generateSecondaries(physicalColumns, principal, centroid);
+
+      principalLengthM = principal.length >= 2
+        ? turf.length(turf.lineString(principal), { units: "meters" })
+        : 0;
+      adutoraLengthM = adutora.length >= 2
+        ? turf.length(turf.lineString(adutora), { units: "meters" })
+        : 0;
+      secondaryLengthM = secondaries.reduce((s, r) => s + r.lengthM, 0);
+      totalNetworkLengthM = totalLateralLengthM + principalLengthM + adutoraLengthM + secondaryLengthM;
+      avgSecondaryLengthM = secondaries.length > 0 ? secondaryLengthM / secondaries.length : 0;
+      maxSecondaryLengthM = secondaries.length > 0 ? Math.max(...secondaries.map((r) => r.lengthM)) : 0;
+
+      // Normalização da penalidade: razão rede de distribuição / laterais.
+      // Quanto mais a distribuição excede as laterais, maior a penalidade.
+      // PREMISSA_PROVISORIA_MERCADO — valor de referência (razão 1,0) sem dado de campo.
+      distributionLengthRatio =
+        (principalLengthM + adutoraLengthM + secondaryLengthM) / Math.max(totalLateralLengthM, 1);
+
+      distributionPenalty =
+        WEIGHT_SECONDARY_LENGTH * Math.min(secondaryLengthM / Math.max(totalLateralLengthM, 1), 1)
+        + WEIGHT_TOTAL_NETWORK_LENGTH * Math.min(distributionLengthRatio, 1);
+    } catch {
+      // Falha silenciosa — captação inválida para este candidato; métricas permanecem null.
+    }
+  }
+
   const total =
     fillingRatio
     - WEIGHT_SHORT_COLUMN * shortColumnRatio
     - WEIGHT_EDGE * edgePenalty
-    - operationalPenalty;
+    - operationalPenalty
+    - distributionPenalty;
 
   return {
     total,
@@ -372,8 +548,17 @@ function computeScore(
     maxLateralLengthM,
     lateralLengthPerSprinklerM,
     lateralLengthPerHectareM,
-    secondaryLengthM: NULL,
+    principalLengthM,
+    adutoraLengthM,
+    secondaryLengthM,
+    totalNetworkLengthM,
+    avgSecondaryLengthM,
+    maxSecondaryLengthM,
+    distributionLengthRatio,
     hydraulicBlockers: NULL,
+    hydraulicEvaluationStatus: NULL,
+    hydraulicHmtRequiredMca: NULL,
+    hydraulicInvalidSegmentsCount: NULL,
   };
 }
 
@@ -385,6 +570,7 @@ function evaluateCandidate(
   offsetXm: number,
   offsetYm: number,
   nSetores: number | null,
+  waterSource: { lng: number; lat: number } | null,
 ): LayoutCandidate {
   const positions = generateRotatedSprinklerGridWithOffset(
     polygon,
@@ -404,7 +590,16 @@ function evaluateCandidate(
     // Sem sectorIds — avaliação puramente geométrica
   );
 
-  const score = computeScore(positions, polygon, physicalColumns, spacingMeters, nSetores);
+  const score = computeScore(
+    positions,
+    polygon,
+    physicalColumns,
+    spacingMeters,
+    nSetores,
+    waterSource,
+    centroid,
+    angleDegrees,
+  );
 
   return { angleDegrees, offsetXm, offsetYm, positions, physicalColumns, score };
 }
@@ -444,6 +639,7 @@ function generateCandidateConfigs(
 function buildSelectionReason(
   best: LayoutCandidate,
   second: LayoutCandidate | null,
+  opts?: { noElevationWarning?: boolean },
 ): string {
   const sc = best.score;
   const { N_MIN_COLUMN } = OPTIMIZER_PARAMS;
@@ -479,6 +675,44 @@ function buildSelectionReason(
     );
   }
 
+  if (sc.secondaryLengthM !== null) {
+    parts.push(
+      `Rede de distribuição (preliminar — comprimentos geométricos, não substitui hidráulica):` +
+      ` Principal: ${sc.principalLengthM!.toFixed(0)} m.` +
+      ` Adutora: ${sc.adutoraLengthM!.toFixed(0)} m.` +
+      ` Ramais/secundárias: ${sc.secondaryLengthM.toFixed(0)} m (média ${sc.avgSecondaryLengthM!.toFixed(0)} m, máx. ${sc.maxSecondaryLengthM!.toFixed(0)} m).` +
+      ` Rede total: ${sc.totalNetworkLengthM!.toFixed(0)} m.` +
+      ` Razão distribuição/laterais: ${sc.distributionLengthRatio!.toFixed(2)}.` +
+      ` Penalidade usa PREMISSA_PROVISORIA_MERCADO — ver 12-premissas-provisorias-e-revisao-rt.md.`,
+    );
+  } else {
+    parts.push(`Métricas de rede de distribuição não calculadas — defina a captação para incluir principal, adutora e ramais no score.`);
+  }
+
+  if (sc.hydraulicEvaluationStatus !== null) {
+    if (sc.hydraulicEvaluationStatus === "evaluated_no_blockers") {
+      parts.push(
+        `Validação hidráulica (solver oficial — Top K candidatos): SEM blockers.` +
+        ` HMT necessária: ${sc.hydraulicHmtRequiredMca !== null ? sc.hydraulicHmtRequiredMca.toFixed(1) + " mca" : "n/a"}.` +
+        ` Segmentos inválidos: ${sc.hydraulicInvalidSegmentsCount ?? 0}.` +
+        ` [PREMISSA_PROVISORIA_MERCADO]`,
+      );
+    } else if (sc.hydraulicEvaluationStatus === "evaluated_has_blockers") {
+      const msgs = sc.hydraulicBlockers?.map((b) => b.message).join("; ") ?? "";
+      parts.push(
+        `Validação hidráulica (solver oficial — Top K candidatos): ${sc.hydraulicBlockers?.length ?? 0} blocker(s).` +
+        ` ${msgs}.` +
+        ` HMT necessária: ${sc.hydraulicHmtRequiredMca !== null ? sc.hydraulicHmtRequiredMca.toFixed(1) + " mca" : "n/a"}.` +
+        ` Penalidade de score: -${OPTIMIZER_PARAMS.WEIGHT_HYDRAULIC_BLOCKER} (PREMISSA_PROVISORIA_MERCADO).`,
+      );
+    } else {
+      parts.push(`Validação hidráulica: ${sc.hydraulicEvaluationStatus}.`);
+    }
+    if (opts?.noElevationWarning) {
+      parts.push(`Avaliação hidráulica sem desnível informado.`);
+    }
+  }
+
   parts.push(`Score total: ${sc.total.toFixed(4)}.`);
 
   if (second) {
@@ -508,9 +742,13 @@ function buildSelectionReason(
  *   as métricas operacionais (sectionValveCount, fragmentedLateralRatio, etc.)
  *   ficam null e o score usa apenas critérios geométricos.
  *
- * A captação (waterSource) não é parâmetro.
+ * @param nSetores — número de setores da jornada operacional. Opcional.
+ * @param waterSource — captação do projeto. Opcional. Quando fornecido, inclui métricas
+ *   de principal, adutora e ramais no score. Sem waterSource, essas métricas ficam null.
+ *   Penalidades de rede: PREMISSA_PROVISORIA_MERCADO — ver 12-premissas-provisorias-e-revisao-rt.md.
+ *
  * O motor não chama solver hidráulico nem BOM.
- * secondaryLengthM e hydraulicBlockers permanecem null (requerem solver hidráulico).
+ * hydraulicBlockers permanece null (requer solver hidráulico).
  * Todos os resultados são PRELIMINARES — não substituem validação hidráulica de campo.
  *
  * @throws Error se nenhum candidato gerar posições válidas.
@@ -519,6 +757,7 @@ export function findBestSprinklerLayout(
   polygon: GeoJSON.Polygon,
   spacingMeters: number,
   nSetores?: number | null,
+  waterSource?: { lng: number; lat: number } | null,
 ): LayoutSelectionResult {
   const polyFeature = turf.polygon(polygon.coordinates);
   const centroidFeature = turf.centroid(polyFeature);
@@ -526,10 +765,20 @@ export function findBestSprinklerLayout(
   const centroid = { lng, lat };
 
   const effectiveN = nSetores ?? null;
+  const effectiveWS = waterSource ?? null;
   const configs = generateCandidateConfigs(polygon, spacingMeters);
 
   const allCandidates = configs.map(({ angleDegrees, offsetXm, offsetYm }) =>
-    evaluateCandidate(polygon, spacingMeters, centroid, angleDegrees, offsetXm, offsetYm, effectiveN),
+    evaluateCandidate(
+      polygon,
+      spacingMeters,
+      centroid,
+      angleDegrees,
+      offsetXm,
+      offsetYm,
+      effectiveN,
+      effectiveWS,
+    ),
   );
 
   const candidates = allCandidates
@@ -548,4 +797,223 @@ export function findBestSprinklerLayout(
   const selectionReason = buildSelectionReason(best, second);
 
   return { best, candidates, selectionReason };
+}
+
+/**
+ * Executa validação hidráulica via solver oficial nos Top K candidatos do ranking geométrico.
+ *
+ * Fluxo de dois passos:
+ *  1. `findBestSprinklerLayout` — ranking geométrico-operacional (todos os candidatos).
+ *  2. `runTopKHydraulicValidation` — solver oficial apenas nos Top K melhores.
+ *
+ * O `best` retornado é sempre o melhor entre os candidatos Top K avaliados.
+ * Candidatos fora do Top K NUNCA podem ser `best` após esta função.
+ *
+ * @param selectionResult — resultado de findBestSprinklerLayout (ranking geométrico).
+ * @param options — polygon, spacingMeters, waterSource, pump, geodetic, nSetores.
+ *
+ * Pré-condições para avaliação:
+ *   - waterSource deve estar presente → caso contrário: not_evaluated_missing_waterSource
+ *   - pump deve estar presente → caso contrário: not_evaluated_missing_pump
+ *   - nSetores deve ser válido → caso contrário: not_evaluated_missing_sectorization
+ *
+ * Sem desnível (geodetic ausente): avaliação não é bloqueada, mas selectionReason registra aviso.
+ *
+ * TOP_K_HYDRAULIC_CANDIDATES e WEIGHT_HYDRAULIC_BLOCKER: PREMISSA_PROVISORIA_MERCADO
+ * Ver docs/metodologia/12-premissas-provisorias-e-revisao-rt.md
+ */
+export function runTopKHydraulicValidation(
+  selectionResult: LayoutSelectionResult,
+  options: TopKHydraulicOptions,
+): LayoutSelectionResult {
+  const { polygon, spacingMeters, waterSource, pump, geodetic, nSetores } = options;
+
+  // ── Pré-condições ────────────────────────────────────────────────────────
+
+  const earlyStatus: HydraulicEvaluationStatus | null =
+    !waterSource ? "not_evaluated_missing_waterSource"
+    : !pump ? "not_evaluated_missing_pump"
+    : null;
+
+  if (earlyStatus !== null) {
+    const candidates = selectionResult.candidates.map((c) => ({
+      ...c,
+      score: { ...c.score, hydraulicEvaluationStatus: earlyStatus },
+    }));
+    return {
+      ...selectionResult,
+      candidates,
+      best: candidates[0],
+      selectionReason: buildSelectionReason(candidates[0], candidates[1] ?? null),
+    };
+  }
+
+  const effectiveN =
+    nSetores != null && Number.isInteger(nSetores) && nSetores > 0 ? nSetores : null;
+
+  if (effectiveN === null) {
+    const s: HydraulicEvaluationStatus = "not_evaluated_missing_sectorization";
+    const candidates = selectionResult.candidates.map((c) => ({
+      ...c,
+      score: { ...c.score, hydraulicEvaluationStatus: s },
+    }));
+    return {
+      ...selectionResult,
+      candidates,
+      best: candidates[0],
+      selectionReason: buildSelectionReason(candidates[0], candidates[1] ?? null),
+    };
+  }
+
+  // ── Centroide (idêntico ao de findBestSprinklerLayout) ───────────────────
+
+  const polyFeature = turf.polygon(polygon.coordinates);
+  const centroidFeature = turf.centroid(polyFeature);
+  const [lng, lat] = centroidFeature.geometry.coordinates;
+  const centroid = { lng, lat };
+
+  const noElevationWarning = !geodetic?.elevationDeltaMeters;
+
+  // ── Marcar todos os candidatos; Top K serão avaliados ────────────────────
+
+  const { TOP_K_HYDRAULIC_CANDIDATES, WEIGHT_HYDRAULIC_BLOCKER } = OPTIMIZER_PARAMS;
+  const topKCount = Math.min(TOP_K_HYDRAULIC_CANDIDATES, selectionResult.candidates.length);
+
+  const evaluatedCandidates: LayoutCandidate[] = selectionResult.candidates.map((c, i) => ({
+    ...c,
+    score: {
+      ...c.score,
+      hydraulicEvaluationStatus:
+        i < topKCount ? null : ("not_evaluated_not_in_top_k" as HydraulicEvaluationStatus),
+    },
+  }));
+
+  // ── Avaliar cada candidato Top K com o solver oficial ────────────────────
+
+  for (let i = 0; i < topKCount; i++) {
+    const candidate = evaluatedCandidates[i];
+
+    try {
+      // Reconstruir sectorIndices para este candidato
+      const sectResult = buildSectorsByFlowWithColumnSplitting(
+        candidate.physicalColumns,
+        effectiveN,
+        ASPERSOR_PADRAO.vazaoM3PorHora,
+        candidate.positions.length,
+      );
+
+      // Reconstruir principal/adutora para este candidato e ângulo
+      const { principal, adutora } = generatePrincipalAndAdutora(
+        waterSource!,
+        candidate.physicalColumns,
+        centroid,
+        candidate.angleDegrees,
+      );
+
+      const principalLengthM =
+        principal.length >= 2
+          ? turf.length(turf.lineString(principal), { units: "meters" })
+          : 0;
+
+      const aspersoresPorSetor = Math.floor(candidate.positions.length / effectiveN);
+      const vazaoPorSetorM3PorHora = aspersoresPorSetor * ASPERSOR_PADRAO.vazaoM3PorHora;
+
+      // Montar ProjectLayout temporário — mínimo para o solver oficial rodar
+      // jornadaHoras e tempoPorSetorMinutos são placeholders: não afetam hidráulica.
+      const tempLayout: ProjectLayout = {
+        schemaVersion: "1",
+        area: polygon,
+        centroid,
+        waterSource: { lng: waterSource!.lng, lat: waterSource!.lat },
+        geodetic: geodetic ?? undefined,
+        pump: pump ?? undefined,
+        sprinklers: {
+          aspersorId: ASPERSOR_PADRAO.sku,
+          positions: candidate.positions,
+          count: candidate.positions.length,
+          vazaoProjetoM3PorHora: candidate.positions.length * ASPERSOR_PADRAO.vazaoM3PorHora,
+          espacamentoM: spacingMeters,
+          gridAngleDegrees: candidate.angleDegrees,
+          angleMode: "optimizer",
+        },
+        sectorization: {
+          sectorIndices: sectResult.sectorIndices,
+          setoresCount: effectiveN,
+          // Placeholders — campos obrigatórios pelo schema; não usados pelo solver hidráulico.
+          jornadaHoras: 9,
+          laminaMm: 10,
+          tempoPorSetorMinutos: 0,
+          aspersoresPorSetor,
+          vazaoPorSetorM3PorHora,
+        },
+        mainPipeline: {
+          coordinates: principal,
+          adutora: adutora.length >= 2 ? adutora : undefined,
+          lengthMeters: principalLengthM,
+          segments: Math.max(1, principal.length - 1),
+          source: "auto",
+          corridorValidated: false,
+        },
+      };
+
+      const result = calculateIrrigationProject(tempLayout);
+
+      if (!result.isComplete || !result.diagnostics) {
+        evaluatedCandidates[i] = {
+          ...candidate,
+          score: {
+            ...candidate.score,
+            hydraulicEvaluationStatus: "not_evaluated_solver_error",
+          },
+        };
+        continue;
+      }
+
+      // Blockers reais do solver oficial (diagnostics.blockers = string[])
+      const blockers: HydraulicBlockerReal[] = result.diagnostics.blockers.map((msg) => ({
+        source: "diagnostics_blocker" as const,
+        message: msg,
+      }));
+
+      const hmtRequired = result.hydraulics?.hmt.totalHMT ?? null;
+      const invalidCount = result.hydraulics?.validation.invalidSegments.length ?? null;
+      const hasBlockers = blockers.length > 0;
+
+      evaluatedCandidates[i] = {
+        ...candidate,
+        score: {
+          ...candidate.score,
+          total: hasBlockers
+            ? candidate.score.total - WEIGHT_HYDRAULIC_BLOCKER
+            : candidate.score.total,
+          hydraulicBlockers: blockers,
+          hydraulicEvaluationStatus: hasBlockers
+            ? "evaluated_has_blockers"
+            : "evaluated_no_blockers",
+          hydraulicHmtRequiredMca: hmtRequired,
+          hydraulicInvalidSegmentsCount: invalidCount,
+        },
+      };
+    } catch {
+      evaluatedCandidates[i] = {
+        ...candidate,
+        score: {
+          ...candidate.score,
+          hydraulicEvaluationStatus: "not_evaluated_solver_error",
+        },
+      };
+    }
+  }
+
+  // ── Best é o melhor entre os Top K avaliados (não candidatos não avaliados) ─
+
+  const topKCandidates = evaluatedCandidates.slice(0, topKCount);
+  const best = topKCandidates.reduce((a, b) =>
+    a.score.total > b.score.total ? a : b,
+  );
+  const second = topKCandidates.find((c) => c !== best) ?? null;
+
+  const selectionReason = buildSelectionReason(best, second, { noElevationWarning });
+
+  return { best, candidates: evaluatedCandidates, selectionReason };
 }
