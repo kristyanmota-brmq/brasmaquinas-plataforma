@@ -782,9 +782,14 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     // setTimeout mantém o render cycle antes do cálculo síncrono pesado.
     setTimeout(() => {
       try {
+        const nSetores =
+          typeof layout.sectorization?.setoresCount === "number"
+            ? layout.sectorization.setoresCount
+            : null;
         const result = findBestSprinklerLayout(
           layout.area!,
           ASPERSOR_PADRAO.espacamentoPadraoM,
+          nSetores,
         );
         setOptimizerState({ status: "ready", result });
       } catch (err) {
@@ -2170,6 +2175,33 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                   <span><span className="text-ink-4 font-sans">Col. curtas</span> {best.score.shortColumnCount}</span>
                   <span><span className="text-ink-4 font-sans">Borda</span> {(best.score.edgeQualityScore * 100).toFixed(0)}%</span>
                 </div>
+
+                {best.score.sectionValveCount !== null ? (
+                  <div className="border-t border-amber-200 pt-2 space-y-1">
+                    <p className="text-[9px] uppercase tracking-wider text-amber-600 font-semibold">
+                      Métricas operacionais — preliminares
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-ink-2">
+                      <span><span className="text-ink-4 font-sans">Reg. seção</span> {best.score.sectionValveCount}</span>
+                      {best.score.operationalSegmentsCount !== null && (
+                        <span><span className="text-ink-4 font-sans">Segmentos</span> {best.score.operationalSegmentsCount}</span>
+                      )}
+                      {best.score.fragmentedColumnCount !== null && (
+                        <span><span className="text-ink-4 font-sans">Col. frag.</span> {best.score.fragmentedColumnCount}</span>
+                      )}
+                      {best.score.fragmentedLateralRatio !== null && (
+                        <span><span className="text-ink-4 font-sans">Frag.</span> {(best.score.fragmentedLateralRatio * 100).toFixed(0)}%</span>
+                      )}
+                      {best.score.desbalanceamentoPercent !== null && (
+                        <span><span className="text-ink-4 font-sans">Desbal.</span> {best.score.desbalanceamentoPercent.toFixed(0)}%</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-amber-600 italic">
+                    Selecione uma jornada para incluir métricas operacionais.
+                  </p>
+                )}
 
                 <details className="text-[10px]">
                   <summary className="cursor-pointer text-amber-700 hover:text-amber-900 select-none">

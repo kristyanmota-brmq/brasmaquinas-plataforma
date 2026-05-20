@@ -1,0 +1,317 @@
+import { describe, it, expect } from "vitest";
+import * as turf from "@turf/turf";
+import {
+  findBestSprinklerLayout,
+  OPTIMIZER_PARAMS,
+  type LayoutScore,
+} from "@/lib/layout/sprinkler-grid-optimizer";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fixtures
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SPACING = 12; // m
+const CENTER_LNG = -46.0;
+const CENTER_LAT = -12.0;
+const DEG_PER_M_LAT = 1 / 111320;
+const DEG_PER_M_LNG = 1 / (111320 * Math.cos((CENTER_LAT * Math.PI) / 180));
+
+function rectPolygon(widthM: number, heightM: number): GeoJSON.Polygon {
+  const dLng = (widthM / 2) * DEG_PER_M_LNG;
+  const dLat = (heightM / 2) * DEG_PER_M_LAT;
+  const ring: [number, number][] = [
+    [CENTER_LNG - dLng, CENTER_LAT - dLat],
+    [CENTER_LNG + dLng, CENTER_LAT - dLat],
+    [CENTER_LNG + dLng, CENTER_LAT + dLat],
+    [CENTER_LNG - dLng, CENTER_LAT + dLat],
+    [CENTER_LNG - dLng, CENTER_LAT - dLat],
+  ];
+  return { type: "Polygon", coordinates: [ring] };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Testes estruturais: constantes de calibração pendentes
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("OPTIMIZER_PARAMS — constantes pendentes de calibração", () => {
+  it("OPTIMIZER_PARAMS é exportado e contém todos os parâmetros pendentes", () => {
+    // Garante que nenhum peso/limite técnico foi incorporado silenciosamente
+    // sem documentação. Qualquer novo parâmetro deve aparecer aqui.
+    expect(typeof OPTIMIZER_PARAMS.N_MIN_COLUMN).toBe("number");
+    expect(typeof OPTIMIZER_PARAMS.N_ANGLE_NEIGHBORS).toBe("number");
+    expect(typeof OPTIMIZER_PARAMS.ANGLE_STEP_DEG).toBe("number");
+    expect(typeof OPTIMIZER_PARAMS.N_OFFSET_STEPS).toBe("number");
+    expect(typeof OPTIMIZER_PARAMS.WEIGHT_SHORT_COLUMN).toBe("number");
+    expect(typeof OPTIMIZER_PARAMS.WEIGHT_EDGE).toBe("number");
+  });
+
+  it("espaço de candidatos é limitado (entre 10 e 200)", () => {
+    // Verifica que a combinação de ângulos × offsets não explode.
+    // 7 ângulos × 4×4 offsets = 112 candidatos no máximo.
+    const maxAngles = 2 * OPTIMIZER_PARAMS.N_ANGLE_NEIGHBORS + 1;
+    const offsetCombos =
+      OPTIMIZER_PARAMS.N_OFFSET_STEPS * OPTIMIZER_PARAMS.N_OFFSET_STEPS;
+    const maxCandidates = maxAngles * offsetCombos;
+
+    expect(maxCandidates).toBeGreaterThanOrEqual(10);
+    expect(maxCandidates).toBeLessThanOrEqual(200);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// findBestSprinklerLayout — comportamento geral
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("findBestSprinklerLayout", () => {
+  it("retorna pelo menos 1 candidato válido para retângulo 120×60", () => {
+    const poly = rectPolygon(120, 60);
+    const result = findBestSprinklerLayout(poly, SPACING);
+
+    expect(result.candidates.length).toBeGreaterThan(0);
+    expect(result.best).toBeDefined();
+    expect(isFinite(result.best.score.total)).toBe(true);
+  });
+
+  it("melhor candidato tem fillingRatio > 0,5", () => {
+    // Um campo 120×60 com grade 12×12 deve preencher mais de metade da área teórica.
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(best.score.fillingRatio).toBeGreaterThan(0.5);
+  });
+
+  it("melhor candidato tem shortColumnRatio < 0,4", () => {
+    // A penalidade de colunas curtas deve excluir candidatos muito fragmentados.
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(best.score.shortColumnRatio).toBeLessThan(0.4);
+  });
+
+  it("score inclui edgeQualityScore e edgePenalty", () => {
+    // Verifica que a métrica de borda está presente e é numérica (PENDENTE_CALIBRACAO_RT_CAMPO).
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+    const sc: LayoutScore = best.score;
+
+    expect(typeof sc.edgeQualityScore).toBe("number");
+    expect(typeof sc.edgePenalty).toBe("number");
+    expect(sc.edgeQualityScore).toBeGreaterThanOrEqual(0);
+    expect(sc.edgeQualityScore).toBeLessThanOrEqual(1);
+    expect(sc.edgePenalty).toBeCloseTo(1 - sc.edgeQualityScore, 8);
+  });
+
+  it("campos pendentes de setorização e hidráulica permanecem null", () => {
+    // Garante que o motor geométrico NÃO preenche métricas que requerem
+    // setorização (TASK-010C) ou solver hidráulico.
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+    const sc: LayoutScore = best.score;
+
+    expect(sc.sectionValveCount).toBeNull();
+    expect(sc.fragmentedLateralRatio).toBeNull();
+    expect(sc.secondaryLengthM).toBeNull();
+    expect(sc.hydraulicBlockers).toBeNull();
+  });
+
+  it("posições do melhor candidato estão dentro do polígono", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(best.positions.length).toBeGreaterThan(0);
+
+    const polyFeature = turf.polygon(poly.coordinates);
+    for (const [lng, lat] of best.positions) {
+      expect(turf.booleanPointInPolygon(turf.point([lng, lat]), polyFeature)).toBe(true);
+    }
+  });
+
+  it("motor é determinístico — mesmo polígono produz o mesmo best", () => {
+    // Reprodutibilidade: chamadas repetidas retornam o mesmo candidato.
+    const poly = rectPolygon(120, 60);
+    const a = findBestSprinklerLayout(poly, SPACING);
+    const b = findBestSprinklerLayout(poly, SPACING);
+
+    expect(a.best.angleDegrees).toBe(b.best.angleDegrees);
+    expect(a.best.offsetXm).toBe(b.best.offsetXm);
+    expect(a.best.offsetYm).toBe(b.best.offsetYm);
+    expect(a.best.score.sprinklerCount).toBe(b.best.score.sprinklerCount);
+  });
+
+  it("candidatos com offsets distintos têm posições distintas", () => {
+    // O motor avalia múltiplos offsets e os candidatos devem ser diferentes entre si.
+    const poly = rectPolygon(120, 60);
+    const { candidates } = findBestSprinklerLayout(poly, SPACING);
+
+    // Filtra dois candidatos com mesmo ângulo mas offsets diferentes
+    const sameAngle = candidates.filter(
+      (c) => c.angleDegrees === candidates[0].angleDegrees,
+    );
+
+    expect(sameAngle.length).toBeGreaterThan(1);
+
+    // Pelo menos dois deles devem ter contagens de aspersores diferentes,
+    // ou posições diferentes — confirma que offset realmente varia a grade.
+    const counts = sameAngle.map((c) => c.score.sprinklerCount);
+    const hasDifferentCounts = new Set(counts).size > 1;
+    const hasDifferentOffsets =
+      sameAngle.some(
+        (c) => c.offsetXm !== sameAngle[0].offsetXm || c.offsetYm !== sameAngle[0].offsetYm,
+      );
+
+    // Um desses dois critérios deve ser verdadeiro.
+    expect(hasDifferentCounts || hasDifferentOffsets).toBe(true);
+  });
+
+  it("selectionReason contém ângulo, aspersores, fillingRatio e aviso de calibração", () => {
+    // O relatório deve ser informativo e incluir o aviso de que não é homologado.
+    const poly = rectPolygon(120, 60);
+    const { selectionReason, best } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(selectionReason).toBeTruthy();
+    expect(selectionReason.length).toBeGreaterThan(50);
+
+    // Deve mencionar o ângulo escolhido.
+    expect(selectionReason).toContain(`${best.angleDegrees}°`);
+
+    // Deve mencionar a contagem de aspersores.
+    expect(selectionReason).toContain(`${best.score.sprinklerCount}`);
+
+    // Deve conter aviso de calibração pendente.
+    expect(selectionReason).toContain("PENDENTE_CALIBRACAO_RT_CAMPO");
+
+    // Deve deixar claro que não é homologado.
+    expect(selectionReason).toContain("geometricamente melhor");
+    expect(selectionReason).toContain("não homologado");
+  });
+
+  it("motor não recebe waterSource e não expõe campos de solver ou BOM", () => {
+    // Asserção estrutural: findBestSprinklerLayout recebe apenas polygon + spacingMeters.
+    // O resultado não contém campos que seriam produzidos pelo solver ou BOM.
+    const poly = rectPolygon(120, 60);
+
+    // A chamada compila sem waterSource — garantido pelo TypeScript.
+    // Em runtime, verificamos que o resultado não tem campos do solver.
+    const result = findBestSprinklerLayout(poly, SPACING);
+
+    expect("hydraulics" in result).toBe(false);
+    expect("bom" in result).toBe(false);
+    expect("sectorization" in result).toBe(false);
+    expect("waterSource" in result).toBe(false);
+    expect("mainPipeline" in result).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Métricas operacionais de setorização (TASK-010D)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("findBestSprinklerLayout — métricas operacionais com nSetores", () => {
+  const N_SETORES = 9;
+
+  it("com nSetores válido, sectionValveCount é número (não null)", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING, N_SETORES);
+
+    expect(best.score.sectionValveCount).not.toBeNull();
+    expect(typeof best.score.sectionValveCount).toBe("number");
+  });
+
+  it("com nSetores válido, fragmentedLateralRatio está em [0, 1]", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING, N_SETORES);
+
+    expect(best.score.fragmentedLateralRatio).not.toBeNull();
+    expect(best.score.fragmentedLateralRatio!).toBeGreaterThanOrEqual(0);
+    expect(best.score.fragmentedLateralRatio!).toBeLessThanOrEqual(1);
+  });
+
+  it("com nSetores válido, desbalanceamentoPercent >= 0", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING, N_SETORES);
+
+    expect(best.score.desbalanceamentoPercent).not.toBeNull();
+    expect(best.score.desbalanceamentoPercent!).toBeGreaterThanOrEqual(0);
+  });
+
+  it("com nSetores válido, sectionValveCount <= operationalSegmentsCount", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING, N_SETORES);
+    const sc = best.score;
+
+    expect(sc.sectionValveCount).not.toBeNull();
+    expect(sc.operationalSegmentsCount).not.toBeNull();
+    expect(sc.sectionValveCount!).toBeLessThanOrEqual(sc.operationalSegmentsCount!);
+  });
+
+  it("com nSetores válido, operationalSegmentsCount >= nSetores", () => {
+    // Cada setor precisa de pelo menos 1 segmento operacional.
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING, N_SETORES);
+
+    expect(best.score.operationalSegmentsCount!).toBeGreaterThanOrEqual(N_SETORES);
+  });
+
+  it("sem nSetores, métricas operacionais permanecem null (retrocompatibilidade)", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+    const sc = best.score;
+
+    expect(sc.sectionValveCount).toBeNull();
+    expect(sc.fragmentedLateralRatio).toBeNull();
+    expect(sc.operationalSegmentsCount).toBeNull();
+    expect(sc.fragmentedColumnCount).toBeNull();
+    expect(sc.maxSegmentsPerColumn).toBeNull();
+    expect(sc.desbalanceamentoPercent).toBeNull();
+  });
+
+  it("nSetores inválido (0) mantém métricas null e não lança exceção", () => {
+    const poly = rectPolygon(120, 60);
+    expect(() => findBestSprinklerLayout(poly, SPACING, 0)).not.toThrow();
+    const { best } = findBestSprinklerLayout(poly, SPACING, 0);
+
+    expect(best.score.sectionValveCount).toBeNull();
+    expect(best.score.fragmentedLateralRatio).toBeNull();
+  });
+
+  it("nSetores inválido (não inteiro) mantém métricas null e não lança exceção", () => {
+    const poly = rectPolygon(120, 60);
+    expect(() => findBestSprinklerLayout(poly, SPACING, 2.5)).not.toThrow();
+    const { best } = findBestSprinklerLayout(poly, SPACING, 2.5);
+
+    expect(best.score.sectionValveCount).toBeNull();
+  });
+
+  it("selectionReason com nSetores menciona registros de seção e fragmentação", () => {
+    const poly = rectPolygon(120, 60);
+    const { selectionReason } = findBestSprinklerLayout(poly, SPACING, N_SETORES);
+
+    expect(selectionReason).toContain("Registros de seção");
+    expect(selectionReason).toContain("Colunas fragmentadas");
+    expect(selectionReason).toContain("PENDENTE_CALIBRACAO_RT_CAMPO");
+    expect(selectionReason).toContain("não substituem validação hidráulica");
+  });
+
+  it("selectionReason sem nSetores menciona jornada pendente", () => {
+    const poly = rectPolygon(120, 60);
+    const { selectionReason } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(selectionReason).toContain("selecione uma jornada");
+  });
+
+  it("OPTIMIZER_PARAMS contém WEIGHT_SECTION_VALVE, WEIGHT_FRAGMENTATION, WEIGHT_IMBALANCE", () => {
+    expect(typeof OPTIMIZER_PARAMS.WEIGHT_SECTION_VALVE).toBe("number");
+    expect(typeof OPTIMIZER_PARAMS.WEIGHT_FRAGMENTATION).toBe("number");
+    expect(typeof OPTIMIZER_PARAMS.WEIGHT_IMBALANCE).toBe("number");
+  });
+
+  it("com nSetores, resultado é determinístico", () => {
+    const poly = rectPolygon(120, 60);
+    const a = findBestSprinklerLayout(poly, SPACING, N_SETORES);
+    const b = findBestSprinklerLayout(poly, SPACING, N_SETORES);
+
+    expect(a.best.angleDegrees).toBe(b.best.angleDegrees);
+    expect(a.best.score.sectionValveCount).toBe(b.best.score.sectionValveCount);
+    expect(a.best.score.fragmentedLateralRatio).toBe(b.best.score.fragmentedLateralRatio);
+  });
+});

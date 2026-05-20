@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-20
-Testes na base: 552/552 · TypeScript: 0 erros
+Testes na base: 564/564 · TypeScript: 0 erros
 
 ---
 
@@ -313,9 +313,27 @@ Testes na base: 552/552 · TypeScript: 0 erros
 
 ---
 
+### TASK-010D — Métricas operacionais de setorização no motor de candidatos de layout
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** layout / domínio
+**Arquivo:** `tasks/TASK-010D-metricas-setorizacao-motor-candidatos.md`
+**Concluída em:** 2026-05-20 · 564/564 testes · 0 erros tsc
+
+> `findBestSprinklerLayout()` evoluído para aceitar `nSetores?: number | null`. Quando válido
+> (inteiro, >0, ≤ sprinklerCount), executa `buildSectorsByFlowWithColumnSplitting()` por candidato
+> e preenche 6 métricas operacionais em `LayoutScore`: `sectionValveCount`, `fragmentedColumnCount`,
+> `fragmentedLateralRatio`, `operationalSegmentsCount`, `maxSegmentsPerColumn`,
+> `desbalanceamentoPercent`. 3 novos pesos em `OPTIMIZER_PARAMS` (PENDENTE_CALIBRACAO_RT_CAMPO).
+> `ProjectMap.tsx` passa `layout.sectorization?.setoresCount` e exibe métricas como "preliminares"
+> ou hint de jornada pendente. `secondaryLengthM` e `hydraulicBlockers` permanecem `null`.
+> Retrocompatibilidade total. 12 novos testes em `sprinkler-grid-optimizer.test.ts`.
+
+---
+
 ## Próximas tarefas sugeridas (não formalizadas)
 
-- **TASK-010D — Métricas de setorização no motor**: adicionar `sectionValveCount` e `fragmentedLateralRatio` ao `LayoutScore` (requer executar `buildSectorsByFlowWithColumnSplitting` para cada candidato com o `nSetores` da jornada escolhida). Depende de TASK-010C ✅
-- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar `N_MIN_COLUMN`, `WEIGHT_SHORT_COLUMN`, `WEIGHT_EDGE` com dados de projetos homologados; remover marcadores `PENDENTE_CALIBRACAO_RT_CAMPO`.
-- **P2 — Labels de setor no mapa**: marcadores de setor devem aparecer em `PhysicalColumn.startLngLat` da primeira lateral, não no centroide. Mudança em `ProjectMap.tsx`, bloco `sectorLabelsGeoJSON`.
+- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar `N_MIN_COLUMN`, `WEIGHT_SHORT_COLUMN`, `WEIGHT_EDGE`, `WEIGHT_SECTION_VALVE`, `WEIGHT_FRAGMENTATION`, `WEIGHT_IMBALANCE` com dados de projetos homologados; remover marcadores `PENDENTE_CALIBRACAO_RT_CAMPO`. Depende de TASK-010D ✅
+- **TASK-010E — Labels de setor no mapa**: marcadores de setor devem aparecer em `PhysicalColumn.startLngLat` da primeira lateral, não no centroide. Mudança em `ProjectMap.tsx`, bloco `sectorLabelsGeoJSON`.
 - **Diâmetro dos ramais no PDF**: `PropostaPDF.tsx` não exibe diâmetro individual dos ramais. Incluir coluna com SKU selecionado por `sizedSecondaries`.
