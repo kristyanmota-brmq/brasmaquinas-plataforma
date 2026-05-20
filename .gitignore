@@ -44,3 +44,10 @@ next-env.d.ts
 
 /src/generated/prisma
 .env
+
+# local workspace artifacts
+.vscode/
+memory/
+HANDOFF.md
+update_catalog_and_bom.py
+.claude/settings.local.json
