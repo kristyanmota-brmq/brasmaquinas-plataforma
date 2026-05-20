@@ -6,12 +6,15 @@
  * métricas operacionais de setorização (registros de seção, fragmentação,
  * desbalanceamento de vazão).
  *
- * Escopo desta versão (TASK-010D):
+ * Escopo desta versão (TASK-010E-A):
  *   ✅  Métricas geométricas: fillingRatio, shortColumnRatio, edgeQualityScore
  *   ✅  Métricas operacionais: sectionValveCount, fragmentedLateralRatio,
  *       operationalSegmentsCount, fragmentedColumnCount, maxSegmentsPerColumn,
  *       desbalanceamentoPercent — disponíveis quando nSetores é válido
- *   ❌  secondaryLengthM — PENDENTE: requer hidráulica completa
+ *   ✅  Métricas de comprimento de laterais: totalLateralLengthM, avgLateralLengthM,
+ *       maxLateralLengthM, lateralLengthPerSprinklerM, lateralLengthPerHectareM
+ *       (geométricas puras — não incluem principal, adutora nem ramais até captação)
+ *   ❌  secondaryLengthM — PENDENTE TASK-010E-B: requer waterSource e principalCoords
  *   ❌  hydraulicBlockers — PENDENTE: requer solver hidráulico
  *   ❌  Topografia — PENDENTE
  *
@@ -74,6 +77,12 @@ export const OPTIMIZER_PARAMS = {
    * PENDENTE_CALIBRACAO_RT_CAMPO
    */
   WEIGHT_IMBALANCE: 0.2,
+  /**
+   * Peso da penalidade de comprimento de laterais.
+   * Atualmente INATIVO (0) — normalização pendente de calibração com dados de campo.
+   * PENDENTE_CALIBRACAO_RT_CAMPO
+   */
+  WEIGHT_LATERAL_LENGTH: 0,
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,8 +152,30 @@ export interface LayoutScore {
    */
   desbalanceamentoPercent: number | null;
 
+  // ── Métricas de comprimento de laterais (geométricas puras) ─────────────
+  // Calculadas de physicalColumns.comprimentoM — sem solver, sem waterSource.
+  // NÃO incluem principal, adutora nem ramais até captação.
+  // Ramais/secundárias dependem de waterSource e principalCoords → TASK-010E-B.
+  // PENDENTE_CALIBRACAO_RT_CAMPO — preliminares.
+  /** Soma de comprimentoM de todas as colunas físicas (metro de tubo lateral total). */
+  totalLateralLengthM: number;
+  /** Comprimento médio de coluna física (totalLateralLengthM / physicalColumnCount). */
+  avgLateralLengthM: number;
+  /** Comprimento da coluna física mais longa. */
+  maxLateralLengthM: number;
+  /** totalLateralLengthM / sprinklerCount — metro de lateral por aspersor. */
+  lateralLengthPerSprinklerM: number;
+  /**
+   * totalLateralLengthM / (área_ha) — metro de lateral por hectare irrigado.
+   * Permite comparar layouts em áreas de tamanhos diferentes.
+   */
+  lateralLengthPerHectareM: number;
+
   // ── Métricas pendentes de solver hidráulico ──────────────────────────────
-  /** PENDENTE: requer hidráulica completa para cálculo. */
+  /**
+   * PENDENTE TASK-010E-B: requer waterSource, principalCoords e generateSecondaries().
+   * Ramais/secundárias conectam colunas físicas à tubulação principal.
+   */
   secondaryLengthM: null;
   /** PENDENTE: requer solver hidráulico para cálculo. */
   hydraulicBlockers: null;
@@ -221,6 +252,11 @@ function computeScore(
       fragmentedLateralRatio: NULL,
       maxSegmentsPerColumn: NULL,
       desbalanceamentoPercent: NULL,
+      totalLateralLengthM: 0,
+      avgLateralLengthM: 0,
+      maxLateralLengthM: 0,
+      lateralLengthPerSprinklerM: 0,
+      lateralLengthPerHectareM: 0,
       secondaryLengthM: NULL,
       hydraulicBlockers: NULL,
     };
@@ -257,6 +293,17 @@ function computeScore(
     edgeQualityScore = innerAvg > 0 ? Math.min(1, edgeAvg / innerAvg) : 1;
   }
   const edgePenalty = 1 - edgeQualityScore;
+
+  // ── Métricas de comprimento de laterais ─────────────────────────────────
+  // Geométricas puras: derivadas de physicalColumns.comprimentoM, sem waterSource.
+  // NÃO incluem principal, adutora nem ramais até captação (TASK-010E-B).
+  // PENDENTE_CALIBRACAO_RT_CAMPO — peso WEIGHT_LATERAL_LENGTH atualmente inativo (0).
+  const totalLateralLengthM = physicalColumns.reduce((s, c) => s + c.comprimentoM, 0);
+  const avgLateralLengthM = nCols > 0 ? totalLateralLengthM / nCols : 0;
+  const maxLateralLengthM = nCols > 0 ? Math.max(...physicalColumns.map((c) => c.comprimentoM)) : 0;
+  const lateralLengthPerSprinklerM = positions.length > 0 ? totalLateralLengthM / positions.length : 0;
+  const areaHa = areaM2 / 10000;
+  const lateralLengthPerHectareM = areaHa > 0 ? totalLateralLengthM / areaHa : 0;
 
   // ── Métricas operacionais de setorização ─────────────────────────────────
   // Calculadas apenas quando nSetores é inteiro > 0 e ≤ sprinklerCount.
@@ -320,6 +367,11 @@ function computeScore(
     fragmentedLateralRatio,
     maxSegmentsPerColumn,
     desbalanceamentoPercent,
+    totalLateralLengthM,
+    avgLateralLengthM,
+    maxLateralLengthM,
+    lateralLengthPerSprinklerM,
+    lateralLengthPerHectareM,
     secondaryLengthM: NULL,
     hydraulicBlockers: NULL,
   };
@@ -403,6 +455,11 @@ function buildSelectionReason(
     `Colunas físicas: ${sc.physicalColumnCount} | média ${sc.avgSprinklersPerColumn.toFixed(1)} asp./coluna.`,
     `Colunas curtas (<${N_MIN_COLUMN} asp.): ${sc.shortColumnCount}/${sc.physicalColumnCount} (${(sc.shortColumnRatio * 100).toFixed(0)}%). [PENDENTE_CALIBRACAO_RT_CAMPO]`,
     `Qualidade de borda: ${(sc.edgeQualityScore * 100).toFixed(0)}% (colunas de borda vs. média interna). [PENDENTE_CALIBRACAO_RT_CAMPO]`,
+    `Comprimento de laterais: total ${sc.totalLateralLengthM.toFixed(0)} m` +
+    ` | média ${sc.avgLateralLengthM.toFixed(0)} m/coluna` +
+    ` | ${sc.lateralLengthPerSprinklerM.toFixed(1)} m/asp.` +
+    ` | ${sc.lateralLengthPerHectareM.toFixed(0)} m/ha.` +
+    ` Não inclui principal, adutora nem ramais até captação. [PENDENTE_CALIBRACAO_RT_CAMPO]`,
   ];
 
   if (sc.sectionValveCount !== null) {

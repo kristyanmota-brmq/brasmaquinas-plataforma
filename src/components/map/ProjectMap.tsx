@@ -2176,6 +2176,22 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                   <span><span className="text-ink-4 font-sans">Borda</span> {(best.score.edgeQualityScore * 100).toFixed(0)}%</span>
                 </div>
 
+                <div className="border-t border-amber-200 pt-2 space-y-1">
+                  <p className="text-[9px] uppercase tracking-wider text-amber-600 font-semibold">
+                    Comprimento geométrico de laterais
+                  </p>
+                  <p className="text-[9px] text-amber-500 leading-tight">
+                    Não inclui principal, adutora nem ramais até captação.
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-ink-2">
+                    <span><span className="text-ink-4 font-sans">Total</span> {best.score.totalLateralLengthM.toFixed(0)} m</span>
+                    <span><span className="text-ink-4 font-sans">Média/col.</span> {best.score.avgLateralLengthM.toFixed(0)} m</span>
+                    <span><span className="text-ink-4 font-sans">Máx. col.</span> {best.score.maxLateralLengthM.toFixed(0)} m</span>
+                    <span><span className="text-ink-4 font-sans">Por asp.</span> {best.score.lateralLengthPerSprinklerM.toFixed(1)} m</span>
+                    <span className="col-span-2"><span className="text-ink-4 font-sans">Por ha</span> {best.score.lateralLengthPerHectareM.toFixed(0)} m/ha</span>
+                  </div>
+                </div>
+
                 {best.score.sectionValveCount !== null ? (
                   <div className="border-t border-amber-200 pt-2 space-y-1">
                     <p className="text-[9px] uppercase tracking-wider text-amber-600 font-semibold">

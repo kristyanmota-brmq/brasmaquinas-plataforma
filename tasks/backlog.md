@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-20
-Testes na base: 564/564 · TypeScript: 0 erros
+Testes na base: 573/573 · TypeScript: 0 erros
 
 ---
 
@@ -332,8 +332,27 @@ Testes na base: 564/564 · TypeScript: 0 erros
 
 ---
 
+### TASK-010E-A — Métricas de comprimento de laterais no motor de candidatos
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** layout / domínio
+**Arquivo:** `tasks/TASK-010E-A-comprimento-laterais-motor-candidatos.md`
+**Concluída em:** 2026-05-20 · 573/573 testes · 0 erros tsc
+
+> 5 métricas geométricas de comprimento adicionadas ao `LayoutScore`: `totalLateralLengthM`,
+> `avgLateralLengthM`, `maxLateralLengthM`, `lateralLengthPerSprinklerM`,
+> `lateralLengthPerHectareM`. Calculadas de `physicalColumns.comprimentoM` — sem solver,
+> sem `waterSource`. `WEIGHT_LATERAL_LENGTH = 0` inativo (normalização pendente de calibração).
+> `secondaryLengthM` permanece `null` — ramais requerem `waterSource` + `principalCoords`
+> → TASK-010E-B. UI exibe seção "Comprimento geométrico de laterais" com aviso que não inclui
+> principal, adutora nem ramais. 9 novos testes em `sprinkler-grid-optimizer.test.ts`.
+
+---
+
 ## Próximas tarefas sugeridas (não formalizadas)
 
-- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar `N_MIN_COLUMN`, `WEIGHT_SHORT_COLUMN`, `WEIGHT_EDGE`, `WEIGHT_SECTION_VALVE`, `WEIGHT_FRAGMENTATION`, `WEIGHT_IMBALANCE` com dados de projetos homologados; remover marcadores `PENDENTE_CALIBRACAO_RT_CAMPO`. Depende de TASK-010D ✅
-- **TASK-010E — Labels de setor no mapa**: marcadores de setor devem aparecer em `PhysicalColumn.startLngLat` da primeira lateral, não no centroide. Mudança em `ProjectMap.tsx`, bloco `sectorLabelsGeoJSON`.
+- **TASK-010E-B — Métricas de principal, ramais/secundárias e captação**: preencher `secondaryLengthM` executando `generateSecondaries()` por candidato. Requer `waterSource` como parâmetro opcional do motor ou estimativa geométrica da principal a partir do polígono. Depende de TASK-010E-A ✅
+- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar `N_MIN_COLUMN`, `WEIGHT_SHORT_COLUMN`, `WEIGHT_EDGE`, `WEIGHT_SECTION_VALVE`, `WEIGHT_FRAGMENTATION`, `WEIGHT_IMBALANCE`, `WEIGHT_LATERAL_LENGTH` com dados de projetos homologados; remover marcadores `PENDENTE_CALIBRACAO_RT_CAMPO`. Depende de TASK-010E-A ✅
+- **Labels de setor no mapa**: marcadores de setor devem aparecer em `PhysicalColumn.startLngLat` da primeira lateral, não no centroide. Mudança em `ProjectMap.tsx`, bloco `sectorLabelsGeoJSON`.
 - **Diâmetro dos ramais no PDF**: `PropostaPDF.tsx` não exibe diâmetro individual dos ramais. Incluir coluna com SKU selecionado por `sizedSecondaries`.

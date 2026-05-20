@@ -315,3 +315,92 @@ describe("findBestSprinklerLayout — métricas operacionais com nSetores", () =
     expect(a.best.score.fragmentedLateralRatio).toBe(b.best.score.fragmentedLateralRatio);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Métricas de comprimento de laterais (TASK-010E-A)
+// Geométricas puras — NÃO incluem principal, adutora nem ramais até captação.
+// Ramais/secundárias dependem de waterSource + principalCoords → TASK-010E-B.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("findBestSprinklerLayout — métricas de comprimento de laterais", () => {
+  it("totalLateralLengthM é número positivo", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(typeof best.score.totalLateralLengthM).toBe("number");
+    expect(best.score.totalLateralLengthM).toBeGreaterThan(0);
+  });
+
+  it("avgLateralLengthM = totalLateralLengthM / physicalColumnCount", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+    const sc = best.score;
+
+    expect(sc.avgLateralLengthM).toBeCloseTo(
+      sc.totalLateralLengthM / sc.physicalColumnCount,
+      6,
+    );
+  });
+
+  it("maxLateralLengthM >= avgLateralLengthM", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(best.score.maxLateralLengthM).toBeGreaterThanOrEqual(
+      best.score.avgLateralLengthM,
+    );
+  });
+
+  it("lateralLengthPerSprinklerM = totalLateralLengthM / sprinklerCount", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+    const sc = best.score;
+
+    expect(sc.lateralLengthPerSprinklerM).toBeCloseTo(
+      sc.totalLateralLengthM / sc.sprinklerCount,
+      6,
+    );
+  });
+
+  it("lateralLengthPerHectareM > 0", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(best.score.lateralLengthPerHectareM).toBeGreaterThan(0);
+  });
+
+  it("polígono maior tem totalLateralLengthM maior", () => {
+    // Verifica sensibilidade ao tamanho: área dobrada → mais laterais.
+    const small = rectPolygon(60, 60);
+    const large = rectPolygon(120, 120);
+    const { best: bestSmall } = findBestSprinklerLayout(small, SPACING);
+    const { best: bestLarge } = findBestSprinklerLayout(large, SPACING);
+
+    expect(bestLarge.score.totalLateralLengthM).toBeGreaterThan(
+      bestSmall.score.totalLateralLengthM,
+    );
+  });
+
+  it("secondaryLengthM permanece null — ramais requerem waterSource (TASK-010E-B)", () => {
+    const poly = rectPolygon(120, 60);
+    const { best } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(best.score.secondaryLengthM).toBeNull();
+  });
+
+  it("selectionReason menciona comprimento de laterais e não inclui ramais", () => {
+    const poly = rectPolygon(120, 60);
+    const { selectionReason } = findBestSprinklerLayout(poly, SPACING);
+
+    expect(selectionReason).toContain("Comprimento de laterais");
+    expect(selectionReason).toContain("Não inclui principal");
+    expect(selectionReason).toContain("ramais até captação");
+    expect(selectionReason).toContain("PENDENTE_CALIBRACAO_RT_CAMPO");
+  });
+
+  it("OPTIMIZER_PARAMS contém WEIGHT_LATERAL_LENGTH documentado como inativo", () => {
+    expect(typeof OPTIMIZER_PARAMS.WEIGHT_LATERAL_LENGTH).toBe("number");
+    // Inativo nesta tarefa — normalização pendente de calibração.
+    expect(OPTIMIZER_PARAMS.WEIGHT_LATERAL_LENGTH).toBe(0);
+  });
+});
