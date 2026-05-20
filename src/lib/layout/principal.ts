@@ -1,4 +1,4 @@
-import type { Lateral } from "./laterais";
+import type { PhysicalColumn } from "./laterais";
 
 const M_PER_DEG_LAT = 111320;
 
@@ -19,18 +19,30 @@ function dist2(a: [number, number], b: [number, number]): number {
 /**
  * Gera principal (polilinha) e adutora (segmento captação → principal) de forma bottom-up.
  *
- * Implementa §3 do documento Logica_Topologia_Hidraulica.md passos A–G.
- * Garante invariantes I1–I4 antes de retornar; lança erro se alguma falhar.
+ * Recebe PhysicalColumn[] — a rede física já deduplicada, independente da setorização.
+ * Cada PhysicalColumn gera exatamente um ponto de derivação na principal:
+ * a extremidade da coluna que fica no lado da captação (yMin ou yMax no frame local).
+ *
+ * Separa fisico de operacional:
+ *   - A principal é construída a partir de colunas físicas únicas.
+ *   - Setores não fragmentam essa geração; múltiplos setores na mesma coluna física
+ *     resultam em um único ponto de derivação.
+ *
+ * Invariantes validados antes de retornar:
+ *   I1: adutora tem exatamente 2 vértices, adutora[0] = captação.
+ *   I2: principal tem pelo menos 1 vértice.
+ *   I3: sem pontos consecutivos duplicados na principal.
+ *   I4: adutora[1] é uma das extremidades da principal.
  */
 export function generatePrincipalAndAdutora(
   waterSource: { lng: number; lat: number },
-  laterais: Lateral[],
+  physicalColumns: PhysicalColumn[],
   centroid: { lng: number; lat: number },
   gridAngleDegrees: number,
 ): { principal: [number, number][]; adutora: [number, number][] } {
   const captacaoLngLat: [number, number] = [waterSource.lng, waterSource.lat];
 
-  if (laterais.length === 0) {
+  if (physicalColumns.length === 0) {
     return { principal: [captacaoLngLat], adutora: [captacaoLngLat, captacaoLngLat] };
   }
 
@@ -53,20 +65,21 @@ export function generatePrincipalAndAdutora(
 
   const wsLocal = toLocal(waterSource.lng, waterSource.lat);
 
-  // Passo A (cont.) — converter extremos de cada lateral para o frame local.
-  const lateraisLocal = laterais.map((lat) => {
-    const sLocal = toLocal(lat.startLngLat[0], lat.startLngLat[1]);
-    const eLocal = toLocal(lat.endLngLat[0], lat.endLngLat[1]);
+  // Passo A — converter extremos de cada coluna física para o frame local.
+  // startLngLat e endLngLat diferem apenas em Y (mesma X no frame local).
+  const physColsLocal = physicalColumns.map((col) => {
+    const sLocal = toLocal(col.startLngLat[0], col.startLngLat[1]);
+    const eLocal = toLocal(col.endLngLat[0], col.endLngLat[1]);
     return {
-      xLateral: sLocal[0], // X constante para todos os aspersores da coluna
+      xLateral: sLocal[0], // X idêntico em start e end por construção
       yMin: Math.min(sLocal[1], eLocal[1]),
       yMax: Math.max(sLocal[1], eLocal[1]),
     };
   });
 
   // Passo B — de que lado da malha a captação fica (comparando Y local).
-  const yMinGlobal = Math.min(...lateraisLocal.map((l) => l.yMin));
-  const yMaxGlobal = Math.max(...lateraisLocal.map((l) => l.yMax));
+  const yMinGlobal = Math.min(...physColsLocal.map((l) => l.yMin));
+  const yMaxGlobal = Math.max(...physColsLocal.map((l) => l.yMax));
 
   let side: "min" | "max";
   if (wsLocal[1] <= yMinGlobal) {
@@ -74,22 +87,37 @@ export function generatePrincipalAndAdutora(
   } else if (wsLocal[1] >= yMaxGlobal) {
     side = "max";
   } else {
-    // Captação dentro da faixa Y — escolher o lado mais próximo.
     const distToMin = Math.abs(wsLocal[1] - yMinGlobal);
     const distToMax = Math.abs(wsLocal[1] - yMaxGlobal);
     side = distToMin <= distToMax ? "min" : "max";
     console.warn("[principal] Captação dentro da faixa Y da malha — adutora cruza a área irrigada.");
   }
 
-  // Passo C — ponto de derivação de cada lateral.
-  // Usa Y da própria lateral (não Y global) para respeitar clipping de polígono irregular.
-  const derivacoesLocal: [number, number][] = lateraisLocal.map((l) => [
-    l.xLateral,
-    side === "min" ? l.yMin : l.yMax,
-  ]);
+  // Passo C — ponto de derivação de cada coluna física.
+  // Todos os pontos compartilham o mesmo Y (principalY) para que a principal seja
+  // uma linha reta no frame local — não um degrau por coluna.
+  //
+  // Ordenação: X crescente; empate em X (colunas com gap físico = mesmo xRep)
+  // resolve pelo Y mais próximo da captação, para que a primeira ocorrência seja
+  // o segmento diretamente conectado à principal.
+  const principalY = side === "min" ? yMinGlobal : yMaxGlobal;
+  physColsLocal.sort((a, b) => {
+    const dx = a.xLateral - b.xLateral;
+    if (Math.abs(dx) > 1e-6) return dx;
+    const aY = side === "min" ? a.yMin : a.yMax;
+    const bY = side === "min" ? b.yMin : b.yMax;
+    return side === "min" ? aY - bY : bY - aY;
+  });
 
-  // Passo D — ordenar por X local. Esta sequência é a principal.
-  derivacoesLocal.sort((a, b) => a[0] - b[0]);
+  // Deduplicar: segmentos de gap-split compartilham o mesmo xLateral (xRep idêntico).
+  // A principal conecta a cada posição X exatamente uma vez.
+  const EPS_X = 1e-6; // 1 µm — sub-milimétrico, menor que qualquer gap real entre colunas
+  const derivacoesLocal: [number, number][] = physColsLocal
+    .filter(
+      (col, i) =>
+        i === 0 || Math.abs(col.xLateral - physColsLocal[i - 1].xLateral) > EPS_X,
+    )
+    .map((col) => [col.xLateral, principalY]);
 
   // Passo E — ponto de entrada da principal (extremidade mais próxima da captação).
   const d1 = derivacoesLocal[0];

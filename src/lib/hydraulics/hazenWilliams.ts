@@ -12,6 +12,8 @@
 export interface TuboCandidato {
   sku: string;
   diametroMm: number;
+  /** Diâmetro interno real (mm). Quando presente, Hazen-Williams deve usar este valor. */
+  diametroInternoMm?: number;
   pressaoMca: number;
   custo: number;
   precoVenda: number;

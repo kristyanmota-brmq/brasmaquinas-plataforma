@@ -33,6 +33,15 @@ const MAX_SECONDARY_LOSS_FRACTION = 0.10;
 const DEFAULT_SAFETY_MARGIN_MCA = 2.0;
 const DEFAULT_LOCAL_LOSS_FACTOR_PERCENT = 10;
 
+/** Limites hidráulicos usados pelo solver — exportados para diagnósticos externos. */
+export const HYDRAULIC_LIMITS = {
+  maxVelocityPrincipalMs: MAX_VEL_PRINCIPAL_MS,
+  maxVelocitySecondaryMs: MAX_VEL_SECONDARY_MS,
+  maxVelocityLateralMs: MAX_VEL_LATERAL_MS,
+  maxLateralLossFraction: MAX_LATERAL_LOSS_FRACTION,
+  maxSecondaryLossFraction: MAX_SECONDARY_LOSS_FRACTION,
+} as const;
+
 // ── Public types ───────────────────────────────────────────────────────────────
 
 export type OperationMode = "one_sector_at_a_time";
@@ -98,6 +107,8 @@ export interface HydraulicSegment {
   lengthM: number;
   /** Diâmetro nominal/comercial (mm) — para exibição e BOM. */
   diametroMm: number;
+  /** Diâmetro interno real usado nos cálculos HW (mm). Ausente em segmentos sintéticos legados. */
+  internalDiameterMm?: number;
   coefC: number;
   flowM3h: number;
   headLossM: number;
@@ -290,14 +301,14 @@ function internoMm(tube: { diametroMm: number; diametroInternoMm?: number }): nu
   return tube.diametroInternoMm ?? tube.diametroMm;
 }
 
-/** Menor tubo do catálogo PVC rígido que mantém velocidade ≤ maxVelMs (usa nominal). */
+/** Menor tubo do catálogo PVC rígido que mantém velocidade ≤ maxVelMs (usa diâmetro interno). */
 function selectPrincipalTube(
   flowM3h: number,
   maxVelMs: number = MAX_VEL_PRINCIPAL_MS,
 ): (typeof TUBOS_PVC_RIGIDO)[number] {
   const sorted = [...TUBOS_PVC_RIGIDO].sort((a, b) => a.diametroMm - b.diametroMm);
   for (const tube of sorted) {
-    if (velocity(flowM3h, tube.diametroMm) <= maxVelMs) return tube;
+    if (velocity(flowM3h, internoMm(tube)) <= maxVelMs) return tube;
   }
   return sorted[sorted.length - 1];
 }
@@ -449,6 +460,7 @@ export function sizeHydraulics(
           type: "principal",
           lengthM: subLen,
           diametroMm: pipeDiam,
+          internalDiameterMm: pipeInternoMm,
           coefC: pipeCoefC,
           flowM3h: remainFlow,
           headLossM: hf,
@@ -509,6 +521,7 @@ export function sizeHydraulics(
           sectorId: seg.sectorId,
           lengthM: secondary.lengthM,
           diametroMm: secTubeDiam,
+          internalDiameterMm: secIntMm,
           coefC: secCoefC,
           flowM3h: secFlow,
           headLossM: hfSec,
@@ -534,6 +547,7 @@ export function sizeHydraulics(
           operationalSegmentId: seg.id,
           lengthM: lateral.comprimentoM,
           diametroMm: lateral.selecao.tubo.diametroMm,  // nominal para exibição
+          internalDiameterMm: latIntMm,
           coefC: lateral.selecao.tubo.coefC,
           flowM3h: lateral.vazaoM3h,
           headLossM: hfLat,
@@ -578,6 +592,7 @@ export function sizeHydraulics(
     type: "adutora",
     lengthM: adutoraLen,
     diametroMm: pipeDiam,
+    internalDiameterMm: pipeInternoMm,
     coefC: pipeCoefC,
     flowM3h: critSectorFlow,
     headLossM: globalBest.adutoraHf,
@@ -598,6 +613,7 @@ export function sizeHydraulics(
     type: "principal",
     lengthM: critEnr.arcLength,
     diametroMm: pipeDiam,
+    internalDiameterMm: pipeInternoMm,
     coefC: pipeCoefC,
     flowM3h: critSectorFlow,
     headLossM: critEnr.cumPrincipalHfM,

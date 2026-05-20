@@ -239,11 +239,13 @@ export const ADESIVO_PVC: Produto = {
 export function selectTubo(vazaoM3PorHora: number): (typeof TUBOS_PVC_RIGIDO)[number] {
   const Q_m3s = vazaoM3PorHora / 3600;
   const V = 1.5;
+  // D_mm é o diâmetro interno mínimo que garante v ≤ 1,5 m/s.
+  // Comparamos com diametroInternoMm (real) e não com o nominal.
   const D_mm = Math.sqrt((4 * Q_m3s) / (Math.PI * V)) * 1000;
 
   const ordenados = [...TUBOS_PVC_RIGIDO].sort((a, b) => a.diametroMm - b.diametroMm);
   return (
-    ordenados.find((t) => t.diametroMm >= D_mm) ??
+    ordenados.find((t) => t.diametroInternoMm >= D_mm) ??
     ordenados[ordenados.length - 1]
   );
 }
