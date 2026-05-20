@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-20
-Testes na base: 597/597 · TypeScript: 0 erros
+Testes na base: 597/597 · TypeScript: 0 erros · Working tree: limpo
 
 ---
 
@@ -443,6 +443,26 @@ Testes na base: 597/597 · TypeScript: 0 erros
 > governança e ADRs relacionados (ADR-001 a ADR-007), 8 limitações atuais com impacto,
 > rastreabilidade TASK-010A a TASK-010Z, resumo do estado atual para o RT.
 > Sem alteração de código.
+
+---
+
+### TASK-012 — Saneamento de working tree e separação de commits
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico (governança)
+**Área:** governança / repositório
+**Arquivo:** `tasks/TASK-012-saneamento-working-tree-commits.md` *(a criar se necessário)*
+**Concluída em:** 2026-05-20 · 597/597 testes · 0 erros tsc
+
+> 59 itens pendentes (17 tracked modificados + 42 untracked) organizados em 10 commits limpos
+> por responsabilidade. Nenhum arquivo de código alterado.
+> Commits criados: chore(.gitignore), chore(packages), docs(CLAUDE.md+commands),
+> docs(ARQUITETURA_ATUAL.md), feat(domain core — 31 arquivos, 8921 inserções),
+> feat(offset grid TASK-010B), feat(hydraulic diagnostics), refactor(layout-schema),
+> docs(ADR policy + ADRs 001-008), docs(historical reports + task files).
+> `.vscode/`, `memory/`, `HANDOFF.md`, `update_catalog_and_bom.py` adicionados ao `.gitignore`.
+> Dependência circular `sectorization ↔ laterais` resolvida fundindo commits em um único
+> commit de fundação de domínio.
 
 ---
 
