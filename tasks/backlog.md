@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
-Última atualização: 2026-05-19
-Testes na base: 456/456 · TypeScript: 0 erros
+Última atualização: 2026-05-20
+Testes na base: 552/552 · TypeScript: 0 erros
 
 ---
 
@@ -247,7 +247,75 @@ Testes na base: 456/456 · TypeScript: 0 erros
 
 ---
 
+### TASK-009C — Extrair função única de ponto de entrada da lateral
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** domínio / refatoração
+**Arquivo:** `tasks/TASK-009B-PROVA-cadeia-logica-motor-irrigacao.md` (planejada como parte da série 009)
+**Concluída em:** 2026-05-20 · 522/522 testes · 0 erros tsc
+
+> `columnInletCoord()` (privada em `hydraulic-connectivity.ts`) e `columnInletExtreme()` (privada em `constructability.ts`) faziam a mesma coisa: escolher o extremo da PhysicalColumn mais próximo da principal.
+> Exportado `columnPhysicalInlet(col, principalCoords, centroid)` de `hydraulic-connectivity.ts` como wrapper fino sobre a privada existente.
+> `constructability.ts` agora importa e usa `columnPhysicalInlet`, removendo `distPointToPolylineM`, `columnInletExtreme` e a constante `M_PER_DEG_LAT` locais.
+> Sem mudança de comportamento. `inletSideMismatchCount = 0` e `secondary.toCoord ≈ lateral_inlet.coordinate` confirmados por `T009B-inlet` e `T009B-sec`.
+
+---
+
+### TASK-010A — Extrair motor puro de geração da malha de aspersores
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** layout / domínio
+**Arquivo:** `tasks/TASK-010A-extrair-motor-malha-aspersores.md`
+**Concluída em:** 2026-05-20 · 530/530 testes · 0 erros tsc
+
+> `findOptimalGridAngle()` e `generateRotatedSprinklerGrid()` extraídas de `ProjectMap.tsx`
+> para `src/lib/layout/sprinkler-grid.ts` como funções puras exportadas. Sem mudança de
+> algoritmo — extração pura. 8 novos testes cobrindo retângulo 0°, área inclinada 30°,
+> polígono côncavo, determinismo e independência estrutural da captação.
+
+---
+
+### TASK-010B — Motor geométrico inicial de candidatos de layout 12×12
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** layout / domínio
+**Arquivo:** `tasks/TASK-010B-motor-geometrico-candidatos-layout.md`
+**Concluída em:** 2026-05-20 · 545/545 testes · 0 erros tsc
+
+> `generateRotatedSprinklerGridWithOffset()` adicionada a `sprinkler-grid.ts`.
+> `findBestSprinklerLayout(polygon, spacingMeters)` criada em `sprinkler-grid-optimizer.ts`.
+> Motor avalia até 112 candidatos (7 ângulos × 4×4 offsets), pontuando por fillingRatio,
+> shortColumnRatio e edgeQualityScore (métrica de borda heurística). Métricas pendentes
+> (sectionValveCount, fragmentedLateralRatio, secondaryLengthM, hydraulicBlockers) presentes
+> como `null` — requerem TASK-010C. Todos os pesos marcados PENDENTE_CALIBRACAO_RT_CAMPO.
+> 15 novos testes (3 offset + 12 optimizer). Nenhuma integração de UI nesta tarefa.
+
+---
+
+### TASK-010C — Integração do motor de candidatos de layout à UI em modo experimental
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** UI / integração
+**Arquivo:** `tasks/TASK-010C-integracao-motor-candidatos-ui.md`
+**Concluída em:** 2026-05-20 · 552/552 testes · 0 erros tsc
+
+> `candidateToSprinklers()` criada em `optimizer-integration.ts` (mapeamento puro testável).
+> `ProjectMap.tsx` recebe estado `OptimizerState`, callbacks `runOptimizer` / `applyOptimizerCandidate` /
+> `dismissOptimizer` e painel experimental no sidebar de Aspersores. Motor só roda por clique
+> explícito; candidato só altera `layout.sprinklers` após confirmação do usuário. `angleMode`
+> estendido com `"optimizer"` em `layout-schema.ts`. Badge persistente "Layout gerado por motor
+> geométrico preliminar — não homologado tecnicamente." aparece quando `angleMode === "optimizer"`.
+> 7 novos testes em `optimizer-integration.test.ts`.
+
+---
+
 ## Próximas tarefas sugeridas (não formalizadas)
 
+- **TASK-010D — Métricas de setorização no motor**: adicionar `sectionValveCount` e `fragmentedLateralRatio` ao `LayoutScore` (requer executar `buildSectorsByFlowWithColumnSplitting` para cada candidato com o `nSetores` da jornada escolhida). Depende de TASK-010C ✅
+- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar `N_MIN_COLUMN`, `WEIGHT_SHORT_COLUMN`, `WEIGHT_EDGE` com dados de projetos homologados; remover marcadores `PENDENTE_CALIBRACAO_RT_CAMPO`.
 - **P2 — Labels de setor no mapa**: marcadores de setor devem aparecer em `PhysicalColumn.startLngLat` da primeira lateral, não no centroide. Mudança em `ProjectMap.tsx`, bloco `sectorLabelsGeoJSON`.
 - **Diâmetro dos ramais no PDF**: `PropostaPDF.tsx` não exibe diâmetro individual dos ramais. Incluir coluna com SKU selecionado por `sizedSecondaries`.

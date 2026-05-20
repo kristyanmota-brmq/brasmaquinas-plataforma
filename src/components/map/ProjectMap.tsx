@@ -16,6 +16,11 @@ import {
   generateRotatedSprinklerGrid,
 } from "@/lib/layout/sprinkler-grid";
 import {
+  findBestSprinklerLayout,
+  type LayoutSelectionResult,
+} from "@/lib/layout/sprinkler-grid-optimizer";
+import { candidateToSprinklers } from "@/lib/layout/optimizer-integration";
+import {
   MousePointer2,
   Hexagon,
   Droplets,
@@ -63,6 +68,12 @@ interface Props {
 }
 
 type Mode = "view" | "polygon" | "water" | "pump" | "pipeline";
+
+type OptimizerState =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "ready"; result: LayoutSelectionResult }
+  | { status: "error"; message: string };
 
 // ── TASK-008A: diagnóstico de segmentos inválidos ─────────────────────────────
 
@@ -158,6 +169,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   >(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchMarker, setSearchMarker] = useState<{ lng: number; lat: number } | null>(null);
+  const [optimizerState, setOptimizerState] = useState<OptimizerState>({ status: "idle" });
   const hasMounted = useRef(false);
 
   const isDrawingPolygon = mode === "polygon";
@@ -172,6 +184,11 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     }
   }, [mode]);
   const hasPipelineInProgress = isDrawingPipeline && drawingPipeline.length > 1;
+
+  // Limpa o painel do motor de candidatos quando a área muda — candidato anterior não é mais válido.
+  useEffect(() => {
+    setOptimizerState({ status: "idle" });
+  }, [layout.area]);
 
   const optimalAngle = useMemo(
     () => (layout.area ? findOptimalGridAngle(layout.area) : 0),
@@ -752,7 +769,50 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     });
     setShowCoverage(false);
     setSelectedSector(null);
+    setOptimizerState({ status: "idle" });
   }, []);
+
+  // ── Motor de candidatos geométricos (TASK-010C) ───────────────────────────
+  // Roda findBestSprinklerLayout() somente por clique explícito.
+  // Não altera layout.sprinklers — apenas armazena o resultado para exibição.
+  const runOptimizer = useCallback(() => {
+    if (!layout.area) return;
+    setOptimizerState({ status: "running" });
+
+    // setTimeout mantém o render cycle antes do cálculo síncrono pesado.
+    setTimeout(() => {
+      try {
+        const result = findBestSprinklerLayout(
+          layout.area!,
+          ASPERSOR_PADRAO.espacamentoPadraoM,
+        );
+        setOptimizerState({ status: "ready", result });
+      } catch (err) {
+        setOptimizerState({
+          status: "error",
+          message: err instanceof Error ? err.message : "Erro desconhecido ao gerar candidato.",
+        });
+      }
+    }, 0);
+  }, [layout.area]);
+
+  // Aplica o melhor candidato a layout.sprinklers após confirmação explícita do usuário.
+  const applyOptimizerCandidate = useCallback(() => {
+    if (optimizerState.status !== "ready") return;
+    const sprinklers = candidateToSprinklers(
+      optimizerState.result.best,
+      ASPERSOR_PADRAO.sku,
+      ASPERSOR_PADRAO.espacamentoPadraoM,
+      ASPERSOR_PADRAO.vazaoM3PorHora,
+    );
+    setLayout((l) => ({ ...l, sprinklers, sectorization: undefined }));
+    setOptimizerState({ status: "idle" });
+  }, [optimizerState]);
+
+  const dismissOptimizer = useCallback(() => {
+    setOptimizerState({ status: "idle" });
+  }, []);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const applyJornada = useCallback(
     (jornada: Jornada) => {
@@ -1956,15 +2016,19 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                         "text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm",
                         layout.sprinklers.angleMode === "auto"
                           ? "bg-success-soft text-success"
+                          : layout.sprinklers.angleMode === "optimizer"
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
                           : "bg-surface-2 text-ink-2"
                       )}
                     >
                       {layout.sprinklers.angleMode === "auto"
                         ? "Auto"
+                        : layout.sprinklers.angleMode === "optimizer"
+                        ? "Motor"
                         : "Manual"}
                     </span>
                   </div>
-                  {layout.sprinklers.angleMode === "manual" && (
+                  {(layout.sprinklers.angleMode === "manual" || layout.sprinklers.angleMode === "optimizer") && (
                     <button
                       onClick={resetToAutoAngle}
                       title="Voltar para automático"
@@ -1992,6 +2056,12 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                   <span>89°</span>
                 </div>
               </div>
+
+              {layout.sprinklers.angleMode === "optimizer" && (
+                <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-sm px-2 py-1.5 leading-relaxed">
+                  Layout gerado por motor geométrico preliminar — não homologado tecnicamente.
+                </div>
+              )}
 
               <button
                 onClick={() => setShowCoverage(!showCoverage)}
@@ -2037,6 +2107,95 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
               </div>
             </div>
           )}
+
+          {/* ── Motor de candidatos geométricos ─────────────────────────── */}
+          {layout.area && optimizerState.status === "idle" && (
+            <button
+              onClick={runOptimizer}
+              className="mt-3 w-full px-3 py-2 border border-border hover:border-border-strong text-ink-2 hover:text-ink rounded-sm text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Gerar candidato geométrico
+            </button>
+          )}
+
+          {optimizerState.status === "running" && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-ink-3 py-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+              Calculando candidatos geométricos…
+            </div>
+          )}
+
+          {optimizerState.status === "error" && (
+            <div className="mt-3 bg-red-50 border border-red-200 rounded-sm p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] text-red-700 leading-relaxed">{optimizerState.message}</p>
+                <button
+                  onClick={dismissOptimizer}
+                  className="text-red-400 hover:text-red-600 flex-shrink-0 mt-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {optimizerState.status === "ready" && (() => {
+            const { best, selectionReason } = optimizerState.result;
+            return (
+              <div className="mt-3 border border-amber-200 bg-amber-50 rounded-sm p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+                    Candidato geométrico preliminar
+                  </span>
+                  <button
+                    onClick={dismissOptimizer}
+                    className="text-amber-500 hover:text-amber-700 flex-shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-amber-700 font-medium">
+                  Candidato geométrico preliminar — não homologado tecnicamente.
+                </p>
+
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-ink-2">
+                  <span><span className="text-ink-4 font-sans">Ângulo</span> {best.angleDegrees}°</span>
+                  <span><span className="text-ink-4 font-sans">Score</span> {best.score.total.toFixed(3)}</span>
+                  <span><span className="text-ink-4 font-sans">Aspersores</span> {best.score.sprinklerCount}</span>
+                  <span><span className="text-ink-4 font-sans">Filling</span> {(best.score.fillingRatio * 100).toFixed(0)}%</span>
+                  <span><span className="text-ink-4 font-sans">Offset X</span> {best.offsetXm.toFixed(1)} m</span>
+                  <span><span className="text-ink-4 font-sans">Offset Y</span> {best.offsetYm.toFixed(1)} m</span>
+                  <span><span className="text-ink-4 font-sans">Col. curtas</span> {best.score.shortColumnCount}</span>
+                  <span><span className="text-ink-4 font-sans">Borda</span> {(best.score.edgeQualityScore * 100).toFixed(0)}%</span>
+                </div>
+
+                <details className="text-[10px]">
+                  <summary className="cursor-pointer text-amber-700 hover:text-amber-900 select-none">
+                    Justificativa do motor
+                  </summary>
+                  <p className="mt-1.5 text-ink-3 leading-relaxed">{selectionReason}</p>
+                </details>
+
+                <div className="flex gap-2 pt-0.5">
+                  <button
+                    onClick={applyOptimizerCandidate}
+                    className="flex-1 px-3 py-1.5 bg-brand hover:bg-brand-hover text-white rounded-sm text-xs font-medium transition-colors"
+                  >
+                    Aplicar candidato
+                  </button>
+                  <button
+                    onClick={dismissOptimizer}
+                    className="px-3 py-1.5 border border-border hover:border-border-strong text-ink-2 hover:text-ink rounded-sm text-xs font-medium transition-colors"
+                  >
+                    Descartar
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+          {/* ────────────────────────────────────────────────────────────── */}
         </div>
 
         {layout.sprinklers && (
