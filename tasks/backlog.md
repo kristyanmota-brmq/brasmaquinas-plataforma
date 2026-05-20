@@ -390,9 +390,64 @@ Testes na base: 597/597 · TypeScript: 0 erros
 
 ---
 
+### TASK-011 — Política de ADR e ADRs retroativos essenciais
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** governança / documentação
+**Arquivo:** `tasks/TASK-011-politica-adr-e-adrs-retroativos.md`
+**Concluída em:** 2026-05-20 · 597/597 testes · 0 erros tsc (task de documentação — src/ não alterado)
+
+> 8 ADRs retroativos criados em `docs/decisoes/` registrando decisões estruturais já consolidadas:
+> ADR-001 (orquestrador único), ADR-002 (diâmetro interno), ADR-003 (gate de PDF),
+> ADR-004 (lateral física vs. trecho operacional), ADR-005 (registros VIQUA PN80),
+> ADR-006 (motor de candidatos preliminar), ADR-007 (premissas provisórias de mercado),
+> ADR-008 (validação de PN/classe de pressão).
+> Política de ADR adicionada a `docs/software/arquitetura.md` §5.
+> Nenhum arquivo em `src/` alterado.
+
+---
+
+### TASK-011B — ADR-009 Validação hidráulica Top-K dos candidatos de layout
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** documentação / governança / decisões arquiteturais
+**Arquivo:** `tasks/TASK-011B-adr-009-validacao-hidraulica-top-k.md`
+**Concluída em:** 2026-05-20 · 597/597 testes · 0 erros tsc
+
+> ADR-009 criada em `docs/decisoes/`. 10 decisões estruturais da TASK-010F registradas:
+> separação `findBestSprinklerLayout` / `runTopKHydraulicValidation`; validação somente por
+> ação explícita; uso exclusivo do solver oficial; proibição de solver paralelo;
+> `TOP_K_HYDRAULIC_CANDIDATES=5` e `WEIGHT_HYDRAULIC_BLOCKER=0.50` como premissas provisórias;
+> `best` restrito ao Top K avaliado; `jornadaHoras=9` como placeholder técnico; `geodetic`
+> ausente gera warning; pendência de revisão RT. 3 alternativas descartadas documentadas.
+> Nenhum arquivo em `src/` alterado.
+
+---
+
+---
+
+### TASK-010Z — Consolidação do motor de layout 12×12
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** layout / documentação / governança
+**Arquivo:** `tasks/TASK-010Z-consolidacao-motor-layout.md`
+**Concluída em:** 2026-05-20 · 597/597 testes · 0 erros tsc
+
+> Registro técnico consolidado do motor de layout 12×12 após TASK-010A–010F. 8 seções:
+> fluxo de dois passos (`findBestSprinklerLayout` geométrico + `runTopKHydraulicValidation` Top-K),
+> tabela de 14 parâmetros `OPTIMIZER_PARAMS` com origem e status de calibração, classificação
+> de critérios em três blocos (A: regras definidas, B: premissas provisórias, C: pendências futuras),
+> governança e ADRs relacionados (ADR-001 a ADR-007), 8 limitações atuais com impacto,
+> rastreabilidade TASK-010A a TASK-010Z, resumo do estado atual para o RT.
+> Sem alteração de código.
+
+---
+
 ## Próximas tarefas sugeridas (não formalizadas)
 
-- **TASK-010Z — Consolidação do motor de layout 12×12**: relatório consolidado documentando o fluxo completo (geração de malha → candidatos geométricos → métricas de setorização → comprimento de laterais → rede de distribuição → validação hidráulica Top-K), critérios homologados/provisórios/pendentes, todos os pesos do OPTIMIZER_PARAMS com origem, limitações atuais e próximas evoluções possíveis. Sem alteração de código.
-- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar pesos provisionais (PREMISSA_PROVISORIA_MERCADO) e pesos aguardando campo (PENDENTE_CALIBRACAO_RT_CAMPO) com dados de projetos homologados; remover marcadores. Depende de TASK-010E-B ✅
+- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar pesos provisionais (PREMISSA_PROVISORIA_MERCADO) e pesos aguardando campo (PENDENTE_CALIBRACAO_RT_CAMPO) com dados de projetos homologados; remover marcadores. Depende de TASK-010A–010Z ✅
 - **Labels de setor no mapa**: marcadores de setor devem aparecer em `PhysicalColumn.startLngLat` da primeira lateral, não no centroide. Mudança em `ProjectMap.tsx`, bloco `sectorLabelsGeoJSON`.
 - **Diâmetro dos ramais no PDF**: `PropostaPDF.tsx` não exibe diâmetro individual dos ramais. Incluir coluna com SKU selecionado por `sizedSecondaries`.
