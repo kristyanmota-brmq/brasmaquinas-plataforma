@@ -4,7 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Header } from "@/components/brand/Header";
 import { ProjectMap } from "@/components/map/ProjectMap";
-import type { ProjectLayout } from "./actions";
+import { migrateLayout } from "./layout-schema";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -29,7 +29,7 @@ export default async function ProjetoDetalhePage({ params }: Props) {
 
   if (!project || project.ownerId !== userId) notFound();
 
-  const layout = (project.data as ProjectLayout | null) ?? undefined;
+  const layout = project.data ? migrateLayout(project.data) : undefined;
 
   return (
     <main className="min-h-screen bg-surface">
