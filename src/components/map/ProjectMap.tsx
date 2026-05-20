@@ -12,6 +12,10 @@ import Map, {
 import "mapbox-gl/dist/mapbox-gl.css";
 import * as turf from "@turf/turf";
 import {
+  findOptimalGridAngle,
+  generateRotatedSprinklerGrid,
+} from "@/lib/layout/sprinkler-grid";
+import {
   MousePointer2,
   Hexagon,
   Droplets,
@@ -59,6 +63,30 @@ interface Props {
 }
 
 type Mode = "view" | "polygon" | "water" | "pump" | "pipeline";
+
+// ── TASK-008A: diagnóstico de segmentos inválidos ─────────────────────────────
+
+interface InvalidSegmentSummary {
+  id: string;
+  type: string;
+  flowM3h: number;
+  diameterNominalMm: number;
+  internalDiameterMm?: number;
+  velocityMs: number;
+  maxVelocityMs: number;
+  headLossMca: number;
+  maxHeadLossMca?: number;
+  rejectionReason: string;
+}
+
+const REJECTION_REASON_LABEL: Record<string, string> = {
+  velocity: "Velocidade acima do limite",
+  lateral_headloss: "Perda de carga lateral excessiva",
+  secondary_headloss: "Perda de carga de ramal excessiva",
+  pressure_class: "Violação de classe de pressão (PN)",
+  multiple: "Múltiplas causas",
+  unknown: "Motivo desconhecido",
+};
 type Jornada = 9 | 14 | 21;
 
 const DEFAULT_CENTER = { longitude: -45.0, latitude: -12.0, zoom: 14 };
@@ -97,59 +125,6 @@ async function reverseGeocode(lng: number, lat: number) {
   }
 }
 
-function findOptimalGridAngle(polygon: GeoJSON.Polygon): number {
-  const polyFeature = turf.polygon(polygon.coordinates);
-  const centroid = turf.centroid(polyFeature);
-  let minArea = Infinity;
-  let bestAngle = 0;
-
-  for (let angle = 0; angle < 90; angle++) {
-    const rotated = turf.transformRotate(polyFeature, -angle, {
-      pivot: centroid,
-    });
-    const bbox = turf.bbox(rotated);
-    const width = bbox[2] - bbox[0];
-    const height = bbox[3] - bbox[1];
-    const area = width * height;
-
-    if (area < minArea) {
-      minArea = area;
-      bestAngle = angle;
-    }
-  }
-
-  return bestAngle;
-}
-
-function generateRotatedSprinklerGrid(
-  polygon: GeoJSON.Polygon,
-  spacingMeters: number,
-  angleDegrees: number
-): [number, number][] {
-  const polyFeature = turf.polygon(polygon.coordinates);
-  const centroid = turf.centroid(polyFeature);
-
-  const rotatedPoly = turf.transformRotate(polyFeature, -angleDegrees, {
-    pivot: centroid,
-  });
-
-  const bbox = turf.bbox(rotatedPoly);
-  const grid = turf.pointGrid(bbox, spacingMeters / 1000, {
-    units: "kilometers",
-  });
-
-  const inside = turf.pointsWithinPolygon(grid, rotatedPoly);
-
-  const final = inside.features.map((f) =>
-    turf.transformRotate(f, angleDegrees, { pivot: centroid })
-  );
-
-  return final.map(
-    (f) => (f.geometry as GeoJSON.Point).coordinates as [number, number]
-  );
-}
-
-
 function calculatePipelineLength(coords: [number, number][]): number {
   if (coords.length < 2) return 0;
   let total = 0;
@@ -176,7 +151,11 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   const [showMemorial, setShowMemorial] = useState(false);
   const [selectedSector, setSelectedSector] = useState<number | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfError, setPdfError] = useState<{ kind: "blocked"; blockers: string[] } | { kind: "technical" } | null>(null);
+  const [pdfError, setPdfError] = useState<
+    | { kind: "blocked"; blockers: string[]; invalidHydraulicSegments: InvalidSegmentSummary[] }
+    | { kind: "technical" }
+    | null
+  >(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchMarker, setSearchMarker] = useState<{ lng: number; lat: number } | null>(null);
   const hasMounted = useRef(false);
@@ -231,6 +210,25 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     () => Math.round((LAMINA_MM / intensidadeMmPorHora) * 60),
     [intensidadeMmPorHora]
   );
+
+  // Coluna física = tubo real: polilinha pelos aspersores em ordem Y.
+  // Representa o tubo lateral no campo, independente da setorização.
+  // Cada coluna com ≥ 2 aspersores gera uma LineString.
+  const physicalColumnsGeoJSON = useMemo(() => ({
+    type: "FeatureCollection" as const,
+    features: physicalColumns
+      .filter((col) => col.sprinklerIndices.length >= 2)
+      .map((col) => ({
+        type: "Feature" as const,
+        properties: { id: col.id, isSplit: col.sectorsTouched.length > 1 },
+        geometry: {
+          type: "LineString" as const,
+          coordinates: col.sprinklerIndices
+            .map((idx) => layout.sprinklers?.positions[idx])
+            .filter((p): p is [number, number] => p !== undefined),
+        },
+      })),
+  }), [physicalColumns, layout.sprinklers]);
 
   const secondariesGeoJSON = useMemo(() => ({
     type: "FeatureCollection" as const,
@@ -627,8 +625,12 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
           typeof parsed === "object" &&
           (parsed as Record<string, unknown>).error === "PDF_BLOCKED"
         ) {
-          const body = parsed as { blockers: string[] };
-          setPdfError({ kind: "blocked", blockers: body.blockers ?? [] });
+          const body = parsed as { blockers: string[]; invalidHydraulicSegments?: InvalidSegmentSummary[] };
+          setPdfError({
+            kind: "blocked",
+            blockers: body.blockers ?? [],
+            invalidHydraulicSegments: body.invalidHydraulicSegments ?? [],
+          });
         } else {
           setPdfError({ kind: "technical" });
         }
@@ -1120,6 +1122,21 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
 
 
 
+          {/* Lateral física: tubo real como polilinha pelos aspersores em ordem.
+              Backbone contínuo — section_valves caem sobre esta linha. */}
+          <Source id="physical-columns-src" type="geojson" data={physicalColumnsGeoJSON}>
+            <Layer
+              id="physical-columns-line"
+              type="line"
+              paint={{
+                "line-color": "#BE185D",
+                "line-width": 1,
+                "line-opacity": 0.45,
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+          </Source>
+
           <Source
             id="laterais"
             type="geojson"
@@ -1144,7 +1161,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
               id="laterais-line"
               type="line"
               paint={{
-                "line-color": "#3B82A6",
+                "line-color": "#BE185D",
                 "line-width": 1.5,
                 "line-opacity": 0.85,
               }}
@@ -1197,7 +1214,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
             <Layer
               id="adutora-line"
               type="line"
-              paint={{ "line-color": "#E07B00", "line-width": 2.5 }}
+              paint={{ "line-color": "#7C3AED", "line-width": 2.5 }}
               layout={{ "line-cap": "round", "line-join": "round" }}
             />
           </Source>
@@ -1275,6 +1292,25 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
                 "circle-color": "#E07B00",
                 "circle-stroke-color": "#B85C00",
                 "circle-stroke-width": 1.5,
+              }}
+            />
+            <Layer
+              id="control-points-label"
+              type="symbol"
+              minzoom={15}
+              layout={{
+                "text-field": "Reg. seção",
+                "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+                "text-size": 10,
+                "text-offset": [0, -1.4],
+                "text-anchor": "bottom",
+                "text-allow-overlap": false,
+                "text-ignore-placement": false,
+              }}
+              paint={{
+                "text-color": "#B85C00",
+                "text-halo-color": "#FFFFFF",
+                "text-halo-width": 1.5,
               }}
             />
           </Source>
@@ -1399,17 +1435,47 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
         </div>
 
         {pdfError && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-red-300 rounded-md shadow-lg p-3 max-w-sm w-max">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-red-300 rounded-md shadow-lg p-3 max-w-lg w-max max-h-[70vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-xs text-red-700">
+              <div className="text-xs text-red-700 flex-1">
                 {pdfError.kind === "blocked" ? (
                   <>
                     <p className="font-semibold mb-1">Projeto bloqueado para emissão</p>
-                    <ul className="space-y-0.5 list-disc list-inside">
+                    <ul className="space-y-0.5 list-disc list-inside mb-2">
                       {pdfError.blockers.map((b, i) => (
                         <li key={i}>{b}</li>
                       ))}
                     </ul>
+                    {pdfError.invalidHydraulicSegments.length > 0 && (
+                      <div className="mt-2 border-t border-red-200 pt-2">
+                        <p className="font-semibold mb-1">
+                          Segmentos hidráulicos inválidos ({pdfError.invalidHydraulicSegments.length} total
+                          {pdfError.invalidHydraulicSegments.length > 3 ? " — exibindo os 3 primeiros" : ""}):
+                        </p>
+                        <div className="space-y-2">
+                          {pdfError.invalidHydraulicSegments.slice(0, 3).map((seg) => (
+                            <div key={seg.id} className="bg-red-50 rounded p-1.5 font-mono text-[10px] leading-snug">
+                              <div className="font-sans font-semibold text-[10px] mb-0.5 text-red-800">
+                                {seg.type} · {REJECTION_REASON_LABEL[seg.rejectionReason] ?? seg.rejectionReason}
+                              </div>
+                              <div>
+                                DN {seg.diameterNominalMm} mm
+                                {seg.internalDiameterMm != null && ` (Øint ${seg.internalDiameterMm} mm)`}
+                                {" · "}Q {seg.flowM3h.toFixed(1)} m³/h
+                              </div>
+                              <div>
+                                v {seg.velocityMs.toFixed(2)} m/s
+                                {" > lim "}{seg.maxVelocityMs.toFixed(1)} m/s
+                              </div>
+                              <div>
+                                hf {seg.headLossMca.toFixed(2)} mca
+                                {seg.maxHeadLossMca != null && ` > lim ${seg.maxHeadLossMca.toFixed(1)} mca`}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <p>Erro técnico ao gerar o PDF. Tente novamente ou contacte o suporte.</p>
@@ -1497,15 +1563,39 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
           </div>
         )}
 
-        {/* Badge de traçado automático não validado */}
-        {layout.mainPipeline?.source === "auto" &&
-          !layout.mainPipeline.corridorValidated && (
-            <div className="absolute bottom-14 left-1/2 -translate-x-1/2 pointer-events-none">
-              <div className="bg-amber-600/90 text-white text-[10px] font-medium uppercase tracking-wider px-3 py-1.5 rounded-full shadow-md whitespace-nowrap">
-                Traçado automático — validar corredor em campo antes da proposta final
-              </div>
+        {/* Alerta de corredor não validado */}
+        {layout.mainPipeline && layout.mainPipeline.corridorValidated === false && (
+          <div className="absolute bottom-14 left-1/2 -translate-x-1/2 pointer-events-none">
+            <div className="bg-amber-600/90 text-white text-[10px] font-medium uppercase tracking-wider px-3 py-1.5 rounded-full shadow-md whitespace-nowrap">
+              Traçado automático de tubulação pendente de validação de campo.
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Legenda técnica mínima */}
+        {layout.sprinklers && (
+          <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-border rounded-md shadow-md px-3 py-2 pointer-events-none">
+            <div className="text-[9px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-1.5">Legenda</div>
+            <div className="space-y-1">
+              {layout.mainPipeline?.adutora && (
+                <LegendRow color="#7C3AED" label="Adutora" />
+              )}
+              {layout.mainPipeline && (
+                <LegendRow color="#1B5680" label="Principal" />
+              )}
+              {secondaries.length > 0 && (
+                <LegendRow color="#0D9F6E" label="Ramal/secundária" dashed />
+              )}
+              <LegendRow color="#BE185D" label="Lateral física (tubo real)" thin />
+              {laterais.length > 0 && (
+                <LegendRow color="#BE185D" label="Trecho operacional (setor ativo)" />
+              )}
+              {controlPoints.some((cp) => cp.type === "section_valve") && (
+                <LegendRow color="#E07B00" label="Registro de seção" dot />
+              )}
+            </div>
+          </div>
+        )}
 
         <SaveStatus saving={saving} savedAt={savedAt} />
       </div>
@@ -2189,6 +2279,45 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
           </ol>
         </div>
       </aside>
+    </div>
+  );
+}
+
+function LegendRow({
+  color,
+  label,
+  dashed,
+  dot,
+  thin,
+}: {
+  color: string;
+  label: string;
+  dashed?: boolean;
+  dot?: boolean;
+  /** Linha fina (lateral física — backbone) vs. linha normal (trecho operacional). */
+  thin?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {dot ? (
+        <span
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-white shadow-sm"
+          style={{ backgroundColor: color }}
+        />
+      ) : (
+        <span
+          className={`flex-shrink-0 w-5 rounded-full ${thin ? "h-px" : "h-0.5"}`}
+          style={
+            dashed
+              ? {
+                  backgroundImage: `repeating-linear-gradient(to right, ${color} 0, ${color} 3px, transparent 3px, transparent 5px)`,
+                  backgroundColor: "transparent",
+                }
+              : { backgroundColor: color, opacity: thin ? 0.5 : 1 }
+          }
+        />
+      )}
+      <span className="text-[9px] text-ink-2 whitespace-nowrap">{label}</span>
     </div>
   );
 }
