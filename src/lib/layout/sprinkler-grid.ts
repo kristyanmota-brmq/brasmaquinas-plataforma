@@ -79,3 +79,64 @@ export function generateRotatedSprinklerGrid(
     (f) => (f.geometry as GeoJSON.Point).coordinates as [number, number]
   );
 }
+
+/**
+ * Variante de generateRotatedSprinklerGrid com deslocamento da origem da grade.
+ *
+ * Desloca o padrão de grade por (offsetXm, offsetYm) metros no frame local rotacionado,
+ * testando uma fase diferente da grade infinita 12×12 dentro do mesmo polígono.
+ *
+ * Invariante: offsetXm = 0 e offsetYm = 0 produz resultado equivalente a
+ * generateRotatedSprinklerGrid(polygon, spacingMeters, angleDegrees).
+ *
+ * Os offsets devem estar em [0, spacingMeters) — valores maiores repetem padrões
+ * já cobertos por outros candidatos (periodicidade = spacingMeters).
+ *
+ * A captação (waterSource) não é parâmetro — a disposição depende apenas de
+ * polígono, espaçamento, ângulo e offset.
+ */
+export function generateRotatedSprinklerGridWithOffset(
+  polygon: GeoJSON.Polygon,
+  spacingMeters: number,
+  angleDegrees: number,
+  offsetXm: number,
+  offsetYm: number,
+): [number, number][] {
+  const polyFeature = turf.polygon(polygon.coordinates);
+  const centroid = turf.centroid(polyFeature);
+  const centLat = (centroid.geometry.coordinates[1] * Math.PI) / 180;
+
+  // Converter offset de metros para graus no espaço geográfico
+  const offsetXdeg = offsetXm / (111320 * Math.cos(centLat)) / 1000;
+  const offsetYdeg = offsetYm / 111320 / 1000;
+
+  const rotatedPoly = turf.transformRotate(polyFeature, -angleDegrees, {
+    pivot: centroid,
+  });
+
+  const bbox = turf.bbox(rotatedPoly);
+
+  // Expandir o bbox mínimo pelo offset desloca o padrão de grade dentro do polígono.
+  // Quando offsetXdeg = offsetYdeg = 0, shiftedBbox === bbox → comportamento idêntico
+  // ao generateRotatedSprinklerGrid.
+  const shiftedBbox: [number, number, number, number] = [
+    bbox[0] - offsetXdeg,
+    bbox[1] - offsetYdeg,
+    bbox[2],
+    bbox[3],
+  ];
+
+  const grid = turf.pointGrid(shiftedBbox, spacingMeters / 1000, {
+    units: "kilometers",
+  });
+
+  const inside = turf.pointsWithinPolygon(grid, rotatedPoly);
+
+  const final = inside.features.map((f) =>
+    turf.transformRotate(f, angleDegrees, { pivot: centroid })
+  );
+
+  return final.map(
+    (f) => (f.geometry as GeoJSON.Point).coordinates as [number, number]
+  );
+}

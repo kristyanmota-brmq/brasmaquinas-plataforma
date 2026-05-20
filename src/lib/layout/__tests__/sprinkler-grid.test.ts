@@ -3,6 +3,7 @@ import * as turf from "@turf/turf";
 import {
   findOptimalGridAngle,
   generateRotatedSprinklerGrid,
+  generateRotatedSprinklerGridWithOffset,
 } from "@/lib/layout/sprinkler-grid";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,5 +157,62 @@ describe("findOptimalGridAngle", () => {
     const angle = findOptimalGridAngle(poly);
 
     expect(angle).toBeLessThanOrEqual(10);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// generateRotatedSprinklerGridWithOffset
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("generateRotatedSprinklerGridWithOffset", () => {
+  it("offset (0, 0) produz resultado equivalente a generateRotatedSprinklerGrid", () => {
+    // Invariante central da função: offset zero = comportamento original.
+    const poly = rectPolygon(120, 60);
+    const original = generateRotatedSprinklerGrid(poly, SPACING, 15);
+    const withZero = generateRotatedSprinklerGridWithOffset(poly, SPACING, 15, 0, 0);
+
+    expect(withZero.length).toBe(original.length);
+
+    // As posições devem ser idênticas (mesma bbox, mesma grade).
+    for (let i = 0; i < original.length; i++) {
+      expect(withZero[i][0]).toBeCloseTo(original[i][0], 8);
+      expect(withZero[i][1]).toBeCloseTo(original[i][1], 8);
+    }
+  });
+
+  it("offset não-zero gera posições diferentes do offset zero", () => {
+    // Verificação de que o deslocamento realmente muda o padrão da grade.
+    // Usamos offset = SPACING/2 (meia célula) para garantir que nenhuma coluna
+    // original coincide com a grade deslocada.
+    const poly = rectPolygon(120, 60);
+    const zero = generateRotatedSprinklerGridWithOffset(poly, SPACING, 0, 0, 0);
+    const shifted = generateRotatedSprinklerGridWithOffset(poly, SPACING, 0, SPACING / 2, 0);
+
+    expect(shifted.length).toBeGreaterThan(0);
+
+    // Compara os conjuntos de posições: offset meia-célula não pode produzir
+    // as mesmas colunas que offset zero.
+    const fmt = ([lng, lat]: [number, number]) =>
+      `${lng.toFixed(7)},${lat.toFixed(7)}`;
+
+    const setZero = new Set(zero.map(fmt));
+    const setShifted = new Set(shifted.map(fmt));
+
+    // Deve haver pelo menos alguns pontos exclusivos de cada conjunto.
+    const uniqueToZero = [...setZero].filter((p) => !setShifted.has(p)).length;
+    expect(uniqueToZero).toBeGreaterThan(0);
+  });
+
+  it("todos os pontos com offset não-zero estão dentro do polígono", () => {
+    const poly = rectPolygon(120, 60);
+    const positions = generateRotatedSprinklerGridWithOffset(poly, SPACING, 20, SPACING / 3, SPACING / 3);
+
+    expect(positions.length).toBeGreaterThan(0);
+
+    const polyFeature = turf.polygon(poly.coordinates);
+    for (const [lng, lat] of positions) {
+      const inside = turf.booleanPointInPolygon(turf.point([lng, lat]), polyFeature);
+      expect(inside).toBe(true);
+    }
   });
 });
