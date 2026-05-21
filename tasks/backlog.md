@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-20
-Testes na base: 686/686 · TypeScript: 0 erros · Working tree: modificado (TASK-019)
+Testes na base: 686/686 · TypeScript: 0 erros · Working tree: modificado (TASK-020)
 
 ---
 
@@ -619,6 +619,29 @@ Testes na base: 686/686 · TypeScript: 0 erros · Working tree: modificado (TASK
 > 8 novos testes (T19-a..T19-h).
 >
 > **Pendência:** revisão RT do valor 0,10 m para fazendas > 500–700 m.
+
+---
+
+### TASK-020 — ADR-011 Aspersor obrigatoriamente sobre lateral física
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** governança / documentação
+**Arquivo:** `tasks/TASK-020-adr-011-aspersor-sobre-lateral-fisica.md`
+**Concluída em:** 2026-05-20 · 686/686 testes · 0 erros tsc (nenhuma alteração de código)
+
+> Registro formal da decisão operacional Brasmáquinas em ADR-011: a vala da lateral e o ponto do aspersor são a mesma execução física. Aspersor fora do eixo exige segunda escavação, tornando projeto construtivamente inválido.
+>
+> **ADR-011** criado em `docs/decisoes/` com 10 seções: Contexto, Decisão (regra confirmada, tolerância 0,10 m, severidade blocker, implementação), Alternativas (4 descartadas), Consequências, Arquivos, Classificação, Referências, Log.
+>
+> Registra:
+> - Regra: **APROVADO — decisão operacional Brasmáquinas** (não é premissa provisória)
+> - Tolerância: `TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,10 m` (constante exportada)
+> - Severidade: **blocker** — desvio > 0,10 m impede emissão do PDF via gate existente (ADR-003)
+> - Implementação: `detectAxisDeviations`, `generateProposalDiagnostics`, `IrrigationProjectResult.axisDeviation` (já em TASK-019)
+> - Status do valor: `PENDENTE_REVISAO_BRASMAQUINAS` (para fazendas > 500–700 m)
+>
+> Nenhum arquivo em `src/` alterado — documentação pura. Task, ADR e relatório criados. Backlog atualizado.
 
 ---
 
