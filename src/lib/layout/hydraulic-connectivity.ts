@@ -23,10 +23,18 @@ export interface SecondaryPipe {
   id: string;
   /** ID da PhysicalColumn que este ramal alimenta. */
   physicalColumnId: string;
-  /** Ponto de saída na principal (projeção do inlet). */
+  /** Ponto de saída na principal (projeção do inlet). Preservado para retrocompatibilidade. */
   fromCoord: [number, number];
-  /** Inlet da lateral física (extremidade mais próxima da principal). */
+  /** Inlet da lateral física (extremidade mais próxima da principal). Preservado para retrocompatibilidade. */
   toCoord: [number, number];
+  /**
+   * Polilinha completa do ramal (LngLat).
+   * - Ausente: rota é [fromCoord, toCoord] (linha reta — caso legado ou caso padrão).
+   * - Presente com length=2: linha reta explícita.
+   * - Presente com length=3: rota em L com cotovelo 90°.
+   * coords[0] === fromCoord e coords[coords.length-1] === toCoord sempre.
+   */
+  coords?: [number, number][];
   lengthM: number;
   /** Sempre "auto" — gerado algoritmicamente a partir da geometria. */
   source: "auto";
@@ -55,6 +63,9 @@ export interface HydraulicConnectivityReport {
 
 const M_PER_DEG_LAT = 111320;
 
+/** Tolerância angular para classificar deflexão como 0° ou 90° (graus). */
+const ROUTING_TOL_DEG = 5;
+
 function mPerLngAtLat(lat: number): number {
   return M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180);
 }
@@ -69,6 +80,157 @@ function distM(
   const dy = (b[1] - a[1]) * M_PER_DEG_LAT;
   return Math.sqrt(dx * dx + dy * dy);
 }
+
+// ─── Helpers de roteamento (L-shape 90°) ─────────────────────────────────────
+
+function toMetricPt(p: [number, number], mPerLng: number): [number, number] {
+  return [p[0] * mPerLng, p[1] * M_PER_DEG_LAT];
+}
+
+function fromMetricPt(m: [number, number], mPerLng: number): [number, number] {
+  return [m[0] / mPerLng, m[1] / M_PER_DEG_LAT];
+}
+
+function euclidM(a: [number, number], b: [number, number]): number {
+  return Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2);
+}
+
+function unitVecM(a: [number, number], b: [number, number]): [number, number] {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1e-9) return [1, 0];
+  return [dx / len, dy / len];
+}
+
+function perpCCW(v: [number, number]): [number, number] {
+  return [-v[1], v[0]];
+}
+
+function angleBetweenDegM(va: [number, number], vb: [number, number]): number {
+  const dot = va[0] * vb[0] + va[1] * vb[1];
+  return (Math.acos(Math.max(-1, Math.min(1, dot))) * 180) / Math.PI;
+}
+
+/**
+ * Direção (unit vector) do segmento da polilinha mais próximo ao ponto (em espaço métrico).
+ */
+function nearestSegDirM(
+  point: [number, number],
+  polyline: [number, number][],
+  mPerLng: number,
+): [number, number] {
+  if (polyline.length < 2) return [1, 0];
+  const px = point[0] * mPerLng;
+  const py = point[1] * M_PER_DEG_LAT;
+  let bestDist = Infinity;
+  let bestDir: [number, number] = [1, 0];
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const ax = polyline[i][0] * mPerLng;
+    const ay = polyline[i][1] * M_PER_DEG_LAT;
+    const bx = polyline[i + 1][0] * mPerLng;
+    const by = polyline[i + 1][1] * M_PER_DEG_LAT;
+    const abx = bx - ax;
+    const aby = by - ay;
+    const len2 = abx * abx + aby * aby;
+    if (len2 < 1e-20) continue;
+    const t = Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / len2));
+    const d = Math.sqrt((px - (ax + t * abx)) ** 2 + (py - (ay + t * aby)) ** 2);
+    if (d < bestDist) {
+      bestDist = d;
+      const len = Math.sqrt(len2);
+      bestDir = [abx / len, aby / len];
+    }
+  }
+  return bestDir;
+}
+
+/**
+ * Interseção de duas retas: A + s*dA = B + t*dB.
+ * Retorna o ponto de interseção em espaço métrico, ou null se paralelas.
+ */
+function intersectRaysM(
+  A: [number, number], dA: [number, number],
+  B: [number, number], dB: [number, number],
+): [number, number] | null {
+  // det = dA[1]*dB[0] - dA[0]*dB[1]
+  const det = dA[1] * dB[0] - dA[0] * dB[1];
+  if (Math.abs(det) < 1e-10) return null;
+  const bax = B[0] - A[0];
+  const bay = B[1] - A[1];
+  const s = (bay * dB[0] - bax * dB[1]) / det;
+  return [A[0] + s * dA[0], A[1] + s * dA[1]];
+}
+
+/**
+ * Calcula a rota construtível de um ramal.
+ *
+ * Regra da rede interna: apenas deflexões 0° (luva) e 90° (curva/tê) são permitidas.
+ *
+ * - α ≈ 0° (principal ⊥ lateral): rota reta [F, T] — caso padrão.
+ * - α ≈ 90° (principal ∥ lateral): rota em L [F, M, T] com cotovelo 90°.
+ * - Outro α (incluindo 45°): rota reta mantida; diagnóstico emitirá blocker.
+ *
+ * @param F  fromCoord (ponto na principal)
+ * @param T  toCoord (inlet da lateral)
+ * @param col  PhysicalColumn — fornece direção da lateral
+ * @param principalCoords  Polilinha da principal
+ * @param mPerLng  Metros por grau de longitude na latitude local
+ */
+function routeSecondary(
+  F: [number, number],
+  T: [number, number],
+  col: PhysicalColumn,
+  principalCoords: [number, number][],
+  mPerLng: number,
+): { coords: [number, number][]; lengthM: number } {
+  const Fm = toMetricPt(F, mPerLng);
+  const Tm = toMetricPt(T, mPerLng);
+  const directLen = euclidM(Fm, Tm);
+
+  if (directLen < 1e-3) {
+    return { coords: [F, T], lengthM: directLen };
+  }
+
+  const principalDir = nearestSegDirM(F, principalCoords, mPerLng);
+  const latStart = toMetricPt(col.startLngLat, mPerLng);
+  const latEnd   = toMetricPt(col.endLngLat,   mPerLng);
+  const lateralDir = unitVecM(latStart, latEnd);
+
+  // Perpendicular à principal, apontando para T.
+  let perpDir = perpCCW(principalDir);
+  if (perpDir[0] * (Tm[0] - Fm[0]) + perpDir[1] * (Tm[1] - Fm[1]) < 0) {
+    perpDir = [-perpDir[0], -perpDir[1]];
+  }
+
+  const alpha = angleBetweenDegM(perpDir, lateralDir);
+
+  if (alpha <= ROUTING_TOL_DEG) {
+    // perpDir ∥ lateralDir → principal ⊥ lateral → rota reta (caso padrão).
+    return { coords: [F, T], lengthM: directLen };
+  }
+
+  if (Math.abs(alpha - 90) <= ROUTING_TOL_DEG) {
+    // perpDir ⊥ lateralDir → principal ∥ lateral → rota em L 90°.
+    const Mm = intersectRaysM(Fm, perpDir, Tm, lateralDir);
+    if (Mm === null) {
+      return { coords: [F, T], lengthM: directLen };
+    }
+    const lenFM = euclidM(Fm, Mm);
+    const lenMT = euclidM(Mm, Tm);
+    if (lenFM < 1e-3 || lenMT < 1e-3) {
+      return { coords: [F, T], lengthM: directLen };
+    }
+    const M = fromMetricPt(Mm, mPerLng);
+    return { coords: [F, M, T], lengthM: lenFM + lenMT };
+  }
+
+  // Ângulo não construtível (ex.: 45°, 30°, 60°): manter rota reta.
+  // detectNetworkAngleIssues emitirá blocker para este ramal.
+  return { coords: [F, T], lengthM: directLen };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Projeta um ponto na polilinha mais próxima.
@@ -180,12 +342,16 @@ export function generateSecondaries(
     const { coord: projCoord, distM: gap } = projectOnPolyline(inlet, principalCoords, mPerLng);
 
     if (gap > minGapM) {
+      const { coords, lengthM } = routeSecondary(
+        projCoord, inlet, col, principalCoords, mPerLng,
+      );
       secondaries.push({
         id: `sec-${col.id}`,
         physicalColumnId: col.id,
         fromCoord: projCoord,
         toCoord: inlet,
-        lengthM: gap,
+        coords,
+        lengthM,
         source: "auto",
       });
     }

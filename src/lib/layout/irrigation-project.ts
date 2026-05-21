@@ -41,6 +41,10 @@ import {
   type ControlPoint,
 } from "@/lib/layout/constructability";
 import {
+  detectNetworkAngleIssues,
+  type NetworkAngleReport,
+} from "@/lib/layout/network-angle-diagnostics";
+import {
   buildBOM,
   generateProposalDiagnostics,
   type BOMResult,
@@ -139,6 +143,7 @@ export interface IrrigationProjectResult {
   constructability: ConstructabilityReport | null;
   bom: BOMResult | null;
   diagnostics: ProposalDiagnostics | null;
+  networkAngle: NetworkAngleReport | null;
   /** Null quando o projeto ainda não tem todos os dados necessários para o solver hidráulico. */
   hydraulics: HydraulicSizingReport | null;
 }
@@ -202,6 +207,7 @@ export function calculateIrrigationProject(
     constructability: null,
     bom: null,
     diagnostics: null,
+    networkAngle: null,
     hydraulics: null,
     ...partial,
   });
@@ -376,6 +382,16 @@ export function calculateIrrigationProject(
 
   // ── Resultado parcial (antes do solver hidráulico e diagnósticos) ─────────
 
+  // ── Construtibilidade angular da rede ────────────────────────────────────
+
+  const networkAngle = detectNetworkAngleIssues({
+    physicalColumns,
+    secondaries,
+    principalCoords,
+    adutoraCoords,
+    centroid,
+  });
+
   const partialResult: IrrigationProjectResult = {
     isComplete: true,
     missingFields: [],
@@ -388,6 +404,7 @@ export function calculateIrrigationProject(
     constructability,
     bom: bomPrelim,
     diagnostics: null,
+    networkAngle,
     hydraulics: null,
   };
 
@@ -404,7 +421,7 @@ export function calculateIrrigationProject(
 
   // ── Diagnósticos (recebe BOM final + solver hidráulico) ──────────────────
 
-  const diagnostics = generateProposalDiagnostics(layout, bom, hydraulics);
+  const diagnostics = generateProposalDiagnostics(layout, bom, hydraulics, networkAngle);
 
   return { ...partialResult, bom, diagnostics, hydraulics };
 }

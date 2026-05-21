@@ -25,6 +25,7 @@ import {
 } from "@/lib/layout/constructability";
 import type { SecondaryPipe } from "@/lib/layout/hydraulic-connectivity";
 import type { SizedSecondaryPipe } from "@/lib/layout/secondary-sizing";
+import type { NetworkAngleReport } from "@/lib/layout/network-angle-diagnostics";
 import type { ProjectLayout } from "@/app/projetos/[id]/actions";
 import type {
   HydraulicSizingReport,
@@ -596,6 +597,7 @@ export function generateProposalDiagnostics(
   layout: ProjectLayout,
   bom: BOMResult,
   hydraulics?: HydraulicSizingReport | null,
+  networkAngleReport?: NetworkAngleReport | null,
 ): ProposalDiagnostics {
   const physCols = bom.meta.nColunasLaterais;
   const nLaterais = bom.meta.nLaterais;
@@ -774,6 +776,23 @@ export function generateProposalDiagnostics(
       `nLaterais (${nLaterais}) > nColunasFísicas × setores ` +
       `(${physCols} × ${layout.sectorization?.setoresCount} = ${maxEsperado}). ` +
       `Provável fragmentação na setorização.`,
+    );
+  }
+
+  // Blockers de construtibilidade angular — gerados por detectNetworkAngleIssues.
+  // Cada issue representa uma conexão com ângulo fora de 45°/90°/180°.
+  if (networkAngleReport && networkAngleReport.hasBlockers) {
+    const byType = new Map<string, number>();
+    for (const issue of networkAngleReport.issues) {
+      byType.set(issue.elementType, (byType.get(issue.elementType) ?? 0) + 1);
+    }
+    const summary = [...byType.entries()]
+      .map(([t, n]) => `${n} em ${t}`)
+      .join(", ");
+    blockers.push(
+      `Construtibilidade angular: ${networkAngleReport.issues.length} conexão(ões) com ângulo ` +
+      `fora de 45°/90°/180° (${summary}). Nenhuma conexão padrão disponível. ` +
+      `Corrija o traçado da rede antes de emitir proposta.`,
     );
   }
 

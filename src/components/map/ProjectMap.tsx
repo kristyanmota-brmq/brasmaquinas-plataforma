@@ -53,6 +53,7 @@ import {
 import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
 import type { BOMResult } from "@/lib/bom";
 import type { Lateral, PhysicalColumn } from "@/lib/layout/laterais";
+import { resolveSectorLabelAnchor } from "@/lib/layout/sector-label-anchor";
 import { calculateIrrigationProject } from "@/lib/layout/irrigation-project";
 import {
   buildAutoPipelineCoords,
@@ -232,9 +233,8 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     [intensidadeMmPorHora]
   );
 
-  // Coluna física = tubo real: polilinha pelos aspersores em ordem Y.
-  // Representa o tubo lateral no campo, independente da setorização.
-  // Cada coluna com ≥ 2 aspersores gera uma LineString.
+  // Coluna física = tubo real reto: LineString de 2 pontos (startLngLat → endLngLat).
+  // Aspersores intermediários são conexões ao tubo, não vértices da polilinha.
   const physicalColumnsGeoJSON = useMemo(() => ({
     type: "FeatureCollection" as const,
     features: physicalColumns
@@ -244,19 +244,17 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
         properties: { id: col.id, isSplit: col.sectorsTouched.length > 1 },
         geometry: {
           type: "LineString" as const,
-          coordinates: col.sprinklerIndices
-            .map((idx) => layout.sprinklers?.positions[idx])
-            .filter((p): p is [number, number] => p !== undefined),
+          coordinates: [col.startLngLat, col.endLngLat],
         },
       })),
-  }), [physicalColumns, layout.sprinklers]);
+  }), [physicalColumns]);
 
   const secondariesGeoJSON = useMemo(() => ({
     type: "FeatureCollection" as const,
     features: secondaries.map((s) => ({
       type: "Feature" as const,
       properties: { physicalColumnId: s.physicalColumnId, lengthM: s.lengthM },
-      geometry: { type: "LineString" as const, coordinates: [s.fromCoord, s.toCoord] },
+      geometry: { type: "LineString" as const, coordinates: s.coords ?? [s.fromCoord, s.toCoord] },
     })),
   }), [secondaries]);
 
@@ -945,7 +943,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     ];
   }, [selectedSector]);
 
-  // Centroides dos setores para labels
+  // Labels de setor ancorados em PhysicalColumn.startLngLat (TASK-014)
   const sectorLabelsGeoJSON = useMemo(() => {
     if (!layout.sprinklers || !layout.sectorization) return null;
     const byGroup: Record<number, [number, number][]> = {};
@@ -957,20 +955,23 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     });
 
     const features = Object.entries(byGroup).map(([s, points]) => {
-      const fc = turf.featureCollection(points.map((p) => turf.point(p)));
-      const centroid = turf.centroid(fc);
+      const sectorIdx = parseInt(s);
+      const anchor = resolveSectorLabelAnchor(sectorIdx, physicalColumns);
+      const geometry = anchor
+        ? { type: "Point" as const, coordinates: anchor }
+        : turf.centroid(turf.featureCollection(points.map((p) => turf.point(p)))).geometry;
       return {
         type: "Feature" as const,
         properties: {
-          label: String(parseInt(s) + 1),
-          sector: parseInt(s),
-          isSelected: parseInt(s) === selectedSector,
+          label: String(sectorIdx + 1),
+          sector: sectorIdx,
+          isSelected: sectorIdx === selectedSector,
         },
-        geometry: centroid.geometry,
+        geometry,
       };
     });
     return turf.featureCollection(features);
-  }, [layout.sprinklers, layout.sectorization, selectedSector]);
+  }, [layout.sprinklers, layout.sectorization, selectedSector, physicalColumns]);
 
   const pipelineCanStart = !!layout.waterSource;
 

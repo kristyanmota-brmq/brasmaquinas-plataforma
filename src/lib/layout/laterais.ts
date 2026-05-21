@@ -227,9 +227,6 @@ export function generatePhysicalColumns(
   const result: PhysicalColumn[] = [];
 
   for (const col of rawColumns) {
-    // X representativo da coluna = média dos X locais de todos os seus aspersores.
-    const xRep = col.pts.reduce((s, p) => s + p.x, 0) / col.pts.length;
-
     // Ordenar aspersores da coluna por Y crescente
     const ptsSorted = [...col.pts].sort((a, b) => a.y - b.y);
 
@@ -247,6 +244,10 @@ export function generatePhysicalColumns(
       const n = seg.length;
       const yFirst = seg[0].y;
       const yLast = seg[n - 1].y;
+      // Eixo canônico do segmento: X médio de todos os aspersores do segmento.
+      // Garante que a reta startLngLat → endLngLat passe pelos aspersores intermediários
+      // dentro da tolerância métrica, independente de desvios individuais dos extremos.
+      const xSegRep = seg.reduce((s, p) => s + p.x, 0) / n;
 
       const sectorsTouched = sectorIds
         ? [...new Set(seg.map((p) => sectorIds[p.origIdx]).filter((s): s is number => s !== undefined))]
@@ -265,8 +266,8 @@ export function generatePhysicalColumns(
       result.push({
         id: `col-${colIdx}`,
         columnIndex: colIdx,
-        startLngLat: toLngLat(xRep, yFirst),
-        endLngLat: toLngLat(xRep, yLast),
+        startLngLat: toLngLat(xSegRep, yFirst),
+        endLngLat:   toLngLat(xSegRep, yLast),
         comprimentoM,
         sprinklerCount: n,
         vazaoM3h,
@@ -458,4 +459,59 @@ export function deriveLateraisFromNetwork(
   }
 
   return laterais;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Diagnóstico de qualidade do eixo canônico
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Calcula o desvio máximo, em metros, de qualquer aspersor da coluna em
+ * relação ao eixo canônico `startLngLat → endLngLat`.
+ *
+ * Usa projeção plana (flat-earth) consistente com o restante do domínio.
+ * Retorna 0 quando a coluna tem menos de 2 aspersores.
+ *
+ * Tolerância de referência: TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,5 m
+ * (PREMISSA_PROVISORIA_ENGENHARIA | PENDENTE_REVISAO_BRASMAQUINAS).
+ * Documentada em docs/metodologia/12-premissas-provisorias-e-revisao-rt.md.
+ *
+ * Integração do desvio em diagnostics.blockers: escopo de task imediata.
+ */
+export function maxSprinklerAxisDeviationM(
+  col: PhysicalColumn,
+  positions: [number, number][],
+  centroid: { lng: number; lat: number },
+): number {
+  if (col.sprinklerIndices.length < 2) return 0;
+
+  const latRad = (centroid.lat * Math.PI) / 180;
+  const mLng = metersPerDegLng(latRad);
+
+  const ax = col.startLngLat[0] * mLng;
+  const ay = col.startLngLat[1] * M_PER_DEG_LAT;
+  const bx = col.endLngLat[0] * mLng;
+  const by = col.endLngLat[1] * M_PER_DEG_LAT;
+  const abx = bx - ax;
+  const aby = by - ay;
+  const ab2 = abx * abx + aby * aby;
+
+  let maxDev = 0;
+  for (const idx of col.sprinklerIndices) {
+    const pos = positions[idx];
+    if (!pos) continue;
+    const px = pos[0] * mLng;
+    const py = pos[1] * M_PER_DEG_LAT;
+
+    let dev: number;
+    if (ab2 < 1e-20) {
+      const dx = px - ax, dy = py - ay;
+      dev = Math.sqrt(dx * dx + dy * dy);
+    } else {
+      const cross = (px - ax) * aby - (py - ay) * abx;
+      dev = Math.abs(cross) / Math.sqrt(ab2);
+    }
+    if (dev > maxDev) maxDev = dev;
+  }
+  return maxDev;
 }

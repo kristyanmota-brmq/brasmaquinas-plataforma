@@ -130,9 +130,61 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 
 ---
 
+### TOLERANCIA_ANGULAR_CONSTRUTIBILIDADE
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `toleranceDeg` em `detectNetworkAngleIssues()` |
+| **Valor usado** | `5°` |
+| **Onde é usado** | `src/lib/layout/network-angle-diagnostics.ts` — `isAllowedDeflection()`, `detectNetworkAngleIssues()` |
+| **Motivo** | Conexões físicas reais têm tolerância de fabricação e montagem. Uma deflexão de 87° pode ser executada com uma curva 90° sem problema prático. A tolerância de ±5° cobre variações de alinhamento em campo e imprecisões de traçado digital. |
+| **Origem** | Premissa provisória de engenharia. Valor 5° adotado como ponto de partida conservador sem dado calibrado de montagem de campo. |
+| **Risco** | Tolerância muito ampla pode aceitar ângulos estruturalmente problemáticos; muito estreita pode gerar falsos blockers em redes válidas. |
+| **Responsável futuro** | RT Brasmáquinas |
+| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+
+---
+
+---
+
+### REGRA_CONSTRUTIBILIDADE_ANGULAR_REDE_INTERNA
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `ALLOWED_DEFLECTIONS_INTERNAL` e `ALLOWED_DEFLECTIONS_ADUTORA` em `network-angle-diagnostics.ts` |
+| **Valor usado** | Rede interna: `[0°, 90°]` — Adutora: `[0°, 45°, 90°]` |
+| **Onde é usado** | `src/lib/layout/network-angle-diagnostics.ts` — `isAllowedDeflection()`, `detectNetworkAngleIssues()` |
+| **Motivo** | A rede interna (principal, ramais, laterais, trechos operacionais, registros, junções internas) opera em malha ortogonal 12×12 m — geometria que naturalmente exige apenas luvas (0°) e curvas/tês 90°. Curvas de 45° não fazem parte do catálogo de conexões da rede interna Brasmáquinas. A adutora conecta captação (posição arbitrária) à boca da rede e pode exigir 45° para acompanhar topografia ou limites de propriedade. |
+| **Origem** | Regra confirmada pelo RT da Brasmáquinas antes do início da TASK-015. Não é premissa provisória — é a regra oficial. A tolerância angular ±5° (ver `TOLERANCIA_ANGULAR_CONSTRUTIBILIDADE`) permanece provisória. |
+| **Risco** | Projetos com geometria diagonal na principal (polígono inclinado) podem gerar blocker 45° mesmo quando o traçado é razoável. Nesses casos, o usuário deve ajustar o traçado ou o RT deve revisar a regra de ângulos para o caso específico. |
+| **Responsável futuro** | RT Brasmáquinas — revisão se houver necessidade de 45° em rede interna em casos especiais |
+| **Status** | Regra confirmada pelo RT. Tolerância angular ±5° → `PENDENTE_REVISAO_RT_BRASMAQUINAS` (ver `TOLERANCIA_ANGULAR_CONSTRUTIBILIDADE`) |
+
+---
+
+---
+
+### TOLERANCIA_ASPERSOR_EIXO_LATERAL
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `TOLERANCIA_ASPERSOR_EIXO_LATERAL` |
+| **Valor usado** | `0,5 m` |
+| **Onde é usado** | `src/lib/layout/laterais.ts` — `maxSprinklerAxisDeviationM()`: calcula desvio máximo de aspersor ao eixo canônico `startLngLat → endLngLat` da lateral física |
+| **Motivo** | Após o eixo canônico ser calculado via `toLngLat(xSegRep, yFirst/yLast)`, os aspersores da coluna devem estar a no máximo 0,5 m desse eixo. Desvios acima disso indicam inconsistência geométrica: possível atribuição incorreta de aspersor à coluna, ou error de aproximação plana-geodésica significativo (farm > ~700 m). |
+| **Origem** | Premissa provisória de engenharia. Para fazendas < 500 m, o erro de aproximação flat-earth é < 0,1 m — puramente numérico. Para fazendas de 1–2 km, o erro pode alcançar 0,5–2 m, tornando o limiar tecnicamente relevante. Valor 0,5 m adotado como ponto de partida conservador. |
+| **Risco** | Para projetos grandes (> 700 m), o limiar pode disparar diagnósticos mesmo em projetos geometricamente corretos. Nesses casos, o RT deve revisar se o limiar deve ser elevado ou se a aproximação plana-geodésica requer correção. |
+| **Responsável futuro** | RT Brasmáquinas — revisão para projetos com fazendas > 700 m |
+| **Status** | `PREMISSA_PROVISORIA_ENGENHARIA` \| `PENDENTE_REVISAO_BRASMAQUINAS` |
+
+---
+
 ## Histórico de revisões
 
 | Data | Autor | O que mudou |
 |------|-------|-------------|
 | 2026-05-20 | Claude Sonnet 4.6 | Documento criado (TASK-010E-B). Registradas 4 premissas: WEIGHT_SECONDARY_LENGTH, WEIGHT_TOTAL_NETWORK_LENGTH, fórmula de normalização, proxy de comprimento. |
 | 2026-05-20 | Claude Sonnet 4.6 | TASK-010F: Adicionadas 2 premissas: TOP_K_HYDRAULIC_CANDIDATES, WEIGHT_HYDRAULIC_BLOCKER. |
+| 2026-05-20 | Claude Sonnet 4.6 | TASK-013: Adicionada premissa TOLERANCIA_ANGULAR_CONSTRUTIBILIDADE (±5°). |
+| 2026-05-20 | Claude Sonnet 4.6 | TASK-015: Adicionada regra REGRA_CONSTRUTIBILIDADE_ANGULAR_REDE_INTERNA (rede interna=[0°,90°]; adutora=[0°,45°,90°]). |
+| 2026-05-20 | Claude Sonnet 4.6 | TASK-018: Adicionada premissa TOLERANCIA_ASPERSOR_EIXO_LATERAL (0,5 m). |

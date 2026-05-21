@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-20
-Testes na base: 597/597 · TypeScript: 0 erros · Working tree: limpo
+Testes na base: 678/678 · TypeScript: 0 erros · Working tree: limpo
 
 ---
 
@@ -466,8 +466,137 @@ Testes na base: 597/597 · TypeScript: 0 erros · Working tree: limpo
 
 ---
 
+### TASK-013 — Auditar e corrigir laterais físicas construtíveis
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** layout / construtibilidade / diagnósticos
+**Arquivo:** `tasks/TASK-013-laterais-fisicas-construtiveis.md`
+**Concluída em:** 2026-05-20 · 629/629 testes · 0 erros tsc
+
+> **P1 (bug):** `generatePhysicalColumns()` usava `xRep` (média X da coluna no frame local)
+> como `startLngLat`/`endLngLat`. Corrigido: endpoints agora são as posições geodésicas reais
+> do primeiro e último aspersor da coluna.
+>
+> **P2 (feature):** `detectNetworkAngleIssues()` criada em `network-angle-diagnostics.ts`.
+> Verifica dobras internas da principal e junções ramal → principal / ramal → lateral.
+> Ângulos fora de 0°/45°/90° (tolerância ±5° — `PENDENTE_REVISAO_RT_BRASMAQUINAS`) geram
+> blocker em `diagnostics.blockers`, impedindo emissão de PDF via gate existente (HTTP 422).
+> Junção adutora → principal não verificada: por invariante I4 de `generatePrincipalAndAdutora`,
+> a adutora sempre conecta no endpoint da principal (conexão de extremidade — não T-junction).
+> 20 novos testes. Premissa documentada em `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md`.
+
+---
+
+### TASK-014 — Labels de setor no mapa usando PhysicalColumn.startLngLat
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** mapa / UI
+**Arquivo:** `tasks/TASK-014-labels-setor-start-physical-column.md`
+**Concluída em:** 2026-05-20 · 634/634 testes · 0 erros tsc
+
+> Labels de setor migrados de centroide da nuvem de aspersores para `PhysicalColumn.startLngLat`.
+> Função pura `resolveSectorLabelAnchor(sectorIdx, physicalColumns)` extraída para
+> `src/lib/layout/sector-label-anchor.ts` com lógica de prioridade em 2 níveis:
+> (1) `sectorsTouched[0] === sectorIdx` (setor primário), menor `columnIndex`;
+> (2) `sectorsTouched.includes(sectorIdx)` (setor secundário), menor `columnIndex`;
+> (3) fallback ao centroide quando `null`.
+> `sectorLabelsGeoJSON` em `ProjectMap.tsx` atualizado; `physicalColumns` adicionado às deps.
+> 5 novos testes em `sector-label-anchor.test.ts`.
+>
+> **Pendência:** validação visual no browser (2, 3 e 4 setores; coluna fragmentada).
+
+---
+
+### TASK-015 — Roteamento construtível de ramais/secundárias com 90°/180°
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** layout / construtibilidade / domínio
+**Arquivo:** `tasks/TASK-015-roteamento-construtivel-ramais-secundarias-90-180.md`
+**Concluída em:** 2026-05-20 · 672/672 testes · 0 erros tsc
+
+> Aplicação da regra oficial de construtibilidade angular Brasmáquinas (confirmada pelo RT):
+> **rede interna** (principal, ramais, laterais, trechos, registros, junções) usa apenas 0° e 90°
+> (deflexões permitidas: 0° = luva/trecho reto e 90° = curva/tê 90°);
+> **adutora** aceita 0°, 45° e 90°. 45° na rede interna é blocker.
+>
+> `ALLOWED_DEFLECTIONS_INTERNAL = [0, 90]` e `ALLOWED_DEFLECTIONS_ADUTORA = [0, 45, 90]`
+> exportados de `network-angle-diagnostics.ts`. `isAllowedDeflection(45)` → `false`.
+> `SecondaryPipe.coords?: [number,number][]` opcional (retrocompatível); `generateSecondaries`
+> popula `coords` via `routeSecondary()` (reta ou L-shape 90°); `lengthM` = rota real.
+> `ProjectMap.tsx` usa `coords ?? [fromCoord, toCoord]` na LineString do ramal.
+> `detectNetworkAngleIssues` usa primeiro segmento de `coords` para junção ramal→principal
+> e último segmento para junção ramal→lateral. 28 novos testes.
+> ADR-010 criada. `REGRA_CONSTRUTIBILIDADE_ANGULAR_REDE_INTERNA` documentada em premissas.
+>
+> **Pendências:** BOM de conexões físicas (cotovelos/luvas) — futura task;
+> roteamento automático de dobras manuais na principal — fora do escopo.
+>
+> **Follow-up (mesma sessão):** TASK-016 corrigiu falso positivo de 180° na junção ramal→lateral.
+
+---
+
+### TASK-016 — Corrigir falso positivo 180° na junção ramal-lateral
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** layout / construtibilidade / diagnósticos
+**Arquivo:** `tasks/TASK-016-falso-positivo-180-juncao-ramal-lateral.md`
+**Concluída em:** 2026-05-20 · 672/672 testes · 0 erros tsc
+
+> Bug em `detectNetworkAngleIssues` (seção 2b — junção ramal → lateral): o código usava
+> `latVec = col.startLngLat → col.endLngLat` independente de qual extremo era o inlet.
+> Quando `sec.toCoord ≈ col.endLngLat`, o vetor ficava antiparalelo ao `lastVec` → deflexão 180°
+> → falso blocker em continuidade reta válida.
+> Corrigido com snap métrico (tolerância 1,0 m): `latVec` agora aponta de inlet → extremidade oposta.
+> `isAllowedDeflection`, `ALLOWED_DEFLECTIONS_INTERNAL` e `ALLOWED_DEFLECTIONS_ADUTORA` preservados.
+> Roteamento, solver, BOM, mapa e catálogo não alterados.
+> 10 novos testes em `network-angle-diagnostics.test.ts` (T16-A a T16-F).
+
+---
+
+### TASK-017 — Corrigir lateral física para rota reta/construtível
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** mapa / renderização / construtibilidade
+**Arquivo:** `tasks/TASK-017-lateral-fisica-reta-construtivel.md`
+**Concluída em:** 2026-05-20 · 673/673 testes · 0 erros tsc
+
+> Correção de renderização: `physicalColumnsGeoJSON` em `ProjectMap.tsx` usava
+> `col.sprinklerIndices.map(idx → positions[idx])` — N pontos com micro-desvios de ponto
+> flutuante — gerando zigue-zague visual com deflexões ~120° na camada "Lateral física".
+> Corrigido para `[col.startLngLat, col.endLngLat]` — LineString reta de 2 pontos.
+> O modelo (`PhysicalColumn`) estava correto desde TASK-013; a correção foi exclusivamente
+> de renderização. `layout.sprinklers` removido das deps do `useMemo`. Teste P1g atualizado;
+> P1g_col novo: aspersores intermediários < 0,5 m do eixo (ruído numérico de rotação).
+> 1 novo teste. Arquivo retroativo `tasks/TASK-016-*.md` criado nesta sessão.
+
+---
+
+### TASK-018 — Corrigir eixo canônico das laterais físicas
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** layout / construtibilidade / renderização
+**Arquivo:** `tasks/TASK-018-corrigir-eixo-canonico-laterais-fisicas.md`
+**Concluída em:** 2026-05-20 · 678/678 testes · 0 erros tsc
+
+> Causa raiz identificada após TASK-017: `generatePhysicalColumns` usava posições geodésicas
+> reais dos aspersores extremos como `startLngLat`/`endLngLat`. Extremos com desvio oposto
+> (X+δ e X-δ) inclinavam a reta e afastavam os aspersores intermediários.
+> Corrigido com `xSegRep = média de X do segmento` → `startLngLat = toLngLat(xSegRep, yFirst)`,
+> `endLngLat = toLngLat(xSegRep, yLast)`. Linha verificada matematicamente: `dev = |δx_local|`.
+> `maxSprinklerAxisDeviationM()` exportado como função diagnóstica pura (integração em
+> `diagnostics` adiada para TASK-019). Helper `makeGridFlat` adicionado para testes com
+> projeção flat-earth consistente com o domínio. Premissa `TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,5 m`
+> registrada. 5 novos testes (T18-a, T18-b, T18-c × 3).
+
+---
+
 ## Próximas tarefas sugeridas (não formalizadas)
 
 - **Calibração RT de campo — OPTIMIZER_PARAMS**: validar pesos provisionais (PREMISSA_PROVISORIA_MERCADO) e pesos aguardando campo (PENDENTE_CALIBRACAO_RT_CAMPO) com dados de projetos homologados; remover marcadores. Depende de TASK-010A–010Z ✅
-- **Labels de setor no mapa**: marcadores de setor devem aparecer em `PhysicalColumn.startLngLat` da primeira lateral, não no centroide. Mudança em `ProjectMap.tsx`, bloco `sectorLabelsGeoJSON`.
 - **Diâmetro dos ramais no PDF**: `PropostaPDF.tsx` não exibe diâmetro individual dos ramais. Incluir coluna com SKU selecionado por `sizedSecondaries`.
