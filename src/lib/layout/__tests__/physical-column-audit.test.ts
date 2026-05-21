@@ -11,7 +11,12 @@
  */
 import { describe, it, expect } from "vitest";
 import * as turf from "@turf/turf";
-import { generatePhysicalColumns, maxSprinklerAxisDeviationM } from "@/lib/layout/laterais";
+import {
+  generatePhysicalColumns,
+  maxSprinklerAxisDeviationM,
+  detectAxisDeviations,
+  TOLERANCIA_ASPERSOR_EIXO_LATERAL,
+} from "@/lib/layout/laterais";
 import { ASPERSOR_PADRAO, TUBOS_PVC_LF } from "@/lib/catalog/aspersores";
 import type { TuboCandidato } from "@/lib/hydraulics/hazenWilliams";
 
@@ -326,5 +331,113 @@ describe("T18-c: eixo canônico supera linha entre extremos reais quando X diver
       const distM = turf.pointToLineDistance(pt, line, { units: "meters" });
       expect(distM).toBeLessThan(0.1);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-019 — detectAxisDeviations
+// Verifica que colunas com desvio acima de TOLERANCIA_ASPERSOR_EIXO_LATERAL
+// (0,10 m) geram violations; colunas dentro da tolerância não geram.
+// Tolerância é numérica/cartográfica — regra operacional Brasmáquinas.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const M_PER_LAT_T19 = 111320;
+const mPerLngT19 = M_PER_LAT_T19 * Math.cos((-12 * Math.PI) / 180);
+
+function localToLngLat0(x: number, y: number): [number, number] {
+  return [CENTROID.lng + x / mPerLngT19, CENTROID.lat + y / M_PER_LAT_T19];
+}
+
+describe("T19-a: detectAxisDeviations — grid flat 4×8 a 30° → violations = []", () => {
+  const positions = makeGridFlat(4, 8, 30);
+  const cols = generatePhysicalColumns(
+    positions, 30, CENTROID, SPACING, ASPERSOR_MIN, TEST_CATALOG,
+  );
+
+  it("nenhuma coluna viola a tolerância em grid flat correto", () => {
+    const report = detectAxisDeviations(cols, positions, CENTROID);
+    expect(report.violations).toHaveLength(0);
+    expect(report.maxDeviationM).toBeLessThan(0.01);
+  });
+});
+
+describe("T19-b: detectAxisDeviations — desvio 0,04 m < 0,10 m → sem blocker", () => {
+  // 3 aspersores: X₁=100.03, X₂=99.97, X₃=99.97 → xSegRep≈99.99, dev_X₁≈0.04 m
+  const positions: [number, number][] = [
+    localToLngLat0(100.03, 0),
+    localToLngLat0(99.97, SPACING),
+    localToLngLat0(99.97, 2 * SPACING),
+  ];
+  const cols = generatePhysicalColumns(
+    positions, 0, CENTROID, SPACING, ASPERSOR_MIN, TEST_CATALOG,
+  );
+
+  it("desvio abaixo da tolerância não gera violation", () => {
+    expect(cols).toHaveLength(1);
+    const report = detectAxisDeviations(cols, positions, CENTROID);
+    expect(report.violations).toHaveLength(0);
+    expect(report.maxDeviationM).toBeLessThan(TOLERANCIA_ASPERSOR_EIXO_LATERAL);
+  });
+});
+
+describe("T19-c: detectAxisDeviations — desvio 0,40 m > 0,10 m → blocker", () => {
+  // 3 aspersores: X₁=100.30, X₂=99.70, X₃=99.70 → xSegRep≈99.90, dev_X₁≈0.40 m
+  const positions: [number, number][] = [
+    localToLngLat0(100.30, 0),
+    localToLngLat0(99.70, SPACING),
+    localToLngLat0(99.70, 2 * SPACING),
+  ];
+  const cols = generatePhysicalColumns(
+    positions, 0, CENTROID, SPACING, ASPERSOR_MIN, TEST_CATALOG,
+  );
+
+  it("desvio acima da tolerância gera exactly 1 violation", () => {
+    expect(cols).toHaveLength(1);
+    const report = detectAxisDeviations(cols, positions, CENTROID);
+    expect(report.violations).toHaveLength(1);
+    expect(report.violations[0].columnIndex).toBe(0);
+    expect(report.violations[0].deviationM).toBeGreaterThan(TOLERANCIA_ASPERSOR_EIXO_LATERAL);
+    expect(report.maxDeviationM).toBeGreaterThan(TOLERANCIA_ASPERSOR_EIXO_LATERAL);
+  });
+});
+
+describe("T19-d: detectAxisDeviations — 2 colunas, 1 violadora, 1 ok", () => {
+  // Coluna 0 (X≈0 m): 3 aspersores alinhados → ok
+  // Coluna 1 (X≈12 m): X₁=12.30, X₂=11.70, X₃=11.70 → violation
+  const posCol0: [number, number][] = [
+    localToLngLat0(0, 0),
+    localToLngLat0(0, SPACING),
+    localToLngLat0(0, 2 * SPACING),
+  ];
+  const posCol1: [number, number][] = [
+    localToLngLat0(SPACING + 0.30, 0),
+    localToLngLat0(SPACING - 0.30, SPACING),
+    localToLngLat0(SPACING - 0.30, 2 * SPACING),
+  ];
+  const positions = [...posCol0, ...posCol1];
+  const cols = generatePhysicalColumns(
+    positions, 0, CENTROID, SPACING, ASPERSOR_MIN, TEST_CATALOG,
+  );
+
+  it("exatamente 1 violation na coluna desalinhada", () => {
+    expect(cols).toHaveLength(2);
+    const report = detectAxisDeviations(cols, positions, CENTROID);
+    expect(report.violations).toHaveLength(1);
+  });
+});
+
+describe("T19-e: detectAxisDeviations — coluna com 1 aspersor → dev = 0", () => {
+  const positions: [number, number][] = [
+    localToLngLat0(0, 0),
+  ];
+  const cols = generatePhysicalColumns(
+    positions, 0, CENTROID, SPACING, ASPERSOR_MIN, TEST_CATALOG,
+  );
+
+  it("coluna com 1 aspersor não gera violation", () => {
+    expect(cols).toHaveLength(1);
+    const report = detectAxisDeviations(cols, positions, CENTROID);
+    expect(report.violations).toHaveLength(0);
+    expect(report.maxDeviationM).toBe(0);
   });
 });

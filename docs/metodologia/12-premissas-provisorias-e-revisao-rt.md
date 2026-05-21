@@ -169,13 +169,14 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | Campo | Valor |
 |-------|-------|
 | **Parâmetro** | `TOLERANCIA_ASPERSOR_EIXO_LATERAL` |
-| **Valor usado** | `0,5 m` |
-| **Onde é usado** | `src/lib/layout/laterais.ts` — `maxSprinklerAxisDeviationM()`: calcula desvio máximo de aspersor ao eixo canônico `startLngLat → endLngLat` da lateral física |
-| **Motivo** | Após o eixo canônico ser calculado via `toLngLat(xSegRep, yFirst/yLast)`, os aspersores da coluna devem estar a no máximo 0,5 m desse eixo. Desvios acima disso indicam inconsistência geométrica: possível atribuição incorreta de aspersor à coluna, ou error de aproximação plana-geodésica significativo (farm > ~700 m). |
-| **Origem** | Premissa provisória de engenharia. Para fazendas < 500 m, o erro de aproximação flat-earth é < 0,1 m — puramente numérico. Para fazendas de 1–2 km, o erro pode alcançar 0,5–2 m, tornando o limiar tecnicamente relevante. Valor 0,5 m adotado como ponto de partida conservador. |
-| **Risco** | Para projetos grandes (> 700 m), o limiar pode disparar diagnósticos mesmo em projetos geometricamente corretos. Nesses casos, o RT deve revisar se o limiar deve ser elevado ou se a aproximação plana-geodésica requer correção. |
-| **Responsável futuro** | RT Brasmáquinas — revisão para projetos com fazendas > 700 m |
-| **Status** | `PREMISSA_PROVISORIA_ENGENHARIA` \| `PENDENTE_REVISAO_BRASMAQUINAS` |
+| **Valor usado** | `0,10 m` |
+| **Onde é usado** | `src/lib/layout/laterais.ts` — `detectAxisDeviations()`: itera as colunas físicas chamando `maxSprinklerAxisDeviationM()`; resultado passado para `generateProposalDiagnostics()` |
+| **Regra** | Todo aspersor deve estar sobre a lateral física que o atende. A vala da lateral e o ponto do aspersor são a mesma execução física — um aspersor fora do eixo exige segunda escavação, tornando o projeto construtivamente inválido. A tolerância é exclusivamente numérica/cartográfica, **não é permissão de campo**. |
+| **Severidade** | **Blocker.** Desvio acima do limiar impede emissão do PDF via gate existente (HTTP 422). |
+| **Origem** | Decisão operacional Brasmáquinas (regra confirmada). Valor 0,10 m é tolerância numérica provisória: para fazendas < 500 m, o erro de aproximação flat-earth é < 0,1 m. O valor cobre o ruído numérico com margem de segurança para projetos normais. |
+| **Risco** | Para projetos com fazendas > 500–700 m, o erro flat-earth pode aproximar-se de 0,10 m. Se o RT observar blockers espúrios em projetos geometricamente corretos, elevar o limiar para 0,20 m. |
+| **Responsável futuro** | RT Brasmáquinas — revisão do valor se houver blockers espúrios em projetos > 500 m |
+| **Status** | Regra: **APROVADO — decisão operacional Brasmáquinas** (não é premissa provisória). Valor 0,10 m: `PENDENTE_REVISAO_BRASMAQUINAS`. |
 
 ---
 
@@ -188,3 +189,4 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | 2026-05-20 | Claude Sonnet 4.6 | TASK-013: Adicionada premissa TOLERANCIA_ANGULAR_CONSTRUTIBILIDADE (±5°). |
 | 2026-05-20 | Claude Sonnet 4.6 | TASK-015: Adicionada regra REGRA_CONSTRUTIBILIDADE_ANGULAR_REDE_INTERNA (rede interna=[0°,90°]; adutora=[0°,45°,90°]). |
 | 2026-05-20 | Claude Sonnet 4.6 | TASK-018: Adicionada premissa TOLERANCIA_ASPERSOR_EIXO_LATERAL (0,5 m). |
+| 2026-05-20 | Claude Sonnet 4.6 | TASK-019: TOLERANCIA_ASPERSOR_EIXO_LATERAL revisada: valor 0,5 m → 0,10 m; severidade warning → blocker; origem alterada para decisão operacional Brasmáquinas confirmada. |

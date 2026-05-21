@@ -466,17 +466,36 @@ export function deriveLateraisFromNetwork(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Tolerância numérica/cartográfica para desvio aspersor → eixo da lateral.
+ *
+ * Regra operacional Brasmáquinas: a vala da lateral e o ponto do aspersor são
+ * a mesma execução física. Aspersor fora do eixo exige segunda escavação —
+ * projeto construtivamente inválido. A tolerância NÃO é permissão de campo.
+ *
+ * Valor 0,10 m: tolerância numérica provisória (PENDENTE_REVISAO_BRASMAQUINAS).
+ * Documentada em docs/metodologia/12-premissas-provisorias-e-revisao-rt.md.
+ */
+export const TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0.10;
+
+export interface AxisDeviationViolation {
+  columnIndex: number;
+  deviationM: number;
+}
+
+export interface AxisDeviationReport {
+  violations: AxisDeviationViolation[];
+  maxDeviationM: number;
+}
+
+/**
  * Calcula o desvio máximo, em metros, de qualquer aspersor da coluna em
  * relação ao eixo canônico `startLngLat → endLngLat`.
  *
  * Usa projeção plana (flat-earth) consistente com o restante do domínio.
  * Retorna 0 quando a coluna tem menos de 2 aspersores.
  *
- * Tolerância de referência: TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,5 m
- * (PREMISSA_PROVISORIA_ENGENHARIA | PENDENTE_REVISAO_BRASMAQUINAS).
+ * Limiar de referência: TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,10 m (blocker).
  * Documentada em docs/metodologia/12-premissas-provisorias-e-revisao-rt.md.
- *
- * Integração do desvio em diagnostics.blockers: escopo de task imediata.
  */
 export function maxSprinklerAxisDeviationM(
   col: PhysicalColumn,
@@ -514,4 +533,25 @@ export function maxSprinklerAxisDeviationM(
     if (dev > maxDev) maxDev = dev;
   }
   return maxDev;
+}
+
+/**
+ * Detecta colunas físicas cujos aspersores excedem TOLERANCIA_ASPERSOR_EIXO_LATERAL.
+ * Retornado pelo orquestrador e passado para generateProposalDiagnostics.
+ */
+export function detectAxisDeviations(
+  cols: PhysicalColumn[],
+  positions: [number, number][],
+  centroid: { lng: number; lat: number },
+): AxisDeviationReport {
+  const violations: AxisDeviationViolation[] = [];
+  let maxDeviationM = 0;
+  for (const col of cols) {
+    const dev = maxSprinklerAxisDeviationM(col, positions, centroid);
+    if (dev > maxDeviationM) maxDeviationM = dev;
+    if (dev > TOLERANCIA_ASPERSOR_EIXO_LATERAL) {
+      violations.push({ columnIndex: col.columnIndex, deviationM: dev });
+    }
+  }
+  return { violations, maxDeviationM };
 }

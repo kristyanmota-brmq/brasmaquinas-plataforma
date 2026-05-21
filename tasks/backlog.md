@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-20
-Testes na base: 678/678 · TypeScript: 0 erros · Working tree: limpo
+Testes na base: 686/686 · TypeScript: 0 erros · Working tree: modificado (TASK-019)
 
 ---
 
@@ -593,6 +593,32 @@ Testes na base: 678/678 · TypeScript: 0 erros · Working tree: limpo
 > `diagnostics` adiada para TASK-019). Helper `makeGridFlat` adicionado para testes com
 > projeção flat-earth consistente com o domínio. Premissa `TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,5 m`
 > registrada. 5 novos testes (T18-a, T18-b, T18-c × 3).
+
+---
+
+### TASK-019 — Integrar desvio aspersor-eixo da lateral em diagnostics
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Área:** layout / construtibilidade / diagnósticos
+**Arquivo:** `tasks/TASK-019-integrar-desvio-aspersor-eixo-lateral-diagnostics.md`
+**Concluída em:** 2026-05-20 · 686/686 testes · 0 erros tsc
+
+> Regra operacional Brasmáquinas confirmada: a vala da lateral e o ponto do aspersor são
+> a mesma execução física. Aspersor fora do eixo é erro construtivo.
+>
+> `detectAxisDeviations(cols, positions, centroid)` criada em `laterais.ts`.
+> `TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,10 m` exportada como constante nomeada.
+> Integrada ao orquestrador `calculateIrrigationProject()` após `detectNetworkAngleIssues`.
+> `generateProposalDiagnostics()` recebe 5° parâmetro opcional `axisDeviationReport`.
+> Desvio > 0,10 m gera **blocker** com texto "Aspersor fora do eixo da lateral física".
+> PDF bloqueado automaticamente via gate existente (`pdfEmissionBlockers()`).
+> `axisDeviation: AxisDeviationReport | null` exposto em `IrrigationProjectResult`.
+> Premissa `TOLERANCIA_ASPERSOR_EIXO_LATERAL` atualizada: valor 0,10 m, origem decisão
+> operacional Brasmáquinas, severidade blocker, valor pendente revisão RT.
+> 8 novos testes (T19-a..T19-h).
+>
+> **Pendência:** revisão RT do valor 0,10 m para fazendas > 500–700 m.
 
 ---
 

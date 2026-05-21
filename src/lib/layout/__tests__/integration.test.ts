@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { calculateIrrigationProject } from "@/lib/layout/irrigation-project";
+import { calculateIrrigationProject, pdfEmissionBlockers } from "@/lib/layout/irrigation-project";
 import { migrateLayout, validateLayout } from "@/app/projetos/[id]/layout-schema";
 import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
 import type { ProjectLayout } from "@/app/projetos/[id]/layout-schema";
@@ -530,5 +530,62 @@ describe("T10 — consistência mapa vs PDF: mesmo IrrigationProjectResult", () 
     expect(mapDisplayLaterais).toBeGreaterThanOrEqual(pdfBomColunasLaterais);
     // E os dois vêm do mesmo result — não há divergência mapa vs PDF
     expect(pdfBomColunasLaterais).toBe(result.physical!.nColumns);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T19 — Desvio aspersor → eixo lateral em diagnostics.blockers
+//
+// Regra operacional Brasmáquinas: aspersor fora do eixo da lateral física é
+// blocker (vala da lateral = vala do aspersor). TOLERANCIA = 0,10 m.
+//
+// T19-f: layout com positions[0] deslocado +0,15 m em X → col 0 tem desvio
+//   xSegRep = X + 0,15×1/5 = X + 0,03; dev_pos[0] = 0,12 m > 0,10 → blocker.
+// T19-g: layout sem offset → nenhum blocker de eixo.
+// T19-h: pdfEmissionBlockers retorna a mensagem de T19-f.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T19 — desvio aspersor → eixo lateral gera blocker", () => {
+  const mPerLng = 111320 * Math.cos((CENTROID.lat * Math.PI) / 180);
+  // Offset de 0,15 m em longitude no positions[0] da coluna 0.
+  // Com 5 sprinklers: xSegRep = X + 0,15/5 = X + 0,03; dev = 0,12 m > 0,10 → blocker.
+  const xOffsetLng = 0.15 / mPerLng;
+
+  function makeLayoutWithOffset(): ProjectLayout {
+    const base = makeCompleteLayout(4, 5, 2);
+    const positions = base.sprinklers!.positions.map<[number, number]>(
+      (p, i) => (i === 0 ? [p[0] + xOffsetLng, p[1]] : p),
+    );
+    return {
+      ...base,
+      sprinklers: { ...base.sprinklers!, positions, count: positions.length },
+    };
+  }
+
+  it("T19-f: calculateIrrigationProject com posição deslocada → blocker de eixo", () => {
+    const result = calculateIrrigationProject(makeLayoutWithOffset());
+    expect(result.diagnostics).not.toBeNull();
+    const hasAxisBlocker = result.diagnostics!.blockers.some(
+      (b) => b.includes("Aspersor fora do eixo da lateral física"),
+    );
+    expect(hasAxisBlocker).toBe(true);
+  });
+
+  it("T19-g: calculateIrrigationProject com grid correto → zero blockers de eixo", () => {
+    const result = calculateIrrigationProject(makeCompleteLayout(4, 5, 2));
+    expect(result.diagnostics).not.toBeNull();
+    const hasAxisBlocker = result.diagnostics!.blockers.some(
+      (b) => b.includes("Aspersor fora do eixo da lateral física"),
+    );
+    expect(hasAxisBlocker).toBe(false);
+  });
+
+  it("T19-h: pdfEmissionBlockers retorna blocker de eixo quando presente", () => {
+    const result = calculateIrrigationProject(makeLayoutWithOffset());
+    const blockers = pdfEmissionBlockers(result);
+    const hasAxisBlocker = blockers.some(
+      (b) => b.includes("Aspersor fora do eixo da lateral física"),
+    );
+    expect(hasAxisBlocker).toBe(true);
   });
 });

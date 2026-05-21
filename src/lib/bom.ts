@@ -15,6 +15,8 @@ import {
 import {
   generateLateraisLegacyForDebug,
   generatePhysicalColumns,
+  TOLERANCIA_ASPERSOR_EIXO_LATERAL,
+  type AxisDeviationReport,
   type Lateral,
   type PhysicalColumn,
 } from "@/lib/layout/laterais";
@@ -598,6 +600,7 @@ export function generateProposalDiagnostics(
   bom: BOMResult,
   hydraulics?: HydraulicSizingReport | null,
   networkAngleReport?: NetworkAngleReport | null,
+  axisDeviationReport?: AxisDeviationReport | null,
 ): ProposalDiagnostics {
   const physCols = bom.meta.nColunasLaterais;
   const nLaterais = bom.meta.nLaterais;
@@ -793,6 +796,19 @@ export function generateProposalDiagnostics(
       `Construtibilidade angular: ${networkAngleReport.issues.length} conexão(ões) com ângulo ` +
       `fora de 45°/90°/180° (${summary}). Nenhuma conexão padrão disponível. ` +
       `Corrija o traçado da rede antes de emitir proposta.`,
+    );
+  }
+
+  // Blockers de desvio aspersor → eixo da lateral física.
+  // Regra operacional Brasmáquinas: a vala da lateral e o ponto do aspersor são
+  // a mesma execução física. Aspersor fora do eixo invalida o projeto construtivo.
+  if (axisDeviationReport && axisDeviationReport.violations.length > 0) {
+    const n = axisDeviationReport.violations.length;
+    const maxM = axisDeviationReport.maxDeviationM.toFixed(2);
+    blockers.push(
+      `Aspersor fora do eixo da lateral física: ${n} lateral(is) com desvio acima de ` +
+      `${TOLERANCIA_ASPERSOR_EIXO_LATERAL} m (máx: ${maxM} m). ` +
+      `O aspersor deve estar sobre a rede lateral, pois a vala da lateral é a mesma do aspersor.`,
     );
   }
 

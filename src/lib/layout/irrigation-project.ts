@@ -21,6 +21,8 @@ import { ASPERSOR_PADRAO, TUBOS_PVC_LF } from "@/lib/catalog/aspersores";
 import {
   generatePhysicalColumns,
   deriveLateraisFromNetwork,
+  detectAxisDeviations,
+  type AxisDeviationReport,
   type PhysicalColumn,
   type Lateral,
 } from "@/lib/layout/laterais";
@@ -144,6 +146,7 @@ export interface IrrigationProjectResult {
   bom: BOMResult | null;
   diagnostics: ProposalDiagnostics | null;
   networkAngle: NetworkAngleReport | null;
+  axisDeviation: AxisDeviationReport | null;
   /** Null quando o projeto ainda não tem todos os dados necessários para o solver hidráulico. */
   hydraulics: HydraulicSizingReport | null;
 }
@@ -208,6 +211,7 @@ export function calculateIrrigationProject(
     bom: null,
     diagnostics: null,
     networkAngle: null,
+    axisDeviation: null,
     hydraulics: null,
     ...partial,
   });
@@ -392,6 +396,12 @@ export function calculateIrrigationProject(
     centroid,
   });
 
+  const axisDeviation = detectAxisDeviations(
+    physicalColumns,
+    sprinklers.positions,
+    centroid,
+  );
+
   const partialResult: IrrigationProjectResult = {
     isComplete: true,
     missingFields: [],
@@ -405,6 +415,7 @@ export function calculateIrrigationProject(
     bom: bomPrelim,
     diagnostics: null,
     networkAngle,
+    axisDeviation,
     hydraulics: null,
   };
 
@@ -421,7 +432,7 @@ export function calculateIrrigationProject(
 
   // ── Diagnósticos (recebe BOM final + solver hidráulico) ──────────────────
 
-  const diagnostics = generateProposalDiagnostics(layout, bom, hydraulics, networkAngle);
+  const diagnostics = generateProposalDiagnostics(layout, bom, hydraulics, networkAngle, axisDeviation);
 
   return { ...partialResult, bom, diagnostics, hydraulics };
 }
