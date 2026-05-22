@@ -1,10 +1,15 @@
 # TASK-001 — Diagnóstico do Software Atual
 
-**Status:** `pendente`
+**Status:** `aguardando_fechamento` (terminal estável; aguarda commit/push)
 **Prioridade:** P1-crítico
+**Classe:** A — diagnóstico estrutural / arquitetura / governança
 **Área:** governança
 **Criado em:** 2026-05-19
-**Atualizado em:** 2026-05-19
+**Atualizado em:** 2026-05-22
+**Concluída em:** 2026-05-22 · 826/826 testes vitest · 0 erros tsc · 27/27 testes tooling · produto intocado
+**Relatório:** [`docs/relatorios/2026-05-22-TASK-001.md`](../docs/relatorios/2026-05-22-TASK-001.md)
+**Veredito GPT (`/gpt-review TASK-001`):** `aprovado` · 0 blockers · 0/7 invariantes violadas
+**Decisão humana:** `aprovado` (sem override) · `ai/decision-log.md` 2026-05-22T20:17:39-03:00 · hash gpt-review `3dc28c98...cef789`
 
 ---
 
@@ -91,13 +96,20 @@ O relatório deve cobrir os quatro pilares:
 
 ## Critérios de aceite
 
-- [ ] Relatório criado em `docs/relatorios/` com data e versão do software analisada
-- [ ] Diagnóstico cobre os quatro pilares com estrutura definida acima
-- [ ] Cada gap identificado tem: descrição, impacto (bloqueante/importante/melhoria), referência ao requisito (arquivo:§seção), sugestão de próximo passo
-- [ ] Checklist de homologação de `testes-e-homologacao.md` §2 e §3 preenchido contra o estado atual
-- [ ] Lista de prioridades sugeridas para o backlog (com proposta de ordem e justificativa)
-- [ ] `npx tsc --noEmit` → 0 erros (não alteramos código)
-- [ ] `npx vitest run` → 400/400 passando (não alteramos código)
+- [x] Relatório criado em `docs/relatorios/2026-05-22-TASK-001.md` com data e versão do software analisada (commit `6debfd4`)
+- [x] Diagnóstico cobre **12 seções obrigatórias** (estrutura aprovada no `/planejar` excedeu os 4 pilares originais; cobre arquitetura funcional, 9 épicos, motores existentes, status por bloco de valor, evidências, riscos, premissas, blockers para E08, roadmap em 5 categorias)
+- [x] Cada gap identificado tem: descrição, impacto, referência (`arquivo:§seção` ou `ADR-XXX`), sugestão de próximo passo
+- [x] Checklist de homologação de `testes-e-homologacao.md` §2 e §3 preenchido contra estado atual (Apêndice A do relatório)
+- [x] Lista de prioridades sugeridas separada em 5 categorias: próxima task; Classe A; Classe E validação; pendências RT/campo; tooling futuro (Seção 12 do relatório)
+- [x] `npx tsc --noEmit` → **0 erros** (preservado — não alteramos `src/**`)
+- [x] `npx vitest run` → **826/826 passando** (preservado — atualizado de 400 do task file original para 826 real em 2026-05-22)
+- [x] `node scripts/ai/__tests__/run-all.mjs` → **27/27 passando** (preservado)
+- [x] Fluxo TOOL-003 (`/handoff-claude-report` + `/gpt-review`) executado **antes** da implementação (não depois)
+- [x] Decisão humana registrada em `ai/decision-log.md` (append-only) com hash sha256 correto
+- [x] Mapa Mestre `tasks/TASK-024-mapa-mestre-tasks.md` **não alterado** (TASK-024E é fonte)
+- [x] Premissas `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md` **inventariadas mas não alteradas**
+- [x] Nenhum arquivo em `src/**` modificado
+- [x] Nenhum ADR novo criado
 
 ---
 
@@ -129,9 +141,24 @@ Não se aplica — esta tarefa não modifica código.
 
 ---
 
-## Plano de implementação
+## Plano de implementação (executado em 2026-05-22)
 
-> A ser preenchido pelo agente ao executar `/planejar TASK-001`.
+**Plano aprovado com ajustes** pelo usuário em 2026-05-22 via `/planejar TASK-001`. Resumo do que foi executado:
+
+1. **Auditoria de contexto** via `/iniciar-task TASK-001` confirmou estado: 826/826 testes; 0 tsc; nenhum conflito de task ativa; arquivos referenciados existem.
+2. **Plano detalhado** gerado com 12 seções obrigatórias do relatório, reconciliação explícita vs predecessor 2026-05-19, e roadmap separado em 5 categorias.
+3. **Sincronização** de `ai/current-task.md` para TASK-001 (de TOOL-003 `aguardando_fechamento` previamente publicada em `origin/main` no commit `6debfd4`).
+4. **Handoff Claude → GPT Reviewer** via `/handoff-claude-report TASK-001`: plano serializado em `ai/claude-report.md` (9 seções canônicas) com preview + confirmação humana.
+5. **Revisão GPT** via `/gpt-review TASK-001`: chamada real à Responses API (modelo `gpt-5.5`; HTTP 200; 37,9s). Veredito `aprovado`, 0 blockers, 0/7 invariantes violadas. `validate-structure --task TASK-001` retornou **OK** (com 1 WARN não-bloqueante estrutural).
+6. **Decisão humana** registrada em `ai/decision-log.md` (append-only) — entry com `decisao_humana: aprovado`, `override: false`, hash sha256 `3dc28c985f228b5b62e5bdea8418ac7e392957b208985608198bb3b911cef789`.
+7. **Implementação** estritamente documental:
+   - `docs/relatorios/2026-05-22-TASK-001.md` criado (~900 linhas, 12 seções + 3 apêndices).
+   - `tasks/TASK-001-diagnostico-software-atual.md` atualizado (status, critérios marcados, plano executado, log).
+   - `tasks/backlog.md` atualizado (entrada TASK-001 concluída + ajuste bloqueio TASK-002).
+   - `ai/current-task.md` transicionado para `aguardando_fechamento`.
+8. **Verificação final**: `tsc 0`, `vitest 826/826`, `run-all.mjs 27/27`, `git status` confirmou apenas arquivos do escopo permitido.
+
+Nenhum arquivo em `src/**` foi tocado. Nenhuma premissa RT/campo alterada. Nenhum ADR novo criado. Mapa Mestre preservado intacto. Diagnóstico predecessor `2026-05-19-diagnostico-software-atual.md` preservado fisicamente como registro histórico.
 
 ---
 
@@ -140,3 +167,4 @@ Não se aplica — esta tarefa não modifica código.
 | Data | Autor | O que mudou |
 |------|-------|-------------|
 | 2026-05-19 | Claude Sonnet 4.6 | Tarefa criada |
+| 2026-05-22 | Claude Opus 4.7 | TASK-001 executada: diagnóstico em `docs/relatorios/2026-05-22-TASK-001.md` (~900 linhas, 12 seções + 3 apêndices); reconcilia diagnóstico anterior (2026-05-19) desatualizado em 7 dias; consome literalmente Mapa Mestre TASK-024E; inventaria 14 premissas + 6 pesos + 22+ limites de Classe A/B/C pendentes RT; lista 13 riscos técnicos priorizados; explicita 5 condições para destravar E08; roadmap separado em 5 categorias (próxima task / Classe A / Classe E validação / pendências RT/campo / tooling futuro). Estado base: 826/826 testes, 0 tsc, 27/27 tooling, 15 ADRs, 9 épicos. Fluxo TOOL-003 executado integralmente antes da implementação (handoff + gpt-review + decision-log). Mapa Mestre não alterado. Premissas não alteradas. Produto (`src/**`) intocado. |

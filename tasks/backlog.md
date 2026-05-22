@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-22
-Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + TASK-047 + TASK-048 + TASK-049 + TASK-050 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) + Mapa Mestre com épicos como blocos de valor (TASK-024E) + Diâmetros de ramais no PDF (TASK-047) + Validação browser parcial (TASK-048) + Fixtures E06 via seed (TASK-049) + E06 PROMOVIDO a "Validado visualmente" via TASK-050 (6/6 cenários PASS)**
+Testes na base: 826/826 · TypeScript: 0 erros · 27/27 testes tooling · Working tree: modificado (TASK-001 — diagnóstico formal pós-TOOL-003) — **TOOL-003 publicada em `origin/main` (commit `6debfd4`) + Diagnóstico formal TASK-001 entregue (relatório de ~900 linhas, 12 seções + 3 apêndices) — primeira task fora de validação interna a usar fluxo TOOL-003 (`/handoff-claude-report` + `/gpt-review`) integralmente; veredito GPT `aprovado` com 0 blockers e 0/7 invariantes violadas; decisão humana registrada em `ai/decision-log.md` append-only**
 
 ---
 
@@ -37,21 +37,26 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 ---
 
-### TASK-001 — Diagnóstico do software atual
+### TASK-001 — Diagnóstico formal do software atual
 
-**Status:** `pendente`
+**Status:** `aguardando_fechamento` (terminal estável; aguarda commit/push)
 **Prioridade:** P1-crítico
+**Classe:** A — diagnóstico estrutural / arquitetura / governança / documental
 **Área:** governança
 **Arquivo:** `tasks/TASK-001-diagnostico-software-atual.md`
+**Concluída em:** 2026-05-22 · 826/826 testes vitest · 0 erros tsc · 27/27 testes tooling · produto intocado
+**Relatório:** `docs/relatorios/2026-05-22-TASK-001.md`
+**Veredito GPT:** `aprovado` · 0 blockers · 0/7 invariantes violadas
+**Decisão humana:** `aprovado` (sem override) — `ai/decision-log.md` 2026-05-22T20:17:39-03:00
 
-> Varredura de diagnóstico do estado atual do software contra os quatro pilares: metodologia, engenharia de software, validação de campo e disciplina operacional. Produto: relatório em `docs/relatorios/`. Sem implementação de código.
+> Diagnóstico formal do estado atual do software de aspersão convencional em 2026-05-22. **Reconcilia** o arquivo original (criado 2026-05-19, ainda apontando cenário de 400 testes e gate de PDF como pendência) com o estado real (826 testes; 15 ADRs; 9 épicos formalizados no Mapa Mestre TASK-024E; MVP tecnicamente atingido para caso base; TOOL-001/002/003 de handoff Claude ↔ GPT Reviewer entregues). Relatório de ~900 linhas em 12 seções obrigatórias + 3 apêndices: (1) Resumo + escopo + método; (2) Visão geral do software; (3) Arquitetura funcional dos 4 motores (M1 Técnico implementado / M2 Governança não iniciado / M3 Comercial não iniciado / M4 Interface parcial); (4) Matriz dos 9 épicos consumindo Mapa Mestre TASK-024E; (5) Motores existentes com módulos + ADRs + débitos técnicos; (6) Entradas e saídas (`ProjectLayout` → `IrrigationProjectResult` → PDF + mapa); (7) Status por bloco de valor (regra conservadora TASK-024D); (8) Evidências (53 relatórios, 15 ADRs, screenshots, fixtures, 826 testes); (9) 13 riscos técnicos priorizados; (10) Inventário de 14 premissas + 6 pesos + 22+ limites de Classe A/B/C pendentes RT; (11) 5 condições canônicas para destravar E08 — Motor Comercial; (12) Roadmap separado em 5 categorias (próxima task / Classe A / Classe E validação / pendências RT/campo / tooling futuro). Achado-chave: 7 dos 9 épicos do MVP estão em "Validado visualmente no Projeto A — caso único"; Projeto A é fictício; primeira proposta real ao cliente seria simultaneamente a primeira validação visual documentada de múltiplos épicos (regra central TASK-024D alerta contra esse cenário). **Primeira task fora de validação interna a usar fluxo TOOL-003 integralmente** (`/handoff-claude-report TASK-001` → `/gpt-review TASK-001` → entry append-only em `ai/decision-log.md` → `/implementar TASK-001`). Mapa Mestre `tasks/TASK-024-mapa-mestre-tasks.md` não alterado (é fonte). Premissas `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md` inventariadas mas não alteradas. Nenhum arquivo em `src/**` alterado. Nenhum ADR novo criado. Predecessor `docs/relatorios/2026-05-19-diagnostico-software-atual.md` (commit `23609bc`, 400 testes) preservado fisicamente como registro histórico.
 
 ---
 
 ### TASK-002 — Motor de Governança A/B/C (ProjectClassificationEngine)
 
 **Status:** `pendente`
-**Bloqueada por:** TASK-001 + homologação de `docs/metodologia/09-classificacao-de-projetos.md` pelo RT
+**Bloqueada por:** homologação de `docs/metodologia/09-classificacao-de-projetos.md` pelo RT (TASK-001 deixa de ser bloqueio após commit/push)
 **Prioridade:** P2-importante
 **Área:** governança / domínio
 **Arquivo:** `tasks/TASK-002-classificacao-abc-projetos.md`

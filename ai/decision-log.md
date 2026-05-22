@@ -40,3 +40,17 @@ justificativa: |
 override: false
 ajustes_aplicados: ["BLK-MET-001 — alinhar tasks/backlog.md ao escopo permitido em current-task.md (Fase 5)", "BLK-MET-002 — separar Fases 1-3 / 4 / 5 nos artefatos de TOOL-002 (Fase 5)", "BLK-TEC-001 — substituir contagem hardcoded de vitest por critério paramétrico tsc 0 + vitest 100% real + run-all.mjs 20/20 (Fase 5)", "Limitação V1 documentada: tokens/custo zerados do JSON do modelo não são custo real — fatura OpenAI é a referência", "Sugestão futura: capturar usage real via response.usage quando disponível na Responses API"]
 hash_gpt_review: cd4e92f886f39bed9ba969371afd3ba8301fd32194ee14e465aade25c347f55c
+
+---
+
+timestamp: 2026-05-22T20:17:39-03:00
+task_id: TASK-001
+decision_point: pos_planejamento
+veredito_gpt: aprovado
+decisao_humana: aprovado
+responsavel: Kristyan Mota
+justificativa: |
+  Aprovação do plano da TASK-001 (Diagnóstico formal do software atual) após revisão do GPT Reviewer via /gpt-review TASK-001. O GPT aprovou o plano sem blockers (0 blockers identificados), todas as 7 invariantes permanentes retornaram status ok com justificativa específica, e o validate-structure retornou OK (exit 0) com transição válida aguardando_revisao_gpt → aguardando_aprovacao_humana. O único WARN reportado foi não-bloqueante e estrutural — override_permitido declarado pelo GPT=true mas derivado pelo validador=null porque não há blockers a serem permitidos/negados (comportamento esperado em plano aprovado limpo; mesmo WARN apareceu em TOOL-002). A TASK-001 é estritamente documental (Classe A): produz docs/relatorios/2026-05-22-TASK-001.md, atualiza tasks/TASK-001-diagnostico-software-atual.md e tasks/backlog.md, e usa ai/current-task.md como ciclo de governança. A implementação permanece proibida em src/** (motor hidráulico, layout, catálogo, BOM, PDF, UI/mapa intocados). As ~14 premissas RT/campo de docs/metodologia/12-primissas-provisorias-e-revisao-rt.md serão apenas INVENTARIADAS no relatório, sem alteração de valores nem de status. Nenhum ADR novo será criado. O Mapa Mestre (tasks/TASK-024-mapa-mestre-tasks.md) é fonte do diagnóstico, não destino — não será modificado. Predecessor docs/relatorios/2026-05-19-diagnostico-software-atual.md (commit 23609bc, 400 testes, desatualizado em 7 dias) preservado fisicamente como registro histórico. A observação editorial fraca do GPT (citar evidência inline ao marcar critérios como concluídos) já está prevista no passo 6 da sequência operacional do /implementar do plano aprovado. Limitação V1 herdada da TOOL-002 mantida: tokens_prompt=0, tokens_completion=0, custo_estimado_usd=0 vieram zerados do JSON do modelo e não constituem custo real — referência de cobrança é o dashboard/fatura OpenAI; TOOL-004 futura captura usage real.
+override: false
+ajustes_aplicados: ["nenhum — plano aprovado limpo sem ajustes adicionais do GPT", "observação editorial fraca do GPT (citar evidência inline em critérios de aceite) já contemplada no passo 6 da sequência operacional do /implementar"]
+hash_gpt_review: 3dc28c985f228b5b62e5bdea8418ac7e392957b208985608198bb3b911cef789
