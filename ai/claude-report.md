@@ -1,136 +1,116 @@
-# claude-report — TOOL-001
+# claude-report — TOOL-002
 
-> Gerado a partir do plano aprovado com ajustes em `tasks/TOOL-001-handoff-claude-gpt-reviewer.md`.
-> Este arquivo serve como entrada para o GPT Reviewer no fluxo da TOOL-001.
+> Gerado por `/handoff-claude-report TOOL-002` em 2026-05-22.
+> Plano detalhado aprovado pelo humano antes da serialização.
 
 ---
 
 ## Entendimento
 
-Construir uma camada local de handoff Claude Code ↔ GPT Reviewer que insere uma etapa formal de revisão por LLM externo entre `/planejar` e a aprovação humana, materializada em 5 arquivos versionados em `ai/` e scripts em `scripts/ai/`. A automação **nunca executa decisão nem muda status como efeito colateral**: serializa estado, chama o GPT via Responses API com structured output, salva resposta (markdown + bloco JSON canônico) e valida estrutura — humano aprova manualmente.
+Homologar o pipeline real do handoff TOOL-001 executando uma chamada autêntica à Responses API da OpenAI usando a TOOL-002 como task piloto, validando end-to-end: serialização do plano → chamada real → revisão estruturada → validação automática → decisão humana → registro de custo. Sem aprovação automática. Sem alterar produto. Escopo de conteúdo = γ (mínimo — sem RB-09, sem doc metodológico novo).
 
 ## Arquivos criados
 
-- `ai/README.md` — explicação do fluxo + 7 invariantes literais + regra terminal de invariante.
-- `ai/project-state.md` — snapshot resumido do projeto.
-- `ai/current-task.md` — frontmatter YAML com `task_id`, `status`, etc.
-- `ai/claude-report.md` — este arquivo.
-- `ai/gpt-review.md` — preenchido pelo `run-gpt-review.mjs`.
-- `ai/decision-log.md` — append-only inviolável.
-- `scripts/ai/lib/invariants.mjs` — 7 invariantes permanentes (fonte única).
-- `scripts/ai/lib/parsers.mjs` — parsers puros (frontmatter, decision-log, JSON estruturado, sha256, .env.local).
-- `scripts/ai/build-review-prompt.mjs` — prompt + JSON schema para Responses API.
-- `scripts/ai/run-gpt-review.mjs` — CLI que chama Responses API (`text.format: json_schema strict`).
-- `scripts/ai/validate-structure.mjs` — validador read-only com `override_permitido` derivado.
-- `scripts/ai/__tests__/fixtures/builders.mjs` — builders de fixture isolada.
-- `scripts/ai/__tests__/parsers.test.mjs` — testes T1-T9 + sha256.
-- `scripts/ai/__tests__/validate-structure.test.mjs` — testes T10-T17.
-- `scripts/ai/__tests__/build-review-prompt.test.mjs` — testes T18-T19.
-- `scripts/ai/__tests__/run-all.mjs` — runner com node:test.
-- `templates/ai-handoff-claude-report.md` — esqueleto vazio.
-- `templates/ai-handoff-gpt-review.md` — esqueleto com bloco JSON exemplo.
-- `templates/ai-handoff-decision-log-entry.md` — bloco YAML modelo.
-- `templates/ai-handoff-prompt-system.md` — texto literal do prompt.
-- `.claude/commands/handoff-claude-report.md` — define `/handoff-claude-report TOOL-XXX`.
-- `.claude/commands/handoff-status.md` — define `/handoff-status TOOL-XXX <status>`.
-- `tasks/TOOL-001-handoff-claude-gpt-reviewer.md` — arquivo formal da task.
-- `docs/relatorios/2026-05-22-TOOL-001.md` — relatório de fechamento.
+- `ai/claude-report.md` — este arquivo (sobrescreve o soft-dogfood TOOL-001).
+- `ai/gpt-review.md` — será regenerado por `run-gpt-review.mjs` na Fase 2 com bloco JSON canônico válido para TOOL-002.
+- `docs/relatorios/2026-05-22-TOOL-002.md` — relatório de fechamento (criado na Fase 5, fora do escopo desta autorização atual que vai até Fase 3).
 
 ## Arquivos modificados
 
-- `.gitignore` — adicionar `ai/*.tmp` e `ai/.cache/`. **Não ignorar** os 5 arquivos canônicos.
-- `.env.example` — adicionar `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL`.
-- `tasks/backlog.md` — adicionar seção `## Tarefas de tooling (TOOL)` com TOOL-001.
-- `CLAUDE.md` — adicionar seção curta apontando para `ai/README.md`.
+- `ai/current-task.md` — transições de status ao longo do ciclo: `em_planejamento → aguardando_revisao_gpt → aguardando_aprovacao_humana → aprovado_para_implementacao → em_implementacao → aguardando_fechamento`. Cada mudança via comando ou edição manual + validador.
+- `ai/decision-log.md` — append-only; entries de decisão humana (Fase 4, fora do escopo atual).
+- `tasks/TOOL-002-homologar-fluxo-real-gpt-reviewer.md` — atualização de status final, critérios marcados, vínculo ao relatório (Fase 5).
+- `tasks/backlog.md` — entrada formal TOOL-002 concluída (Fase 5).
 
 ## Arquivos não alterados
 
-- `src/**` (motor de layout, hidráulica, BOM, catálogo, SKU, PDF, UI, comercial).
-- `AGENTS.md`, `HANDOFF.md`, `ARQUITETURA_ATUAL.md`.
-- `tsconfig.json`, `vitest.config.*`.
-- `docs/metodologia/01-regras-bloqueantes.md` (ajuste 7).
-- Working tree de TASK-027→046 (não tocado).
-- `package.json` (nenhuma dep nova).
+- `src/**` — todo o produto (motor de layout, hidráulica, BOM, catálogo, PDF, UI/mapa, server actions).
+- `docs/metodologia/01-regras-bloqueantes.md` — promoção a RB-09 fica para task separada (regra TOOL-001 V1).
+- `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md` — premissas técnicas preservadas.
+- `docs/decisoes/ADR-*.md` — sem ADR novo.
+- `ai/README.md` — escopo γ permite alteração mínima opcional, avaliação: não há necessidade. README já documenta o fluxo corretamente.
+- `ai/project-state.md` — pode ser atualizado opcionalmente pós-fechamento; não obrigatório.
+- `scripts/ai/*.mjs` e `scripts/ai/lib/*.mjs` — todos os scripts TOOL-001 preservados.
+- `scripts/ai/__tests__/**` — testes TOOL-001 preservados.
+- `templates/ai-handoff-*.md` — templates preservados.
+- `.env.local` — apenas lido; nunca modificado nem impresso.
+- `.env.example` — preservado.
+- `package.json`, `prisma/**` — sem mudanças.
+- `AGENTS.md`, `HANDOFF.md`, `ARQUITETURA_ATUAL.md`, `CLAUDE.md` — sem mudanças.
+- TASK-047, TASK-048, TASK-049, TASK-050 — já em `origin/main`, intocáveis.
 
 ## Testes obrigatórios
 
-20 testes em `scripts/ai/__tests__/` (pista separada do Vitest):
+Esta tarefa **não exige novos testes automatizados** (Classe A — governança/tooling; pista de testes do TOOL-001 já existente cobre os scripts). Validações operacionais em runtime:
 
-1. T1: parseFrontmatter válido.
-2. T2: parseFrontmatter campo faltando rejeita com nome.
-3. T3: parseDecisionLog vazio → array vazio.
-4. T4: parseDecisionLog 3 entries monotônicas.
-5. T5: parseDecisionLog timestamps fora de ordem → erro.
-6. T6: extractStructuredBlock JSON canônico válido.
-7. T7: extractStructuredBlock ausente → erro.
-8. T8: extractStructuredBlock JSON malformado → erro.
-9. T9: extractStructuredBlock campo obrigatório ausente → erro nominal.
-10. Textra-A: sha256 determinístico.
-11. T10: validate-structure 5 arquivos válidos → ok.
-12. T11: validate-structure claude-report sem seção obrigatória → erro nominal.
-13. T12: validate-structure override sem risco_assumido → erro.
-14. T13: validate-structure override com justificativa < 80 chars → erro.
-15. T14: validate-structure invariante violada + override true → bloqueio terminal.
-16. T15: validate-structure decision-log encolheu vs HEAD → erro.
-17. T16: validate-structure hash_gpt_review divergente → erro.
-18. T17: validate-structure read-only sobre status (não altera arquivos).
-19. T18: buildReviewPrompt 7 invariantes literalmente presentes.
-20. T19: buildReviewPrompt schema marca campos canônicos como required.
+1. **V1** — `validate-structure --task TOOL-002` pós-Fase 1: pode falhar legitimamente por `gpt-review.md` ainda referenciar TOOL-001 (esperado).
+2. **V2** — Pre-flight de secret no início da Fase 2 passa (`.env.local` não em `git status`).
+3. **V3** — HTTP 200 da Responses API.
+4. **V4** — JSON canônico extrai sem erro.
+5. **V5** — `validate-structure --task TOOL-002` pós-Fase 2 retorna OK.
+6. **V6** — `custo_estimado_usd ≤ 0.50` (estimativa operacional V1; referência final = fatura OpenAI).
+7. **V7** — Decision-log entry passa todas as validações (Fase 4 — fora do escopo atual).
+8. **V8** — `validate-structure --task TOOL-002` pós-Fase 4 retorna OK.
+9. **V9** — Hash sha256 do gpt-review bate no decision-log (Fase 4).
+10. **V10** — `npx tsc --noEmit` → 0 erros (preservado).
+11. **V11** — `npx vitest run` → 826/826 (preservado).
 
 ## Critérios de aceite
 
-- [x] `ai/README.md` + 5 arquivos canônicos criados.
-- [x] 5 scripts em `scripts/ai/` (2 libs + 3 CLI) em ESM puro; nenhuma dep npm nova.
-- [x] 4 templates `templates/ai-handoff-*.md`.
-- [x] 2 comandos novos: `/handoff-claude-report` e `/handoff-status`.
-- [x] `.env.example` atualizado com `OPENAI_API_KEY`, `OPENAI_MODEL` (sem default no código).
-- [x] `.gitignore` ajustado.
-- [x] `tasks/backlog.md` tem seção `## Tarefas de tooling (TOOL)` com TOOL-001.
-- [x] `CLAUDE.md` tem seção curta apontando para `ai/README.md`.
-- [x] `docs/metodologia/01-regras-bloqueantes.md` **não foi tocado**.
-- [x] 20 testes de tooling passando.
-- [x] `npx tsc --noEmit` → 0 erros.
-- [x] `npx vitest run` → 817/817.
-- [x] Bloco JSON do `gpt-review.md` valida contra schema.
-- [x] `validate-structure.mjs` é read-only sobre status.
-- [x] `/handoff-claude-report` exige `task_id`.
+- [ ] `/handoff-claude-report TOOL-002` executado; `ai/claude-report.md` gerado no formato canônico.
+- [ ] `current-task.md.status` transitou `em_planejamento → aguardando_revisao_gpt` (transição válida).
+- [ ] `run-gpt-review.mjs --task TOOL-002` executado com **HTTP 200** na chamada real.
+- [ ] `ai/gpt-review.md` regenerado com bloco JSON canônico válido.
+- [ ] `task_id === "TOOL-002"` no JSON.
+- [ ] `custo_estimado_usd` registrado e **≤ US$ 0,50** (estimativa V1).
+- [ ] `validate-structure --task TOOL-002` retorna OK após cada fase relevante.
+- [ ] Decisão humana registrada em `ai/decision-log.md` (append-only; Fase 4).
+- [ ] Hash sha256 de `gpt-review.md` correto no entry do decision-log.
+- [ ] `current-task.md.status` final = `aguardando_fechamento`.
+- [ ] `docs/relatorios/2026-05-22-TOOL-002.md` criado com sumário + custo + lições.
+- [ ] `tasks/backlog.md` atualizado.
+- [ ] `npx tsc --noEmit` → 0 erros (preservado).
+- [ ] `npx vitest run` → 826/826 (preservado).
+- [ ] **Nenhum arquivo** em `src/**`, catálogo, BOM, PDF, layout, UI, mapa, `docs/decisoes/`, `docs/metodologia/01-regras-bloqueantes.md`, `package.json`, `prisma/**` alterado.
+- [ ] **Nenhuma aprovação automática** — toda transição é decisão humana explícita.
+- [ ] **Nenhum push** ao remoto sem aprovação humana adicional.
 
 ## Riscos
 
-| Risco | Mitigação |
-|-------|-----------|
-| Vazamento de `OPENAI_API_KEY` | `.gitignore` + smoke check pré-run. |
-| GPT alucinar invariante violada | Trava terminal só dispara com `status: violada` literal; humano pode reformular. |
-| GPT não detectar violação real | Revisão humana não substituída; testes Vitest + gates PDF continuam ativos. |
-| GPT marcar `override_permitido: true` quando invariante violada | Validador deriva o valor; valor derivado vence. |
-| Bloco JSON mal formado | Responses API com `strict: true` + revalidação local. |
-| Custo descontrolado | `OPENAI_MODEL` configurável; script imprime tokens + custo; cap em Fase 2. |
-| Sobrescrita de `decision-log.md` | Validador rejeita PR onde log encolheu vs. HEAD. |
-| Hash de `gpt-review.md` modificado após decisão | `hash_gpt_review` na entry; mismatch → exit 1. |
-| `/handoff-claude-report` pegar plano errado | task_id obrigatório + confirmação interativa. |
-| `validate-structure` alterar status sem perceber | Code review + teste T17 cobre. |
-| API OpenAI fora do ar | Falha graciosa; humano pode registrar `veredito_gpt: indisponivel`. |
+| Risco | Probabilidade | Impacto | Mitigação |
+|-------|---------------|---------|-----------|
+| `custo_estimado_usd > 0,50` (acima do cap acordado verbal) | Média | Médio | Registrar como FALHA-A no relatório; reportar para decidir se aceita ou abre task de cap automático. |
+| GPT marca invariante como `violada` indevidamente (falso positivo) | Baixa | Alto — task bloqueada terminalmente | Override NÃO libera (regra terminal). Saída: reformular plano e voltar a `/planejar`. |
+| HTTP 401/403/429 da Responses API | Média | Alto | Script aborta com mensagem clara. Verificar `OPENAI_API_KEY`, modelo válido, rate limit. Sem retry automática. |
+| JSON estruturado malformado retornado pela API | Baixa | Alto | Script aborta. `text.format: strict` minimiza isso (validação server-side OpenAI). |
+| Pre-flight de secret detecta `.env.local` em `git status` | Baixa | Crítico | Script aborta. Verificar `.gitignore` (`.env*.local` já presente). |
+| Network timeout | Baixa | Médio | Abort com erro de rede. Re-executar quando rede estável. |
+| `tokens_prompt + tokens_completion` muito alto (custo inflado) | Baixa | Médio | Monitorar nos logs; limitar tamanho de inputs já está em níveis razoáveis. |
+| Modelo escolhido não suporta `text.format: json_schema strict` | Baixa | Alto | gpt-5, gpt-4.1, gpt-4o suportam. Se falhar: abort com mensagem clara. |
+| `custo_estimado_usd` divergir da fatura OpenAI | Média | Baixo | Limitação V1 aceita; comparar com dashboard OpenAI pós-execução. |
+| Validator rejeitar gpt-review por hash divergente após edição manual | Baixa | Baixo | Não editar `gpt-review.md` manualmente — apenas via script. |
+| Decision-log encolhe acidentalmente | Muito baixa | Crítico | Append-only; nunca deletar entries; backup do HEAD. |
+| Transição inválida de `current-task.md.status` | Baixa | Médio | Grafo verificado em `validate-structure.mjs`; rodar validator após cada transição. |
 
 ## O que NÃO será feito
 
-- Não implementar hooks automáticos.
-- Não automatizar aprovação humana.
-- Não automatizar `/implementar`, `/fechar-task`, merge.
-- Não apagar entradas de `decision-log.md` (nem em testes — usam fixtures isoladas).
-- Não criar secrets no repositório.
-- Não alterar nenhum arquivo em `src/`.
-- Não alterar `docs/metodologia/01-regras-bloqueantes.md` (ajuste 7).
-- Não adicionar dependências npm.
-- Não usar `/v1/chat/completions` como padrão.
-- Não fixar `OPENAI_MODEL` default no código.
-- Não validar conteúdo semântico de `gpt-review.md` — só estrutura JSON.
+- Não alterar `src/**`, catálogo, BOM, PDF, layout, UI/mapa, motor hidráulico.
+- Não alterar `docs/metodologia/01-regras-bloqueantes.md`.
+- Não criar RB-09 — task documental separada.
+- Não criar ADR novo.
+- Não alterar premissas técnicas.
+- Não fazer `git add`, `git commit`, `git push` sem aprovação humana adicional.
+- Não chamar a Responses API mais de 1 vez (sem retry automática).
+- Não editar `ai/gpt-review.md` manualmente — sempre via script.
+- Não automatizar a decisão humana — sempre edição manual em `ai/decision-log.md`.
+- Não imprimir `OPENAI_API_KEY` ou valores de `.env.local`.
 
 ## Invariantes verificadas
 
-- **INV-CATALOGO-SEM-HOMOLOGACAO** — OK (catálogo intocado).
-- **INV-NAO-INVENTAR-SKU** — OK (nenhum SKU manipulado).
-- **INV-DN100-LATERAL-5022** — OK (seletor hidráulico intocado).
-- **INV-BLOCKERS-TECNICOS** — OK (nenhum blocker técnico relaxado; ao contrário, regra terminal de invariante REFORÇA blockers).
-- **INV-MASCARAR-PENDENCIA** — OK (pendências aparecem em `project-state.md` e `decision-log.md` é append-only).
-- **INV-DOMINIO-FORA-UI** — OK (TOOL-001 não toca `src/components/` nem `src/app/`).
-- **INV-LAYOUT-INSTAVEL-COMERCIAL** — OK (não avança nenhum motor; só adiciona camada de revisão).
+- **INV-CATALOGO-SEM-HOMOLOGACAO** — ok (TOOL-002 não toca catálogo).
+- **INV-NAO-INVENTAR-SKU** — ok (TOOL-002 não toca SKUs).
+- **INV-DN100-LATERAL-5022** — nao_aplicavel (TOOL-002 não toca seleção hidráulica).
+- **INV-BLOCKERS-TECNICOS** — ok (TOOL-002 não relaxa nenhum blocker).
+- **INV-MASCARAR-PENDENCIA** — ok (TOOL-002 endereça explicitamente a pendência R1 da TOOL-001 com transparência).
+- **INV-DOMINIO-FORA-UI** — nao_aplicavel (TOOL-002 não toca UI/componentes).
+- **INV-LAYOUT-INSTAVEL-COMERCIAL** — nao_aplicavel (TOOL-002 não toca layout, hidráulica, BOM ou comercial).

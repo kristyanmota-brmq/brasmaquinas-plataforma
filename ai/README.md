@@ -127,7 +127,9 @@ A V1 usa a **Responses API** (`POST /v1/responses`) com `text.format: { type: "j
 
 O script imprime ao final: `tokens_prompt`, `tokens_completion`, `custo_estimado_usd`.
 
-**Custo médio observado** será preenchido aqui após os primeiros usos reais (Fase 2 pode adicionar cap automático em `OPENAI_COST_CAP_USD`).
+**Limitação conhecida da V1 (descoberta em TOOL-002):** os campos `tokens_prompt`, `tokens_completion` e `custo_estimado_usd` no JSON canônico vêm **declarados pelo próprio modelo**, não capturados do campo `usage` da Responses API. Modelos podem retornar esses valores zerados ou imprecisos (em TOOL-002 vieram todos zerados). **Esses números não são custo real.** A **referência final de cobrança é o dashboard/fatura OpenAI**.
+
+**Próxima evolução (sugerida):** TOOL-003 captura `response.usage.input_tokens` / `output_tokens` e calcula custo via tabela de preços por modelo. Cap automático em `OPENAI_COST_CAP_USD` permanece como Fase 2 do roadmap.
 
 ---
 

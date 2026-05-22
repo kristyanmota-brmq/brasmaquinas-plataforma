@@ -1134,6 +1134,20 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 > Trilha paralela para tarefas de governança e infraestrutura de desenvolvimento — não tocam código de produto. Usam o mesmo fluxo `/iniciar-task → /planejar → /implementar → /fechar-task`.
 
+### TOOL-002 — Homologar fluxo real Claude Code ↔ GPT Reviewer
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Classe:** A — Governança / tooling / metodologia
+**Área:** tooling / governança / handoff
+**Arquivo:** `tasks/TOOL-002-homologar-fluxo-real-gpt-reviewer.md`
+**Concluída em:** 2026-05-22 · baseline preservado (`src/` não alterado) · produto intocado
+**Veredito GPT:** `aprovado_com_ajustes` · **Decisão humana:** `aprovado_com_ajustes` (sem override)
+
+> Homologação **end-to-end** do pipeline real Claude Code ↔ GPT Reviewer. **Primeira chamada real à Responses API** (modelo `gpt-5.5`) bem-sucedida (HTTP 200 após ajuste de billing na 2ª tentativa); `ai/gpt-review.md` regenerado com JSON canônico válido; `validate-structure --task TOOL-002` retornou **OK** (com 1 WARN não-bloqueante sobre `override_permitido` declarado=true vs derivado=null — não-bloqueante porque 0/7 invariantes foram violadas). Decisão humana registrada em `ai/decision-log.md` (append-only) com hash sha256 correto. 3 blockers metodológicos/técnicos apontados pelo GPT (BLK-MET-001 escopo de `tasks/backlog.md`, BLK-MET-002 separação de fases, BLK-TEC-001 contagem hardcoded de testes) **todos aplicados na Fase 5**. Pendência R1 da TOOL-001 ("primeira chamada real ainda não executada") RESOLVIDA. Limitação V1 descoberta e documentada: `tokens_prompt`, `tokens_completion` e `custo_estimado_usd` vieram zerados no JSON canônico (declarados pelo próprio modelo, não capturados de `response.usage` da API); referência final de custo é o dashboard/fatura OpenAI. Sugestão futura: TOOL-003 captura `response.usage` real. Nenhum arquivo de produto alterado (`src/`, catálogo, BOM, PDF, layout, UI/mapa intocados). Nenhum secret exposto. Nenhuma aprovação automática. Relatório: `docs/relatorios/2026-05-22-TOOL-002.md`.
+
+---
+
 ### TOOL-001 — Handoff automatizado Claude Code ↔ GPT Reviewer
 
 **Status:** `concluída`
