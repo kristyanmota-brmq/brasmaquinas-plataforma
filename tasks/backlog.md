@@ -1078,6 +1078,44 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 ---
 
+## Tarefas de tooling (TOOL)
+
+> Trilha paralela para tarefas de governança e infraestrutura de desenvolvimento — não tocam código de produto. Usam o mesmo fluxo `/iniciar-task → /planejar → /implementar → /fechar-task`.
+
+### TOOL-001 — Handoff automatizado Claude Code ↔ GPT Reviewer
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Classe:** A — Governança / infraestrutura
+**Área:** tooling / governança
+**Arquivo:** `tasks/TOOL-001-handoff-claude-gpt-reviewer.md`
+**Concluída em:** 2026-05-22 · 817/817 testes (produto) · 20/20 testes (tooling, pista separada) · 0 erros tsc · catálogo intocado · nenhum arquivo de produto alterado
+**Relatório:** `docs/relatorios/2026-05-22-TOOL-001.md`
+
+> Camada local de handoff Claude Code ↔ GPT Reviewer que insere etapa de revisão por LLM externo entre `/planejar` e a aprovação humana. 5 arquivos canônicos em `ai/` (README + project-state + current-task + claude-report + gpt-review + decision-log append-only); 5 scripts ESM em `scripts/ai/` (libs `invariants.mjs`, `parsers.mjs`; CLI `build-review-prompt.mjs`, `run-gpt-review.mjs`, `validate-structure.mjs`); 4 templates em `templates/ai-handoff-*.md`; 2 comandos slash novos (`/handoff-claude-report`, `/handoff-status`).
+>
+> Decisões arquiteturais:
+> - **Responses API** com `text.format: { type: "json_schema", strict: true }` (não `/v1/chat/completions`); `OPENAI_MODEL` configurável via `.env.local`, sem default no código.
+> - **Bloco JSON canônico** em `gpt-review.md` é fonte de verdade do validador (não headings nem keywords); markdown narrativo é só para humano.
+> - **`override_permitido` derivado** pelo validador independentemente do que o GPT escrever — se qualquer invariante está `violada`, valor derivado = `false` e vence o JSON.
+> - **`decision-log.md` append-only** verificado contra HEAD do git; hash sha256 de `gpt-review.md` em cada entry detecta tamper.
+> - **`validate-structure.mjs` read-only sobre status** — nunca altera `current-task.md.status`; mudança de estado só por comando explícito ou edição manual.
+> - **Override humano NÃO libera** violação de invariante permanente (regra terminal documentada em `ai/README.md`).
+> - **`docs/metodologia/01-regras-bloqueantes.md` NÃO foi tocado** (ajuste 7 do plano); promoção da regra a RB-09 fica para task documental separada.
+>
+> 20 testes em pista separada (`node scripts/ai/__tests__/run-all.mjs`) — não afetam contador Vitest (817/817 preservado). Fixtures isoladas via `mkdtemp` em `__tests__/fixtures/builders.mjs`; nenhum teste lê ou escreve em `ai/*.md` reais.
+>
+> Soft-dogfood executado: `ai/claude-report.md` e `ai/gpt-review.md` (este último marcado `modelo_gpt: soft-dogfood-claude-opus-4-7` para transparência) materializados; entry **permanente** acrescentada a `ai/decision-log.md` registrando o ciclo. Primeira execução real da Responses API fica para TOOL-002.
+>
+> Nenhuma dependência npm nova (fetch nativo Node 18+). `.gitignore` atualizado (`ai/*.tmp`, `ai/.cache/`, `.playwright-mcp/`, `playwright-trace/`); 5 arquivos canônicos permanecem commitados. `.env.example` documenta `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL`. `CLAUDE.md` ganhou seção curta apontando para `ai/README.md`.
+>
+> **Pendências:**
+> - TOOL-002 (sugerida) — primeira task não-autorreferente a passar pelo fluxo, executando chamada real da Responses API.
+> - TASK documental sugerida — promover regra "violação de invariante permanente é terminal" a `RB-09` em `01-regras-bloqueantes.md`.
+> - Custo médio por chamada GPT (em `ai/README.md`) será preenchido após primeiro uso real.
+
+---
+
 ## Próximas tarefas sugeridas (não formalizadas)
 
 - **[Classe A] Pressão real por derivação (ramal/lateral)**: propagar `cumPrincipalHfM` até ponto de entrada de cada ramal; recalcular `PressureClassCheck` para `violation_confirmed` ou `ok` real; ≥ 3 testes incluindo caso confirmado de violação real vs. conservativo.

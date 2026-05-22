@@ -62,3 +62,14 @@ templates/              — Templates de prompt, revisão, checklist de PR
 
 - Backlog: `tasks/backlog.md`
 - Template: `tasks/TASK_TEMPLATE.md`
+
+## Handoff Claude Code ↔ GPT Reviewer (TOOL-001)
+
+Etapa opcional de revisão por LLM externo entre `/planejar` e a aprovação humana:
+
+1. `/handoff-claude-report TASK-XXX` — serializa o plano para `ai/claude-report.md`.
+2. `node scripts/ai/run-gpt-review.mjs --task TASK-XXX` — chama a Responses API e gera `ai/gpt-review.md` (markdown + bloco JSON canônico).
+3. `node scripts/ai/validate-structure.mjs --task TASK-XXX` — validador read-only; deriva `override_permitido` independentemente do GPT.
+4. Humano edita `ai/decision-log.md` (append-only) e usa `/handoff-status TASK-XXX <novo-status>` para transição explícita.
+
+**Fluxo obrigatório existente não muda** — handoff é camada adicional, opcional, manual. Detalhes em [`ai/README.md`](ai/README.md). Plano original em [`tasks/TOOL-001-handoff-claude-gpt-reviewer.md`](tasks/TOOL-001-handoff-claude-gpt-reviewer.md).

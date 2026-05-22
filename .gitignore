@@ -51,3 +51,17 @@ memory/
 HANDOFF.md
 update_catalog_and_bom.py
 .claude/settings.local.json
+
+# TOOL-001 — handoff Claude Code ↔ GPT Reviewer
+# IMPORTANTE: os 5 arquivos canônicos em ai/ (README + project-state + current-task +
+# claude-report + gpt-review + decision-log) DEVEM ser commitados — não ignorar.
+# Aqui ignoramos apenas artefatos transitórios e cache.
+ai/*.tmp
+ai/.cache/
+
+# Playwright MCP runtime artifacts
+# .playwright-mcp/ é cache local de sessões; playwright-trace/ contém snapshots de
+# página YAML que podem capturar tokens públicos Mapbox renderizados no DOM.
+# Evidências formais (PNGs e screenshots) ficam em docs/relatorios/evidencias/<TASK>/.
+.playwright-mcp/
+playwright-trace/
