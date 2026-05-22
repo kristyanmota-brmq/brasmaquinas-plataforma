@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-22
-Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) concluída + Mapa Mestre com épicos como blocos de valor verificáveis (TASK-024E)**
+Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + TASK-048 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) + Mapa Mestre com épicos como blocos de valor (TASK-024E) + Validação browser parcial TASK-021/014 (TASK-048; Cenários 1 e 6 PASS, 2-5 NÃO EXECUTADOS por limitação ambiental)**
 
 ---
 
@@ -1000,6 +1000,19 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 ---
 
+### TASK-048 — Validação browser TASK-021 / TASK-014
+
+**Status:** `concluída` (parcial — 2 cenários PASS, 4 NÃO EXECUTADOS por limitação ambiental)
+**Prioridade:** P2-importante
+**Classe:** E — Exploratória
+**Área:** ui / validação / governança
+**Arquivo:** `tasks/TASK-048-validacao-browser-task-021-014.md`
+**Concluída em:** 2026-05-22 · 826/826 testes preservados · 0 erros tsc preservado · `src/` não alterado · banco do Projeto A não alterado
+
+> Sessão Playwright MCP no Projeto A (`cmpfu7e4b0001ulshh0ni8jhd`) cobrindo 6 cenários de E06. **Cenário 1 (drawer mobile)** e **Cenário 6 (coluna fragmentada — 17 laterais divididas confirmadas via DOM regex + screenshot)** classificados como **PASS**. **Cenários 2-5 (pdfError + labels 2/3/4 setores) classificados como NÃO EXECUTADOS** por 3 limitações ambientais combinadas: (L1) Projeto A está em 0 blockers pós-TASK-046 — proibido alterá-lo; (L2) apenas 1 projeto existe no banco — proibido alterar `jornadaHoras` do Projeto A para forçar setorização variável; (L3) criar projeto fictício via `/projetos/novo` esbarra no canvas Mapbox WebGL, que não aceita cliques precisos via Playwright para desenhar polígono e captação. **E06 NÃO promovido** — permanece `Testado em código` no Mapa Mestre conforme regra conservadora do briefing. 4 achados: H1 (menor — toggle do drawer sem `aria-expanded`); H2 (processo — ambiente requer fixtures pré-criadas); H3 (infraestrutura — Mapbox WebGL bloqueia automação de desenho); H4 (confirmação positiva do Cenário 6). 3 follow-ups sugeridos: (1) seed de fixtures via Prisma para desbloquear Cenários 2-5; (2) re-execução de TASK-048 cenários 2-5 após fixtures; (3) adicionar `aria-expanded` ao toggle (Classe D, ≤ 5 linhas). 6 PNGs em `docs/relatorios/evidencias/2026-05-22-TASK-048/`. Relatório: `docs/relatorios/2026-05-22-TASK-048.md`. Nenhuma alteração em `src/`, catálogo, PDF, mapa, ADRs, premissas ou banco do Projeto A.
+
+---
+
 ### TASK-024E — Padronizar épicos como blocos de valor verificáveis
 
 **Status:** `concluída`
@@ -1118,6 +1131,7 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 ## Próximas tarefas sugeridas (não formalizadas)
 
+- **[Classe D] `aria-expanded` no toggle do drawer mobile**: achado H1 da TASK-048 (acessibilidade menor); ≤ 5 linhas em `src/components/map/ProjectMap.tsx` + 1 teste E2E ou snapshot.
 - **[Classe A] Pressão real por derivação (ramal/lateral)**: propagar `cumPrincipalHfM` até ponto de entrada de cada ramal; recalcular `PressureClassCheck` para `violation_confirmed` ou `ok` real; ≥ 3 testes incluindo caso confirmado de violação real vs. conservativo.
 - **[Classe E → D] Revisão RT — `TOLERANCIA_ASPERSOR_EIXO_LATERAL` > 500 m**: consultar RT Brasmáquinas; se aprovado, reclassifica para D e ajusta constante de 0,10 → 0,20 m com 1 teste de regressão > 500 m.
 - **[Classe B] Calibração RT de campo — OPTIMIZER_PARAMS**: validar pesos provisionais (PREMISSA_PROVISORIA_MERCADO) e pesos aguardando campo (PENDENTE_CALIBRACAO_RT_CAMPO) com dados de projetos homologados; remover marcadores. Depende de TASK-010A–010Z ✅
