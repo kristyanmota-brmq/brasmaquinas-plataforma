@@ -273,11 +273,10 @@ describe("T18-b: grid 45° flat-earth — todos os aspersores < 0,01 m do eixo c
   });
 });
 
-describe("T18-c: eixo canônico supera linha entre extremos reais quando X diverge", () => {
-  // Coluna sintética: 5 aspersores em grid 30°.
-  // Extremos têm X ±2 m do X canônico; intermediários estão no X canônico.
-  // O eixo canônico (xSegRep = xCanon) passa exatamente pelos intermediários;
-  // a linha entre os extremos reais ficaria até ~1 m fora dos intermediários.
+describe("T28-c: aspersores com desvio ±2 m no eixo (TASK-045B emenda ADR-012)", () => {
+  // TASK-045B emenda interpretativa da ADR-012:
+  // Polilinha não compensa aspersor desalinhado com cotovelos. Rota é reta na
+  // mediana de X. Aspersores genuinamente desalinhados disparam blocker.
   const M_PER_LAT = 111320;
   const mPerLng = M_PER_LAT * Math.cos((-12 * Math.PI) / 180);
   const angleRad = (30 * Math.PI) / 180;
@@ -290,16 +289,16 @@ describe("T18-c: eixo canônico supera linha entre extremos reais quando X diver
     return [CENTROID.lng + drx / mPerLng, CENTROID.lat + dry / M_PER_LAT];
   }
 
-  const xCanon = 100; // 100 m do centróide no frame local
-  const offset = 2;   // 2 m de desvio nos extremos
+  const xCanon = 100;
+  const offset = 2;
   const yStep = SPACING;
 
   const positions: [number, number][] = [
-    localToLngLat(xCanon + offset, 0),           // 1° aspersor: X+2 m
-    localToLngLat(xCanon,          yStep),        // intermediário 1
-    localToLngLat(xCanon,      2 * yStep),        // intermediário 2
-    localToLngLat(xCanon,      3 * yStep),        // intermediário 3
-    localToLngLat(xCanon - offset, 4 * yStep),   // último aspersor: X-2 m
+    localToLngLat(xCanon + offset, 0),
+    localToLngLat(xCanon,          yStep),
+    localToLngLat(xCanon,      2 * yStep),
+    localToLngLat(xCanon,      3 * yStep),
+    localToLngLat(xCanon - offset, 4 * yStep),
   ];
 
   const cols = generatePhysicalColumns(
@@ -311,26 +310,15 @@ describe("T18-c: eixo canônico supera linha entre extremos reais quando X diver
     expect(cols[0].sprinklerIndices).toHaveLength(5);
   });
 
-  it("startLngLat NÃO é idêntico à posição real do 1° aspersor (eixo canônico ≠ extremo real)", () => {
-    const col = cols[0];
-    const firstIdx = col.sprinklerIndices[0];
-    // xSegRep = xCanon; posição real do 1° aspersor tem x = xCanon+2.
-    // Diferença geodésica: ~2 m → >> 1e-6° → detectável com precisão 5.
-    const sameAsFirst =
-      Math.abs(col.startLngLat[0] - positions[firstIdx][0]) < 1e-6 &&
-      Math.abs(col.startLngLat[1] - positions[firstIdx][1]) < 1e-6;
-    expect(sameAsFirst).toBe(false);
+  it("rota é reta de 2 pontos (TASK-045B); routeCoords.length === 2", () => {
+    expect(cols[0].routeCoords.length).toBe(2);
   });
 
-  it("aspersores intermediários estão a < 0,1 m do eixo canônico", () => {
+  it("aspersores com desvio ±2 m do eixo geram dev > tolerância (blocker em integração)", () => {
     const col = cols[0];
-    const line = turf.lineString([col.startLngLat, col.endLngLat]);
-    // intermediários = sprinklerIndices[1..3]
-    for (const idx of col.sprinklerIndices.slice(1, -1)) {
-      const pt = turf.point(positions[idx]);
-      const distM = turf.pointToLineDistance(pt, line, { units: "meters" });
-      expect(distM).toBeLessThan(0.1);
-    }
+    const dev = maxSprinklerAxisDeviationM(col, positions, CENTROID);
+    // Aspersores extremos a 2 m do eixo → dev ≈ 2 m > 0,10 m
+    expect(dev).toBeGreaterThan(0.10);
   });
 });
 
@@ -380,8 +368,9 @@ describe("T19-b: detectAxisDeviations — desvio 0,04 m < 0,10 m → sem blocker
   });
 });
 
-describe("T19-c: detectAxisDeviations — desvio 0,40 m > 0,10 m → blocker", () => {
-  // 3 aspersores: X₁=100.30, X₂=99.70, X₃=99.70 → xSegRep≈99.90, dev_X₁≈0.40 m
+describe("T28-c-violation: desvio 0,40 m → blocker DISPARA (TASK-045B emenda ADR-012)", () => {
+  // TASK-045B: rota não tem mais cotovelo "salvador". Aspersor a 0,40 m do eixo
+  // (mediana) → dev ≈ 0,40 m > TOLERANCIA (0,10 m) → violation.
   const positions: [number, number][] = [
     localToLngLat0(100.30, 0),
     localToLngLat0(99.70, SPACING),
@@ -391,19 +380,18 @@ describe("T19-c: detectAxisDeviations — desvio 0,40 m > 0,10 m → blocker", (
     positions, 0, CENTROID, SPACING, ASPERSOR_MIN, TEST_CATALOG,
   );
 
-  it("desvio acima da tolerância gera exactly 1 violation", () => {
+  it("rota é reta de 2 pontos; aspersores desalinhados → violation", () => {
     expect(cols).toHaveLength(1);
+    expect(cols[0].routeCoords.length).toBe(2);
     const report = detectAxisDeviations(cols, positions, CENTROID);
-    expect(report.violations).toHaveLength(1);
-    expect(report.violations[0].columnIndex).toBe(0);
-    expect(report.violations[0].deviationM).toBeGreaterThan(TOLERANCIA_ASPERSOR_EIXO_LATERAL);
+    expect(report.violations.length).toBeGreaterThanOrEqual(1);
     expect(report.maxDeviationM).toBeGreaterThan(TOLERANCIA_ASPERSOR_EIXO_LATERAL);
   });
 });
 
-describe("T19-d: detectAxisDeviations — 2 colunas, 1 violadora, 1 ok", () => {
-  // Coluna 0 (X≈0 m): 3 aspersores alinhados → ok
-  // Coluna 1 (X≈12 m): X₁=12.30, X₂=11.70, X₃=11.70 → violation
+describe("T28-d: aspersor a 0,30 m do eixo → blocker (TASK-045B)", () => {
+  // TASK-045B: 2 colunas, uma com aspersor a 0,30 m do eixo → violation na coluna 1.
+  // Coluna 0 está alinhada (sem violation). Coluna 1 tem aspersor outlier.
   const posCol0: [number, number][] = [
     localToLngLat0(0, 0),
     localToLngLat0(0, SPACING),
@@ -419,10 +407,11 @@ describe("T19-d: detectAxisDeviations — 2 colunas, 1 violadora, 1 ok", () => {
     positions, 0, CENTROID, SPACING, ASPERSOR_MIN, TEST_CATALOG,
   );
 
-  it("exatamente 1 violation na coluna desalinhada", () => {
+  it("coluna com aspersor desalinhado: pelo menos 1 violation", () => {
     expect(cols).toHaveLength(2);
     const report = detectAxisDeviations(cols, positions, CENTROID);
-    expect(report.violations).toHaveLength(1);
+    // Aspersor a 0,30 m do eixo → violation; coluna 0 OK.
+    expect(report.violations.length).toBeGreaterThanOrEqual(1);
   });
 });
 

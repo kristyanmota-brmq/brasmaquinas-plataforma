@@ -1,23 +1,32 @@
 import {
   ASPERSOR_PADRAO,
   ADESIVO_PVC,
-  TUBO_SUBIDA_PVC_BR,
   TUBOS_PVC_LF,
   TUBOS_PVC_RIGIDO,
+  CURVAS_90,
+  CURVAS_90_RIGIDAS,
   TES_DERIVACAO_LATERAL,
   selectTubo,
   selectCurva,
   selectTe,
   calculatePipelineDiameterMm,
   selectRegistroSecao,
+  selectKitAspersor5022,
   type RegistroSecao,
+  type KitAspersor5022Item,
 } from "@/lib/catalog/aspersores";
+import {
+  countAdutoraBends,
+  countLateralBends90,
+  countSecondaryLBends,
+} from "@/lib/layout/physical-connections";
 import {
   generateLateraisLegacyForDebug,
   generatePhysicalColumns,
   TOLERANCIA_ASPERSOR_EIXO_LATERAL,
   type AxisDeviationReport,
   type Lateral,
+  type LateralCapacityReport,
   type PhysicalColumn,
 } from "@/lib/layout/laterais";
 import {
@@ -45,6 +54,28 @@ export interface BOMItem {
   precoUnitario: number;
   total: number;
   categoria: "ASPERSOR" | "TUBO" | "CONEXAO" | "ACESSORIO";
+}
+
+/**
+ * Conexão física necessária para a rede, mas sem SKU/custo homologado no catálogo.
+ * Não entra em `BOMResult.itens` nem em `totalGeral`.
+ * Gera blocker comercial "BOM incompleta" em generateProposalDiagnostics.
+ */
+export interface BOMPendingConnection {
+  tipo:
+    | "tee_90_aspersor_lateral"
+    | "curva_90_ramal_l"
+    | "curva_90_adutora"
+    | "curva_45_adutora"
+    | "curva_90_lateral";
+  descricao: string;
+  /** DN em mm; 0 quando indeterminado. */
+  dnMm: number;
+  quantidade: number;
+  motivoPendencia:
+    | "sku_nao_catalogado"
+    | "dn_indeterminado"
+    | "criterio_contagem_nao_definido";
 }
 
 export interface BOMResult {
@@ -89,6 +120,24 @@ export interface BOMResult {
     valvulasSemCatalogoCount: number;
     /** TASK-006B: itens de registro manual de seção incluídos na BOM (= valvulasResolvidasCount). */
     registrosManuaisSecaoCount: number;
+    /** TASK-022: conexões físicas necessárias sem SKU/custo homologado. */
+    conexoesFisicasPendentes: BOMPendingConnection[];
+    /** TASK-022: soma das quantidades de todas as conexões pendentes. */
+    conexoesFisicasSemSkuCount: number;
+    /** TASK-022: curvas 90° de ramais em L adicionadas à BOM (itens precificados). */
+    curvas90RamaisLCount: number;
+    /** TASK-022: curvas 90° da adutora adicionadas à BOM (itens precificados). */
+    curvas90AdutoraCount: number;
+    /** TASK-022: curvas 45° da adutora (sem SKU — entram em conexoesFisicasPendentes). */
+    curvas45AdutoraCount: number;
+    /** TASK-035: curvas 90° de laterais físicas com SKU LF homologado (item precificado). */
+    curvas90LateraisCount: number;
+    /** TASK-035: curvas 90° de laterais sem SKU LF homologado (DN50 hoje — pendência). */
+    curvas90LateraisSemSkuCount: number;
+    /** TASK-023: aspersores cujo kit foi resolvido (lateral DN50 ou DN75). */
+    kitAspersorResolvCount: number;
+    /** TASK-023: aspersores em lateral com DN não homologado para kit 5022 (gera blocker). */
+    kitAspersorDnNaoHomologadoCount: number;
   };
 }
 
@@ -121,6 +170,8 @@ export interface BOMInput {
   /** P4: ramais dimensionados individualmente. Quando presente, BOM agrupa por SKU. */
   sizedSecondaries?: SizedSecondaryPipe[];
   constructability: ConstructabilityReport;
+  /** TASK-022: necessário para calcular dobras na adutora. Opcional — sem centroid, adutora é ignorada. */
+  centroid?: { lat: number; lng: number };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -234,18 +285,8 @@ export function buildBOM(input: BOMInput): BOMResult {
     categoria: "ASPERSOR",
   });
 
-  // ── Tubo de subida (riser) ─────────────────────────────────────────────────
-  const barrasSubida = Math.ceil(sprinklers.count / TUBO_SUBIDA_PVC_BR.aspersoresPorBarra);
-  itens.push({
-    sku: TUBO_SUBIDA_PVC_BR.sku,
-    descricao: TUBO_SUBIDA_PVC_BR.descricao,
-    marca: TUBO_SUBIDA_PVC_BR.marca,
-    unidade: TUBO_SUBIDA_PVC_BR.unidade,
-    quantidade: barrasSubida,
-    precoUnitario: TUBO_SUBIDA_PVC_BR.precoVenda,
-    total: barrasSubida * TUBO_SUBIDA_PVC_BR.precoVenda,
-    categoria: "TUBO",
-  });
+  // Tubo de subida (riser) — substituído pelo kit por DN da lateral (TASK-023).
+  // A emissão dos itens de kit ocorre na seção C, após iterar physicalColumns.
 
   // ── Laterais — comprimento por coluna FÍSICA (não por trecho operacional) ──
   type TuboLFEntry = (typeof TUBOS_PVC_LF)[number];
@@ -510,6 +551,184 @@ export function buildBOM(input: BOMInput): BOMResult {
   const valvulasSemCatalogoCount = valvulasCount - valvulasResolvidasCount;
   const registrosManuaisSecaoCount = valvulasResolvidasCount;
 
+  // ── TASK-022: Conexões físicas construtíveis ──────────────────────────────
+  const conexoesFisicasPendentes: BOMPendingConnection[] = [];
+  let curvas90RamaisLCount = 0;
+  let curvas90AdutoraCount = 0;
+  let curvas45AdutoraCount = 0;
+
+  // A. Curvas 90° em ramais em L
+  const lBends = countSecondaryLBends(secondaries, sizedSecondaries);
+
+  for (const [dn, qty] of lBends.byDnMm.entries()) {
+    const curva = CURVAS_90_RIGIDAS.find((c) => c.diametroMm === dn);
+    if (curva) {
+      curvas90RamaisLCount += qty;
+      itens.push({
+        sku: curva.sku,
+        descricao: `${curva.descricao} (ramais em L)`,
+        marca: curva.marca,
+        unidade: curva.unidade,
+        quantidade: qty,
+        precoUnitario: curva.precoVenda,
+        total: qty * curva.precoVenda,
+        categoria: "CONEXAO",
+      });
+    } else {
+      // SKU não encontrado para esse DN — item pendente
+      conexoesFisicasPendentes.push({
+        tipo: "curva_90_ramal_l",
+        descricao: `Curva 90° PVC rígido Ø${dn}mm (ramal em L)`,
+        dnMm: dn,
+        quantidade: qty,
+        motivoPendencia: "sku_nao_catalogado",
+      });
+    }
+  }
+
+  if (lBends.indeterminate > 0) {
+    conexoesFisicasPendentes.push({
+      tipo: "curva_90_ramal_l",
+      descricao: "Curva 90° ramal em L (DN indeterminado — sizedSecondaries ausente)",
+      dnMm: 0,
+      quantidade: lBends.indeterminate,
+      motivoPendencia: "dn_indeterminado",
+    });
+  }
+
+  // B. Curvas 90° e 45° na adutora
+  if (input.centroid && adutoraCoords.length >= 3) {
+    const adutoraBends = countAdutoraBends(adutoraCoords, input.centroid);
+    const dnAdutora = tubo.diametroNominalMm;
+
+    if (adutoraBends.curvas90Count > 0) {
+      const curva = CURVAS_90_RIGIDAS.find((c) => c.diametroMm === dnAdutora);
+      if (curva) {
+        curvas90AdutoraCount = adutoraBends.curvas90Count;
+        itens.push({
+          sku: curva.sku,
+          descricao: `${curva.descricao} (adutora)`,
+          marca: curva.marca,
+          unidade: curva.unidade,
+          quantidade: adutoraBends.curvas90Count,
+          precoUnitario: curva.precoVenda,
+          total: adutoraBends.curvas90Count * curva.precoVenda,
+          categoria: "CONEXAO",
+        });
+      } else {
+        conexoesFisicasPendentes.push({
+          tipo: "curva_90_adutora",
+          descricao: `Curva 90° PVC rígido Ø${dnAdutora}mm (adutora)`,
+          dnMm: dnAdutora,
+          quantidade: adutoraBends.curvas90Count,
+          motivoPendencia: "sku_nao_catalogado",
+        });
+      }
+    }
+
+    if (adutoraBends.curvas45Count > 0) {
+      curvas45AdutoraCount = adutoraBends.curvas45Count;
+      conexoesFisicasPendentes.push({
+        tipo: "curva_45_adutora",
+        descricao: `Curva 45° PVC rígido Ø${dnAdutora}mm (adutora)`,
+        dnMm: dnAdutora,
+        quantidade: adutoraBends.curvas45Count,
+        motivoPendencia: "sku_nao_catalogado",
+      });
+    }
+  }
+
+  // ── TASK-035: Curvas 90° em laterais físicas (sub-laterais) ─────────────────
+  // Fonte de verdade: PhysicalColumn.routeCoords (uma coluna física = uma vala).
+  // Pós-TASK-045B/TASK-046, routeCoords é reta de 2 pontos no caminho feliz
+  // → byDnMm vazio → 0 curvas adicionadas. Detecção é defensiva para o caso de
+  // alguma sub-rota futura introduzir vértice intermediário real.
+  // Catálogo: apenas CURVAS_90 (família LF). CURVAS_90_RIGIDAS não é usado em
+  // lateral LF — mistura de famílias/classes de pressão sem homologação RT.
+  const lateralBends = countLateralBends90(
+    physicalColumns,
+    input.centroid ?? { lat: 0, lng: 0 },
+  );
+  let curvas90LateraisCount = 0;
+  let curvas90LateraisSemSkuCount = 0;
+
+  for (const [dn, qty] of lateralBends.byDnMm.entries()) {
+    const curvaLF = CURVAS_90.find((c) => c.diametroMm === dn);
+    if (curvaLF) {
+      curvas90LateraisCount += qty;
+      itens.push({
+        sku: curvaLF.sku,
+        descricao: `${curvaLF.descricao} (laterais)`,
+        marca: curvaLF.marca,
+        unidade: curvaLF.unidade,
+        quantidade: qty,
+        precoUnitario: curvaLF.precoVenda,
+        total: qty * curvaLF.precoVenda,
+        categoria: "CONEXAO",
+      });
+    } else {
+      curvas90LateraisSemSkuCount += qty;
+      conexoesFisicasPendentes.push({
+        tipo: "curva_90_lateral",
+        descricao: `Curva 90° PVC LF Ø${dn}mm (lateral)`,
+        dnMm: dn,
+        quantidade: qty,
+        motivoPendencia: "sku_nao_catalogado",
+      });
+    }
+  }
+
+  if (lateralBends.indeterminate > 0) {
+    curvas90LateraisSemSkuCount += lateralBends.indeterminate;
+    conexoesFisicasPendentes.push({
+      tipo: "curva_90_lateral",
+      descricao: "Curva 90° lateral (DN indeterminado)",
+      dnMm: 0,
+      quantidade: lateralBends.indeterminate,
+      motivoPendencia: "dn_indeterminado",
+    });
+  }
+
+  // C. Kit de ligação do aspersor 5022 por DN da lateral (TASK-023)
+  // DN50 e DN75: kit homologado → itens precificados agrupados por SKU.
+  // Outros DNs: sem kit → blocker via kitAspersorDnNaoHomologadoCount.
+  let kitAspersorResolvCount = 0;
+  let kitAspersorDnNaoHomologadoCount = 0;
+  const kitBySku = new Map<string, { item: KitAspersor5022Item; quantidade: number }>();
+
+  for (const col of physicalColumns) {
+    const dn = col.selecao.tubo.diametroMm;
+    const kit = selectKitAspersor5022(dn);
+    if (kit) {
+      kitAspersorResolvCount += col.sprinklerCount;
+      for (const item of kit) {
+        const entry = kitBySku.get(item.sku);
+        if (entry) entry.quantidade += col.sprinklerCount;
+        else kitBySku.set(item.sku, { item, quantidade: col.sprinklerCount });
+      }
+    } else {
+      kitAspersorDnNaoHomologadoCount += col.sprinklerCount;
+    }
+  }
+
+  for (const { item, quantidade } of kitBySku.values()) {
+    itens.push({
+      sku: item.sku,
+      descricao: item.descricao,
+      marca: item.marca,
+      unidade: item.unidade,
+      quantidade,
+      precoUnitario: item.precoVenda,
+      total: quantidade * item.precoVenda,
+      categoria: "CONEXAO",
+    });
+  }
+
+  const conexoesFisicasSemSkuCount = conexoesFisicasPendentes.reduce(
+    (sum, c) => sum + c.quantidade,
+    0,
+  );
+
   const totalGeral = itens.reduce((sum, item) => sum + item.total, 0);
 
   return {
@@ -548,6 +767,15 @@ export function buildBOM(input: BOMInput): BOMResult {
       valvulasResolvidasCount,
       valvulasSemCatalogoCount,
       registrosManuaisSecaoCount,
+      conexoesFisicasPendentes,
+      conexoesFisicasSemSkuCount,
+      curvas90RamaisLCount,
+      curvas90AdutoraCount,
+      curvas45AdutoraCount,
+      curvas90LateraisCount,
+      curvas90LateraisSemSkuCount,
+      kitAspersorResolvCount,
+      kitAspersorDnNaoHomologadoCount,
     },
   };
 }
@@ -601,6 +829,7 @@ export function generateProposalDiagnostics(
   hydraulics?: HydraulicSizingReport | null,
   networkAngleReport?: NetworkAngleReport | null,
   axisDeviationReport?: AxisDeviationReport | null,
+  lateralCapacityReport?: LateralCapacityReport | null,
 ): ProposalDiagnostics {
   const physCols = bom.meta.nColunasLaterais;
   const nLaterais = bom.meta.nLaterais;
@@ -810,6 +1039,85 @@ export function generateProposalDiagnostics(
       `${TOLERANCIA_ASPERSOR_EIXO_LATERAL} m (máx: ${maxM} m). ` +
       `O aspersor deve estar sobre a rede lateral, pois a vala da lateral é a mesma do aspersor.`,
     );
+  }
+
+  // ── TASK-031: Blocker técnico — lateral hidraulicamente insuficiente no
+  // subset homologado DN50/DN75 do aspersor 5022. Quando o seletor escolheu
+  // o maior DN homologado (DN75) mas perda ou velocidade excede limites, este
+  // blocker informa a capacidade insuficiente e propõe ações operacionais.
+  if (lateralCapacityReport && lateralCapacityReport.violations.length > 0) {
+    const n = lateralCapacityReport.violations.length;
+    const maxHf = lateralCapacityReport.maxHfM.toFixed(2);
+    const maxVel = lateralCapacityReport.maxVelMs.toFixed(2);
+    blockers.push(
+      `Lateral hidraulicamente insuficiente para o aspersor 5022: o maior DN homologado para ` +
+      `lateral é DN75, mas ${n} coluna(s)/trecho(s) excedem perda de carga ou velocidade ` +
+      `admissível (perda máx: ${maxHf} mca; velocidade máx: ${maxVel} m/s). ` +
+      `Ações sugeridas: reduzir aspersores por trecho operacional; revisar comprimento das ` +
+      `laterais; dividir alimentação; reposicionar principal/corredor; ou escalar para projetista/RT.`,
+    );
+  }
+
+  // ── TASK-023: Blocker comercial — DN de lateral não homologado para kit 5022 ─
+  // Mantido como defesa (não deve disparar no caminho normal após TASK-031,
+  // porque o seletor recebe apenas DN50/DN75 via getCatalogoLateraisHomologadas5022).
+  if (bom.meta.kitAspersorDnNaoHomologadoCount > 0) {
+    blockers.push(
+      `BOM incompleta — DN de lateral não homologado para kit do aspersor 5022: ` +
+      `${bom.meta.kitAspersorDnNaoHomologadoCount} aspersor(es) em lateral sem kit disponível. ` +
+      `Utilizar apenas laterais DN50mm ou DN75mm com o aspersor 5022.`,
+    );
+  }
+
+  // ── TASK-022: Blocker comercial — conexões físicas sem SKU ──────────────────
+  if (bom.meta.conexoesFisicasSemSkuCount > 0) {
+    const tipos = new Set(bom.meta.conexoesFisicasPendentes.map((c) => c.tipo));
+    const tipoTextos: string[] = [];
+    if (tipos.has("tee_90_aspersor_lateral")) tipoTextos.push("derivação aspersor-lateral");
+    if (tipos.has("curva_45_adutora"))        tipoTextos.push("curva 45° adutora");
+    if (tipos.has("curva_90_adutora"))        tipoTextos.push("curva 90° adutora");
+    if (tipos.has("curva_90_lateral"))        tipoTextos.push("curva 90° lateral");
+    if (bom.meta.conexoesFisicasPendentes.some((c) => c.motivoPendencia === "dn_indeterminado"))
+      tipoTextos.push("curva 90° ramal (DN indeterminado)");
+    blockers.push(
+      `BOM incompleta — ${bom.meta.conexoesFisicasSemSkuCount} conexão(ões) física(s) ` +
+      `necessária(s) sem SKU/custo homologado` +
+      (tipoTextos.length > 0 ? `: ${tipoTextos.join(", ")}` : "") +
+      `. Incluir manualmente ou homologar catálogo antes de emitir proposta final.`,
+    );
+  }
+
+  // ── TASK-026-B: Gate de emissão para cálculo hidráulico essencial ───────────
+  // Bloqueia emissão quando o projeto está completo (passou pelas verificações
+  // de isComplete em irrigation-project.ts) mas a hidráulica essencial está
+  // ausente, inválida ou estruturalmente inconsistente. Não corrige a causa-raiz
+  // (TASK-026-A trata generateSecondaries) — apenas garante que PDFs nunca sejam
+  // emitidos sem HMT computada ou com colunas físicas sem ramal correspondente.
+  const projectIsComplete =
+    !!layout.sprinklers && !!layout.sectorization &&
+    !!layout.mainPipeline && !!layout.centroid && !!layout.waterSource;
+
+  if (projectIsComplete) {
+    const hmtIsInvalid =
+      !hydraulics ||
+      typeof hydraulics.hmt?.totalHMT !== "number" ||
+      !Number.isFinite(hydraulics.hmt.totalHMT) ||
+      hydraulics.hmt.totalHMT <= 0;
+
+    if (hmtIsInvalid) {
+      blockers.push(
+        "Cálculo hidráulico incompleto: HMT total não computada ou inválida. " +
+        "Não é possível emitir proposta sem HMT — revisar dados de entrada e tentar novamente.",
+      );
+    } else {
+      const secondariesCount = hydraulics.sizedSecondaries.length;
+      if (physCols > 0 && secondariesCount === 0) {
+        blockers.push(
+          `Cálculo hidráulico incompleto: ${physCols} coluna(s) física(s) sem ramal correspondente na distribuição. ` +
+          "Não é possível emitir proposta — revisar geometria do projeto.",
+        );
+      }
+    }
   }
 
   return {

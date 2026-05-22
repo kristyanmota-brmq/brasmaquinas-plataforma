@@ -181,6 +181,15 @@ function makeMinimalBOM(valvulasCount: number, valvulasResolvidasCount = 0): BOM
       valvulasResolvidasCount,
       valvulasSemCatalogoCount: valvulasCount - valvulasResolvidasCount,
       registrosManuaisSecaoCount: valvulasResolvidasCount,
+      conexoesFisicasPendentes: [],
+      conexoesFisicasSemSkuCount: 0,
+      curvas90RamaisLCount: 0,
+      curvas90AdutoraCount: 0,
+      curvas45AdutoraCount: 0,
+      curvas90LateraisCount: 0,
+      curvas90LateraisSemSkuCount: 0,
+      kitAspersorResolvCount: 0,
+      kitAspersorDnNaoHomologadoCount: 0,
     },
   };
 }

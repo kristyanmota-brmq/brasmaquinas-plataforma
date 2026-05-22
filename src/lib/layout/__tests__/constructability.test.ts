@@ -435,8 +435,11 @@ describe("Suite 9 — generateProposalDiagnostics retorna constructabilityStatus
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Suite 11 — invariantes de contagem de trechos operacionais e pontos de corte", () => {
   // ── 11a: coluna com 3 setores → 2 cortes ≠ physicalColumnsSplitCount = 1 ──
+  // Nota: usamos n=18 aspersores (cabe em DN75 — hf=4.32 mca, V=2.01 m/s) para
+  // que o split por capacidade hidráulica da TASK-040 não dispare. A intenção
+  // do teste é validar setorização operacional (1 coluna × 3 setores).
   describe("11a — 1 coluna física que toca 3 setores gera 2 pontos de corte", () => {
-    const { positions, physCols } = makePhysCols(1, 30);
+    const { positions, physCols } = makePhysCols(1, 18);
     const { sectorIndices } = buildSectorsByFlowWithColumnSplitting(physCols, 3, VAZ, positions.length);
     const layout = buildTestLayout(positions, sectorIndices, 3, SPACING);
     const bom = calculateIrrigationProject(layout).bom!;

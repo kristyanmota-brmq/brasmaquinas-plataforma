@@ -18,8 +18,13 @@ const DUMMY_SELECAO: SelecaoTubo = {
 };
 
 /** Catálogo mínimo para testes de integração que chamam generatePhysicalColumns. */
+// Catálogo robusto para testes de agrupamento (TASK-040: split por capacidade
+// hidráulica não deve interferir nestes testes — eles validam invariantes
+// de agrupamento geométrico, não capacidade do DN).
 const TEST_CATALOG: TuboCandidato[] = [
-  { sku: "TEST-50", diametroMm: 50, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
+  { sku: "TEST-50",  diametroMm: 50,  diametroInternoMm: 46, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
+  { sku: "TEST-75",  diametroMm: 75,  diametroInternoMm: 69, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
+  { sku: "TEST-100", diametroMm: 100, diametroInternoMm: 92, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
 ];
 const TEST_ASPERSOR = { vazao: 1, pressaoServico: 30 };
 
@@ -40,6 +45,8 @@ function makePhysicalColumn(
     selecao: DUMMY_SELECAO,
     sectorsTouched,
     sprinklerIndices: [],
+    routeCoords: [startLngLat, endLngLat],
+    lateralCapacity: { ok: true, hfM: 0, velMs: 0 },
   };
 }
 

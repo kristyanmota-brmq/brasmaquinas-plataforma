@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
-Última atualização: 2026-05-20
-Testes na base: 686/686 · TypeScript: 0 erros · Working tree: modificado (TASK-020)
+Última atualização: 2026-05-22
+Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) concluída**
 
 ---
 
@@ -645,7 +645,428 @@ Testes na base: 686/686 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 ---
 
+### TASK-021 — Workspace full-screen com painel lateral
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** ui / ux / layout
+**Arquivo:** `tasks/TASK-021-workspace-full-screen-mapa.md`
+**Concluída em:** 2026-05-21 · 686/686 testes · 0 erros tsc
+
+> Task UX/layout puro — nenhum arquivo em `src/lib/` alterado; nenhum solver, BOM, catálogo, PDF ou motor técnico tocado.
+>
+> `src/app/projetos/[id]/page.tsx`: removido wrapper `max-w-7xl`, breadcrumb e bloco de título; `<ProjectMap />` renderiza diretamente após `<Header />` com nova prop `statusLabel`.
+>
+> `src/components/map/ProjectMap.tsx`: container `h-[calc(100dvh-64px)] grid grid-cols-1 md:grid-cols-[1fr_360px]` — sem border, sem rounded, sem min-h artificial. Overlay antigo de `pdfError` removido do mapa. Aside reestruturado: desktop = estático 360px fixo, scroll próprio; mobile = drawer `fixed bottom-0 h-[60dvh]` com toggle `md:hidden` (`aria-label`, `min-h-[44px]`) e overlay `bg-black/30`. Header do projeto no topo do sidebar (breadcrumb, nome, status badge, cliente). Seção de blockers (vermelho, `max-h-32 overflow-y-auto`) derivada de `projectResult.diagnostics?.blockers` — sempre reativa, sem precisar clicar PDF. Seção de warnings (âmbar) derivada de `projectResult.diagnostics?.warnings`. `pdfError.invalidHydraulicSegments` exibido como detalhe extra no sidebar. `100dvh` preferido a `100vh` para evitar overflow em mobile/Safari.
+>
+> **Pendências:** validar drawer mobile com clique real (DevTools ou device físico); validar `pdfError.invalidHydraulicSegments` no sidebar via clique PDF com blocker ativo.
+
+---
+
+### TASK-022 — BOM de conexões físicas construtíveis
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Área:** bom / construtibilidade / domínio
+**Arquivo:** `tasks/TASK-022-bom-conexoes-fisicas-construtiveis.md`
+**Concluída em:** 2026-05-21 · 704/704 testes · 0 erros tsc
+
+> Adicionadas à BOM todas as conexões físicas derivadas da geometria: curvas 90° em ramais em L (precificadas via `CURVAS_90_RIGIDAS`), curvas 90°/45° na adutora e derivações aspersor→lateral.
+>
+> Novo tipo `BOMPendingConnection` para conexões sem SKU catalogado. Novo blocker comercial `"BOM incompleta"` em `generateProposalDiagnostics` quando `conexoesFisicasSemSkuCount > 0`. Blockers comerciais filtrados no optimizer para não contaminarem avaliação hidráulica de candidatos.
+>
+> Novos arquivos: `src/lib/layout/physical-connections.ts` (detecção geométrica pura — Camada A), `src/lib/layout/__tests__/physical-connections.test.ts` (18 testes T22-a..r).
+>
+> **Pendências abertas (bloqueiam proposta final até resolução):**
+> - `tee_90_aspersor_lateral`: sem SKU → todo projeto com aspersores tem blocker comercial permanente até TASK futura homologar tê redutor/sela de tomada DN25→DNlateral
+> - `curva_45_adutora`: sem SKU → `BOMPendingConnection` permanente até homologação
+> - Luvas: fora do escopo — sem critério de contagem e sem SKU; TASK futura define por tipo de tubo
+
+---
+
+### TASK-023 — Homologar kit de ligação do aspersor 5022 por DN da lateral
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico (desbloqueia blocker comercial de todo projeto com aspersores)
+**Área:** bom / catálogo
+**Arquivo:** `tasks/TASK-023-homologar-kit-aspersor-5022-por-dn-lateral.md`
+**Concluída em:** 2026-05-21 · 731/731 testes · 0 erros tsc
+
+> Kit de ligação do aspersor 5022 homologado por DN da lateral física. Regra operacional Brasmáquinas: laterais somente DN50mm e DN75mm.
+>
+> `KIT_ASPERSOR_5022` adicionado a `aspersores.ts` com 5 SKUs reais: `1819000` (Luva 3/4"), `1000843` (Tubo de Subida 3/4"×3m), `1000354` (Tê roscável DN50×3/4"), `132789` (Tê PTI PN80 DN75×1"), `1464000` (Bucha 1"×3/4" Tigre). `selectKitAspersor5022(dnMm)` retorna `null` para DN != 50 e != 75.
+>
+> `buildBOM` resolve kit por coluna física, acumulando itens por SKU no `Map` antes de emitir (`1819000` e `1000843` agrupados: qty = total aspersores DN50+DN75). Regra do tubo de subida corrigida: `ceil(count/2)` → `1 unidade por aspersor`. DNs não homologados geram blocker `"BOM incompleta — DN de lateral não homologado para kit do aspersor 5022"` (prefixo compatível com filtro do optimizer).
+>
+> Meta atualizado: `tesAspersorLateralCount` removido → `kitAspersorResolvCount` + `kitAspersorDnNaoHomologadoCount`. T22-n, T22-o, T22-q reescritos. Fixtures `makeMinimalBOM` atualizadas. 27 novos testes em `bom-kit-aspersor.test.ts` (T23-a..f).
+>
+> **Pendências:**
+> - `marca` dos SKUs `1819000`, `1000843`, `1000354` — não informada pelo RT; campo `""` no catálogo
+> - `curva_45_adutora` — sem SKU; `BOMPendingConnection` permanente (escopo futuro)
+> - Seletor hidráulico ainda aceita DN100 → TASK-025
+
+---
+
+### TASK-039 — Revalidação visual pós-TASK-031
+
+**Status:** `concluída` (aprovada — TASK-031 confirmada empiricamente)
+**Prioridade:** P2-importante
+**Classe:** E — Exploratória
+**Área:** validação / governança / hidráulica
+**Arquivo:** `tasks/TASK-039-revalidacao-visual-pos-task-031.md`
+**Concluída em:** 2026-05-21 · 759/759 testes · 0 erros tsc · `src/` não alterado
+
+> Validação empírica no browser real (Playwright MCP) do Projeto A em Barreiras/BA (`cmpfu7e4b0001ulshh0ni8jhd`) após a TASK-031. **TASK-031 confirmada**: (1) Tubo LF Ø100mm = **0 barras** ✅ (era 625 na TASK-033); (2) blocker antigo do kit 5022 **AUSENTE** ✅; (3) blocker técnico novo **presente** ⚠️ (8 colunas excedem DN75; perda máx 33,10 mca; vel máx 3,57 m/s — texto e ações sugeridas conforme TASK-031); (4) BOM total **R$ 226.724,81** ✅ (−R$ 30.364 / −11,8% vs. R$ 257.089 da TASK-033); (5-6) sem blockers hidráulicos inesperados; sidebar/PDF coerentes (gate 422 funciona); (7) laterais sobre aspersores preservadas (TASK-028 mantida); (8) `routeCoords` renderizado. 100% dos aspersores (337/337) agora em kit homologado. 9 achados (H1-H9): **TASK-040 sugerida** para H5/H6 (caminho feliz ainda não limpo — geração default produz 8 colunas com perda 5,5× o limite; revisar arquitetura da grade). F1 da TASK-027 persiste (TASK-034). Evidências: `docs/relatorios/evidencias/2026-05-21-TASK-039/` (3 PNGs + 11 traces). Relatório: `docs/relatorios/2026-05-21-TASK-039.md`.
+
+---
+
+### TASK-035 — BOM de curvas 90° em sub-laterais com routeCoords
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica
+**Área:** bom / construtibilidade / domínio
+**Arquivo:** `tasks/TASK-035-bom-curvas-90-laterais-routecoords.md`
+**Concluída em:** 2026-05-22 · 817/817 testes (+8 vs. 809 baseline) · 0 erros tsc · catálogo intocado
+**Relatório:** `docs/relatorios/2026-05-22-TASK-035.md`
+
+> Fechado o gap deixado pela TASK-028: curvas 90° dentro das valas das laterais físicas (`PhysicalColumn.routeCoords`) agora são contadas. Nova função pura `countLateralBends90()` em `physical-connections.ts` (guard `length < 3`, filtro `MIN_SEG_LEN_M = 0,01 m` para ruído numérico, reusa `ANGLE_TOL_DEG = 5°`). Wiring em `bom.ts`: bloco "D" entre curvas adutora e kit aspersor; **catálogo apenas `CURVAS_90` (LF)** — nunca `CURVAS_90_RIGIDAS` em lateral LF; `BOMPendingConnection.tipo` ampliado com `"curva_90_lateral"`; campos meta novos `curvas90LateraisCount` e `curvas90LateraisSemSkuCount`. **Resultado:** DN75 com curva real → SKU `150174` (CURVA 90 LF DN75 — R$ 20,00) precificado; DN50 com curva real → `BOMPendingConnection { motivoPendencia: "sku_nao_catalogado" }` + blocker "BOM incompleta" cita "curva 90° lateral"; **caminho feliz pós-TASK-046 (todas as colunas com `routeCoords.length === 2`)** → 0 curvas, 0 pendência nova, `totalGeral` inalterado pela task (Projeto A continua R$ 213.740,15). Fonte única: `PhysicalColumn.routeCoords` (evita dupla contagem com `Lateral.routeCoords`). 8 testes novos em `lateral-bends-90.test.ts` (T35-a..T35-h). 2 fixtures `meta` mecanicamente ampliadas (`bom-valves.test.ts`, `pressure-class.test.ts`). **Sem ADR novo** (cumprimento operacional de ADR-012-emenda + ADR-013 + TASK-022). **Sem premissa nova** em `12-premissas-...md`. Catálogo, geometria, `routeCoords`, `buildLateralRoute`, geração da malha, PDF, mapa, server actions — **intocados**.
+>
+> **Pendências:**
+> - Homologação RT de SKU curva 90° LF DN50 (vira `BOMPendingConnection` quando algum projeto tiver lateral DN50 com cotovelo real)
+> - Revalidação visual opcional via Playwright para confirmar BOM R$ 213.740,15 e PDF HTTP 200 no Projeto A
+
+---
+
+### TASK-046 — Corrigir agrupamento/orientação automática das laterais no Projeto A
+
+**Status:** `concluída` — **série de validação visual TASK-027→046 FECHADA**
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica
+**Área:** layout / domínio / geometria
+**Arquivo:** `tasks/TASK-046-corrigir-agrupamento-orientacao.md`
+**Concluída em:** 2026-05-22 · 809/809 testes (+10 vs. 799 baseline) · 0 erros tsc · catálogo intocado
+**Relatório:** `docs/relatorios/2026-05-22-TASK-046.md`
+
+> Causa-raiz IDENTIFICADA via diagnóstico geométrico executado antes da implementação: extraído polígono real do Projeto A via Prisma + matriz ângulo × maxDeviation 0°-89° mostrou que **apenas 0° e 45° eram válidos** com algoritmo antigo (eixos cardinais Haversine). Causa-raiz **estrutural**: `turf.pointGrid` + `turf.transformRotate` operavam em **graus geográficos**, introduzindo distorção métrica que crescia com distância ao centroide — em colunas de 240 m do Projeto A, aspersores de extremidades ficavam até 10 m fora do eixo no frame local. **Correção:** `generateRotatedSprinklerGrid` reescrita em **frame métrico local** (centroide em lng/lat → rotação plana em metros → bbox métrico → grade uniforme em metros → point-in-polygon métrico via ray-casting → rotação plana inversa → conversão para lng/lat). `findOptimalGridAngle` estendida com gate de desvio aspersor-eixo (≤ TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,10 m) como defesa secundária; `spacingMeters` default 12; fallback `console.warn` se nenhum válido. **Resultado empírico Projeto A:** ângulo 31° → 59° (gate aplicado); aspersores 337 → 344; 0 blockers ✅; PDF HTTP 200 + download ✅; BOM R$ 226.946 → **R$ 213.740,15** (−R$ 13.206; −R$ 64.215 / −23,1% vs. baseline TASK-041); ramais 3.859 → 2.736 m; Tubo LF Ø100 = 0 (ADR-013); aspersores em kit 344/344. **TASK-045B preservada** (lateral reta via mediana). ADRs 010/011/012-emenda/013/014/015 preservadas; sem ADR novo. 10 testes T46-* novos em `grid-orientation.test.ts`. **Série de validação visual TASK-027 → TASK-033 → TASK-039 → TASK-041 → TASK-044 → TASK-045 → TASK-045B → TASK-046 fechada com sucesso** — primeira vez que TODOS os critérios são atendidos simultaneamente no caminho feliz default do Projeto A.
+
+---
+
+### TASK-045B — Corrigir rota reta das laterais e eliminar lógica ponto-a-ponto em escada
+
+**Status:** `concluída` (resultado misto — zigue-zague eliminado em código; TASK-046 obrigatória para fechar série visual)
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica
+**Área:** layout / domínio / construtibilidade
+**Arquivo:** `tasks/TASK-045B-corrigir-rota-reta-laterais.md`
+**Concluída em:** 2026-05-21 · 799/799 testes (+11 vs. 788 baseline) · 0 erros tsc · catálogo intocado
+**Relatório:** `docs/relatorios/2026-05-21-TASK-045B.md`
+
+> Substituído algoritmo greedy ponto-a-ponto de `buildLateralRoute` por **reta única no eixo via mediana de X** (robusto contra outliers — não puxado por aspersor desalinhado). `routeCoords` agora sempre tem 2 pontos. **`ROUTE_BUILD_TOL_X_M` marcada DEPRECATED** em `12-premissas-...md`. **ADR-012 recebeu emenda interpretativa** (não criou ADR-016): polilinha não compensa aspersor desalinhado; aspersor fora vira blocker. **15 testes existentes ajustados** (T28-*, T45-1/3/4/9) + **11 testes novos** (T45B-1..T45B-11) em `lateral-reta.test.ts`. **Resultado empírico Projeto A:** zigue-zague eliminado em código (validado visualmente — mudança vs. imagem TASK-045); BOM R$ 226.946,41 (−18,4% vs. baseline TASK-041); MAS **blocker de eixo dispara** (28 laterais; máx 7,45 m) → PDF HTTP 422. **Esse comportamento é ESPERADO pelo briefing** (Ajuste 3: "Se aspersor ficar fora de 0,10 m do eixo → blocker; em task futura, recalcular agrupamento/orientação"). **Causa real:** Projeto A tem aspersores genuinamente desalinhados (antes mascarados pela polilinha em L da TASK-028 que foi superada por esta emenda). **TASK-046 obrigatória** para corrigir agrupamento/orientação no `findOptimalGridAngle`/`generatePhysicalColumns`. ADRs 010, 011, 013, 014, 015 preservadas; ADR-012 com emenda. Catálogo, PDF, mapa intocados.
+
+---
+
+### TASK-045 — Corrigir orientação profissional das laterais e eliminar zigue-zague artificial
+
+**Status:** `parcialmente concluída` (resolveu blocker angular + PDF 200; NÃO resolveu zigue-zague visual — superseded pela TASK-045B)
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica
+**Área:** layout / domínio / construtibilidade
+**Arquivo:** `tasks/TASK-045-corrigir-orientacao-laterais.md`
+**Concluída em:** 2026-05-21 · 788/788 testes (+9 vs. 779 baseline) · 0 erros tsc · catálogo intocado
+**Relatório:** `docs/relatorios/2026-05-21-TASK-045.md`
+
+> Regressão da TASK-044 resolvida. **Duas correções:** (1) `ROUTE_BUILD_TOL_X_M = 0,05 m → 0,10 m` em `laterais.ts:221` — alinhado com `TOLERANCIA_ASPERSOR_EIXO_LATERAL` (ADR-011); elimina cotovelos espúrios na janela 0,05-0,10 m onde aspersores ficam "no eixo operacional" mas geravam zigue-zague visual. (2) Validação angular como **restrição dura no motor** (`architecture-selector.ts:evaluateCandidate`) — candidato com `detectNetworkAngleIssues.hasBlockers === true` vira `isValid: false`; alinhado com ADR-015 §3. Validação usa estrutura completa do fluxo real (principal/adutora/secondaries/physicalColumns/routeCoords). **Resultado empírico Projeto A:** BOM **R$ 277.955 → R$ 265.199 (−R$ 12.755 / −4,6%)** vs. baseline TASK-041; **0 blockers**; **PDF HTTP 200 + download** ✅; Tubo Ø100mm rígido ramais 416 → 267 barras (−R$ 32.035); Tubo LF Ø100mm = 0 (ADR-013); aspersores em kit 337/337; HMT 42,5 mca. **Não relaxou:** `ALLOWED_DEFLECTIONS_INTERNAL = [0, 90]`, tolerância angular, texto do blocker, PDF gate. **ADRs 010-015 preservadas.** **Trade-off aceito:** economia agressiva TASK-044 (−38,7%) era artificial (topologia com 3 junções 180° antiparalelo violando ADR-010); solução TASK-045 é fisicamente construível. **9 testes novos** (T45-1..T45-9) em `lateral-zigzag.test.ts`. Premissa `ROUTE_BUILD_TOL_X_M` atualizada em `12-premissas-...md`. Validação visual via Playwright executada. Próximas: (B sugerida) expor `ArchitectureSelectionResult` na sidebar; TASK-035; TASK-034.
+
+---
+
+### TASK-044 — Revalidação visual pós-TASK-043
+
+**Status:** `concluída` (com regressão registrada — sugere TASK-045)
+**Prioridade:** P2-importante
+**Classe:** E — Exploratória
+**Área:** validação / governança / hidráulica / arquitetura
+**Arquivo:** `tasks/TASK-044-revalidacao-visual-pos-task-043.md`
+**Concluída em:** 2026-05-21 · 779/779 testes · 0 erros tsc · `src/` não alterado
+**Relatório:** `docs/relatorios/2026-05-21-TASK-044.md`
+
+> Revalidação visual no Projeto A pós-TASK-043 via Playwright MCP. **Motor confirmado funcionando**: BOM **R$ 277.955,01 → R$ 170.263,61 (−R$ 107.691,40 / −38,7%)**; ramais **4186 → 878 m (−79%)**; Ø100mm rígido ramais **416 → 31 barras (−92,6%)**; adutora 35 → 19 barras; HMT 40,3 → 37,7 mca; Ø100mm LF mantido em 0 (ADR-013 preservada); 337/337 aspersores em kit. Clique Auto re-acionou motor (console +1 warning `[principal] Captação dentro da faixa Y`); resultado idêntico (motor determinístico). **REGRESSÃO**: blocker angular novo "Construtibilidade angular: 3 conexão(ões) com ângulo fora de 45°/90°/180° (3 em lateral)" → PDF gate 200 → **422** (gate ADR-003 funcionou; problema é o blocker). T43-8 sintético passou mas cenário real expõe edge case na interação motor ↔ detectNetworkAngleIssues ↔ split ↔ routeCoords. **Candidato vencedor: NM** (UI não expõe `ArchitectureSelectionResult`); inferência geométrica sugere arquitetura ≠ A0. **Não corrigido nesta task** (regra explícita). 13 pontos validados (CD/CS/CC/CR/IG/NM). Evidências: `docs/relatorios/evidencias/2026-05-21-TASK-044/` (4 PNGs + 7 traces). **TASK-045 (Classe A) sugerida** como prioritária para resolver regressão sem perder economia.
+
+---
+
+### TASK-043 — Motor de seleção arquitetural da principal/ramais por menor BOM válida e operacionalmente executável
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica
+**Área:** layout / domínio / hidráulica / comercial
+**Arquivo:** `tasks/TASK-043-motor-selecao-arquitetural.md`
+**Concluída em:** 2026-05-21 · 779/779 testes (+11 vs. 768 baseline) · 0 erros tsc · catálogo intocado
+**ADR:** [`docs/decisoes/ADR-015-selecao-arquitetural-menor-bom-valida.md`](../docs/decisoes/ADR-015-selecao-arquitetural-menor-bom-valida.md)
+
+> Motor de seleção arquitetural automático implementado em `src/lib/layout/architecture-selector.ts`. **Função objetivo:** menor BOM estimada preliminar. **Restrições duras:** hidráulica (`MAX_VELOCITY_RAMAL_MS=1,5 m/s`, `MAX_HEADLOSS_RAMAL_MCA=3,0 mca`) + ADRs 010-014. **4 candidatos avaliados:** A0 baseline (borda Y mais próxima da captação); A2-min e A2-max (borda forçada — escolhe o de menor BOM entre os dois); A3 central (`principalY = (yMin+yMax)/2`). Em empate (< R$ 1,00), prefere A0 (princípio "menor mudança"). Retorna `ArchitectureSelectionResult` com diagnóstico completo: vencedor, BOM por candidato, motivo de invalidação, motivo de escolha, warnings, diferença vs. baseline. **A3 vencedor** dispara warning obrigatório "principal central atravessa área irrigada — validar construtibilidade operacional/RT". **A1/A4/A5/A6/A7/A8** pós-MVP. Integração via `buildSelectedPipelineCoords()` em `layout-use-cases.ts`; `ProjectMap.tsx` chama em ambos os caminhos automáticos (auto-sugestão + `resetToAutoPipeline`). **Catálogo, PDF, aspersor padrão, espaçamento 12×12 intocados.** Critério L2 (vazão de projeto do ramal) mantido conservador `max(setor)` — `PENDENTE_REVISAO_RT_BRASMAQUINAS`. **11 testes novos** (T43-1..T43-11) em `architecture-selector.test.ts`. **3 premissas formalizadas** em `12-premissas-...md` (MAX_VEL_RAMAL com referência NRCS NEH; MAX_HEADLOSS_RAMAL com boa prática 10%; critério de vazão — todas `PENDENTE_REVISAO_RT_BRASMAQUINAS`; nenhum valor alterado). **ADR-015 criada.** Próximas: TASK-044 (revalidação visual) → TASK-035 → TASK-034.
+
+---
+
+### TASK-042R — Revisão RT da arquitetura de rede e escolha da alternativa MVP
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** E — Decisão técnica assistida / validação RT
+**Área:** layout / domínio / produto / arquitetura
+**Arquivo:** `tasks/TASK-042R-revisao-rt-arquitetura-rede.md`
+**Concluída em:** 2026-05-21 · 768/768 testes · 0 erros tsc · `src/` não alterado · sem ADR aberto · sem premissa formalizada
+**Documento (produto):** `docs/relatorios/2026-05-21-TASK-042R.md`
+
+> **Diretriz Brasmáquinas registrada** após reformulação da decisão pelo usuário/RT: a escolha **não é binária** entre A2 e A3 (TASK-042 diagnóstico). A escolha é implementar **motor de seleção arquitetural** que avalie candidatos por **menor BOM tecnicamente válida e operacionalmente executável**. **Função objetivo = custo; restrições duras = hidráulica + construtibilidade** (rede 0°/90° conforme ADR-010; aspersor sobre lateral conforme ADR-011/012; DN100 proibido em lateral 5022 conforme ADR-013; split por capacidade preservado conforme ADR-014; montagem compreensível; sem valetas/cruzamentos absurdos). **Diretrizes L1/L2/L3:** L1 posição da principal = menor BOM válida, sem regra fixa (decisão de engenharia + comercial); L2 vazão de projeto do ramal = tecnicamente correto para operação real (rotativa simultaneidade), `PENDENTE_REVISAO_RT_BRASMAQUINAS`; L3 `MAX_VELOCITY_RAMAL_MS = 1,5 m/s` mantido como referência conservadora, origem **[FONTE-TÉCNICA]** NRCS NEH (≈ 5 ft/s tubulação plástica enterrada com válvulas), `PENDENTE_REVISAO_RT_BRASMAQUINAS` quanto a NBR brasileira específica. 7 perguntas do briefing respondidas. Escopo formal da TASK-043 detalhado em 9 sub-seções: candidatos mínimos MVP A0+A2+A3 (A1 condicional); função `selectArchitectureByBom()`; integração ao orquestrador; ADR-015; 3 premissas formais (todas para TASK-043); 8 testes obrigatórios. Linguagem oficial **BOM estimada / preliminar / de comparação** (não "BOM real" sem solver). Coerência com ADRs 010-014 verificada item por item — nenhum conflito. **Nenhum ADR aberto** nesta task; **nenhuma premissa formalizada** em `12-premissas-...md`; **nenhum arquivo em `src/` alterado**. Próximas: TASK-043 → TASK-044 → TASK-035 → TASK-034.
+
+---
+
+### TASK-042 — Diagnóstico profissional da arquitetura principal/ramais/laterais
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica / Diagnóstico de engenharia
+**Área:** layout / domínio / produto / arquitetura
+**Arquivo:** `tasks/TASK-042-diagnostico-arquitetura-principal-ramais-laterais.md`
+**Concluída em:** 2026-05-21 · 768/768 testes · 0 erros tsc · `src/` não alterado
+**Relatório (produto):** `docs/relatorios/2026-05-21-TASK-042.md`
+
+> Diagnóstico técnico baseado em leitura literal do código (`principal.ts`, `secondary-sizing.ts`, `hydraulic-connectivity.ts`, catálogo). **Driver identificado:** Ø100mm rígido em ramais responde por 32% da BOM no Projeto A pós-TASK-040 (416 barras × R$ 215 = R$ 89.440). **Três alavancas ortogonais:** L1 posição da principal (atualmente borda Y mais próxima da captação — [principal.ts:103](../src/lib/layout/principal.ts#L103)); L2 vazão de projeto = `max(setor)` em todos os setores — possível over-spec; L3 `DEFAULT_MAX_VEL_MS = 1,5 m/s` em ramais — limite conservador força DN100 para Q ≥ 20 m³/h. **9 alternativas avaliadas (A0-A8)** com 7 critérios técnicos + 10 critérios complementares (construtibilidade operacional + risco comercial). **Recomendação MVP preliminar:** A2 (refinamento de A0 — escolher lado da principal por menor custo de ramal, não apenas proximidade da captação) — preserva todos os ADRs (010/011/012/013/014), complexidade baixa (~30 linhas + 3 testes), redução faixa baixa (5-10%). A3 (principal central) tem potencial alto (15-25%) mas requer decisão RT sobre valeta atravessando área irrigada. A4-A8 ficam pós-MVP. **Toda recomendação marcada `PENDENTE_REVISAO_RT_BRASMAQUINAS`.** Nenhum ADR aberto (ADR-015 fica para TASK-043). Próximas: TASK-043 (implementação) → TASK-044 (revalidação visual) → TASK-035 → TASK-034.
+
+---
+
+### TASK-041 — Revalidação visual pós-TASK-040
+
+**Status:** `concluída` (aprovada — TASK-040 confirmada empiricamente)
+**Prioridade:** P2-importante
+**Classe:** E — Exploratória
+**Área:** validação / governança / hidráulica
+**Arquivo:** `tasks/TASK-041-revalidacao-visual-pos-task-040.md`
+**Concluída em:** 2026-05-21 · 768/768 testes · 0 erros tsc · `src/` não alterado
+
+> Revalidação empírica no browser real (Playwright MCP) do Projeto A (`cmpfu7e4b0001ulshh0ni8jhd`, Barreiras/BA) após a TASK-040. **TASK-040 confirmada:** (1) blocker técnico *"Lateral hidraulicamente insuficiente"* **AUSENTE** ✅ (era presente com 8 colunas excedendo DN75 na TASK-039); (2) **PDF gate liberado — HTTP 200 + download automático** ✅ (era HTTP 422 na TASK-039); (3) Tubo LF Ø100mm = **0 barras** ✅ (ADR-013 preservada); (4) DN50/DN75 únicos em lateral 5022 (74 + 852 barras); (5) 337/337 aspersores em kit homologado; (6) 0 blockers angulares novos apesar dos +8 ramais do split; (7) HMT 40,7 → 40,3 mca (−0,4 mca; coerente com colunas mais curtas). **Custo:** BOM total R$ 226.724,81 → R$ 277.955,01 (+R$ 51.230 / +22,6%); maior driver: Ø100mm rígido em ramais (416 barras × R$ 215 = R$ 89.440 = 32% da BOM). 29 ramais × 4186 m. 12 achados (H1–H12): TASK-042 reforçada para investigar arquitetura (alimentação intermediária, redistribuição da principal). 13 pontos validados (8 CD + 2 CS + 2 IA + 2 NM). Série TASK-027 → TASK-033 → TASK-039 → TASK-041 completa: caminho feliz default emite PDF pela primeira vez. Evidências: `docs/relatorios/evidencias/2026-05-21-TASK-041/` (3 PNGs + PDF emitido + traces). Relatório: `docs/relatorios/2026-05-21-TASK-041.md`.
+
+---
+
+### TASK-040 — Revisar geração default da grade para projetos densos
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica
+**Área:** layout / domínio / hidráulica
+**Arquivo:** `tasks/TASK-040-revisar-geracao-default-grade-projetos-densos.md`
+**Concluída em:** 2026-05-21 · 768/768 testes (+9 vs. 759 baseline) · 0 erros tsc · catálogo intocado
+**Absorveu:** escopo "algoritmo da grade" da TASK-032
+
+> Implementado split automático por capacidade hidráulica em `generatePhysicalColumns()`. Quando uma coluna excede DN75, a coluna é dividida em sub-colunas via bisseção recursiva (`splitByCapacity`) — parada quando `selectLateralTube` retorna `ok: true` em cada sub-coluna. **Sem n_max hardcoded** (ajuste 1): usa capacidade hidráulica real, escalável para outros aspersores/catálogos. **Split mínimo necessário** (ajuste 2). Rastreabilidade via `originalColumnIndex` + `splitIndex` em `PhysicalColumn` (ajuste 3). Cada sub-coluna ganha ramal automaticamente via `generateSecondaries` (1-por-coluna). Catálogo `TUBOS_PVC_LF` global **intocado**; DN100 continua proibido para lateral 5022 (TASK-031 preservada); `routeCoords` preservado em cada sub-lateral (TASK-028 preservada). Blocker técnico permanece como fallback (T40-4 valida cenário patológico: vazão extrema 50 m³/h/asp). 9 testes novos em `grid-split-density.test.ts`. T31-4/5/6/8 reescritos para refletir split automático. Endereça H5/H6 da TASK-039.
+>
+> **Atenção estratégica:** TASK-040 resolve a capacidade hidráulica **local** da lateral, mas **NÃO encerra a discussão sobre arquitetura profissional da rede**. A solução adotada (mais ramais) pode não ser o ótimo em todos os contextos. **TASK-042** investigará alternativas (alimentação intermediária, redistribuição da principal, rebalanceamento de setores, mudança de orientação).
+>
+> **ADR:** [ADR-014 — Split automático por capacidade hidráulica da lateral](../docs/decisoes/ADR-014-split-automatico-capacidade-hidraulica-lateral.md) (criada em 2026-05-21)
+>
+> **Pendências:**
+> - **TASK-041 (obrigatória)** — Revalidação visual pós-TASK-040
+> - **TASK-042 (estratégica)** — Diagnóstico profissional da arquitetura principal/ramais/laterais
+
+---
+
+### TASK-031 — Revisar geração default de grade vs. laterais homologadas
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica
+**Área:** domínio / hidráulica / catálogo / governança
+**Arquivo:** `tasks/TASK-031-revisar-geracao-default-grade-laterais-homologadas.md`
+**Concluída em:** 2026-05-21 · 759/759 testes (+12 vs. 747 baseline) · 0 erros tsc · catálogo intocado
+**Absorve:** TASK-025 (marcada `superseded` em 2026-05-21)
+
+> Seleção hidráulica de laterais agora restrita ao subset DN50/DN75 (homologadas para aspersor 5022) via `getCatalogoLateraisHomologadas5022()` em `laterais.ts` — função exportada com nome explícito; catálogo global `TUBOS_PVC_LF` permanece com DN50/DN75/DN100. `selectLateralTube` retorna `lateralCapacity: { ok, reason?, hfM, velMs }`; quando DN75 não atende, mantém DN75 como tubo (solver continua rodando) mas `ok: false` aciona blocker técnico em `generateProposalDiagnostics` com texto: *"Lateral hidraulicamente insuficiente para o aspersor 5022: o maior DN homologado para lateral é DN75, mas N coluna(s)/trecho(s) excedem perda de carga ou velocidade admissível..."* + 5 ações sugeridas. Blocker antigo da TASK-023 *"BOM incompleta — DN não homologado para kit 5022"* preservado como defesa (T31-7 confirma silêncio no caminho normal). 12 testes novos em `lateral-capacity.test.ts` pela superfície pública (não `selectLateralTube` privada). Endereça G2/G3 da TASK-033. Relatório: `docs/relatorios/2026-05-21-TASK-031.md`.
+>
+> **ADR:** [ADR-013 — Restrição de DN homologado por aspersor via subset filtrado](../docs/decisoes/ADR-013-restricao-dn-homologado-aspersor-subset-filtrado.md) (criada em 2026-05-21)
+>
+> **Pendências:**
+> - TASK-039 (sugerida) — Revalidação visual no Projeto A real via Playwright MCP para medir BOM efetiva
+
+---
+
+### TASK-033 — Revalidação visual pós-TASK-028
+
+**Status:** `concluída` (aprovada)
+**Prioridade:** P2-importante
+**Classe:** E — Exploratória
+**Área:** validação / governança / ui
+**Arquivo:** `tasks/TASK-033-revalidacao-visual-pos-task-028.md`
+**Concluída em:** 2026-05-21 · 747/747 testes · 0 erros tsc · `src/` não alterado
+
+> Revalidação no browser real (Playwright MCP) do Projeto A da TASK-027 (`cmpfu7e4b0001ulshh0ni8jhd`, Barreiras/BA) após a TASK-028. **Blocker "Aspersor fora do eixo da lateral física" eliminado** (antes: 21 laterais, desvio máx 7,00 m; agora: ausente). Sidebar passou de 2 blockers + 5 avisos para 1 blocker + 6 avisos; BOM total cresceu R$ 207.952 → R$ 257.089 (+23,6%) — efeito esperado das dobras 90° nas polilinhas; tubo LF Ø100mm subiu 385 → 625 barras. HMT 39,1 → 40,7 mca (novo aviso PN/HMT). Nenhum blocker angular novo (ajuste em `network-angle-diagnostics` da TASK-028 funcionou). PDF gate 422 funciona; F1 da TASK-027 (sem feedback UI) persiste — endereçado por TASK-034. 8 achados (G1–G8): G2/G3 → TASK-031, G5 → TASK-035, G6 → TASK-034. Evidências: `docs/relatorios/evidencias/2026-05-21-TASK-033/` (4 PNGs + 14 traces). Relatório: `docs/relatorios/2026-05-21-TASK-033.md`. Sub-itens da TASK-033 ampla original (TASK-014/007/cenário limpo) → TASK-036/037/038.
+
+---
+
+### TASK-028 — Corrigir geração automática da lateral física sobre os aspersores
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica
+**Área:** layout / domínio
+**Arquivo:** `tasks/TASK-028-corrigir-geracao-lateral-fisica-sobre-aspersores.md`
+**Concluída em:** 2026-05-21 · 747/747 testes (+9 vs. 738 baseline) · 0 erros tsc · catálogo intocado
+
+> `PhysicalColumn` e `Lateral` ganharam campo obrigatório `routeCoords: [number, number][]`. Nova função `buildLateralRoute()` em `laterais.ts` constrói polilinha 0°/90° em frame local rotacionado, garantindo que cada aspersor fica em um vértice e que o primeiro segmento é sempre vertical (preservando contrato de `network-angle-diagnostics`). `generatePhysicalColumns()` e `deriveLateraisFromNetwork()` populam `routeCoords` — esta última reconstrói a rota do **subset operacional** (não copia a rota completa da coluna). `maxSprinklerAxisDeviationM()` mede distância à polilinha; fallback para reta `start→end` quando `routeCoords` ausente. `network-angle-diagnostics.ts` usa primeiro/último segmento real da rota ao calcular vetor da lateral no inlet. `ProjectMap.tsx` consome `col.routeCoords` (mudança 2 linhas, permitida pela regra). Cenário F7 sintético da TASK-027 (S-suave ±0,4 m) deixou de gerar blocker. Blocker `"Aspersor fora do eixo da lateral física"` em `bom.ts:976` **preservado** com texto e severidade inalterados, disparável via fallback (T28-6). Nova premissa documentada: `ROUTE_BUILD_TOL_X_M = 0,05 m`. Relatório: `docs/relatorios/2026-05-21-TASK-028.md`.
+>
+> **ADR:** [ADR-012 — Lateral física como polilinha construtível 0°/90°](../docs/decisoes/ADR-012-lateral-fisica-polilinha-construtivel-0-90.md) (criada em 2026-05-21)
+>
+> **Pendências:**
+> - TASK-035 — BOM de curvas 90° em laterais com `routeCoords` (dobras introduzidas pela rota não são contadas hoje)
+> - Revalidação visual via Playwright MCP no Projeto A da TASK-027 (Barreiras/BA) — concluída pela TASK-033 (G1 confirmou desaparecimento dos 21 blockers de eixo)
+
+---
+
+### TASK-027 — Validação prática no browser do fluxo de projeto
+
+**Status:** `concluída` (aprovada com ressalvas)
+**Prioridade:** P2-importante
+**Classe:** E — Exploratória
+**Área:** ui / validação / governança
+**Arquivo:** `tasks/TASK-027-validacao-browser-fluxo-projeto.md`
+**Concluída em:** 2026-05-21 · 738/738 testes · 0 erros tsc · `src/` não alterado
+
+> Primeira validação visual formal de múltiplos épicos do MVP, executada via Playwright MCP (`@playwright/mcp@latest`, escopo `user` em `~/.claude.json`) no Chromium controlado. Projeto fictício "TASK-027 A" criado em Barreiras/BA (4.87 ha, 337 aspersores 5022-SD, 21 setores @ jornada 21h, BOM R$ 207.952,11). Cenários 2 (com blocker), 3 (mobile 375×812) e 4 (gate PDF 422) cobertos integralmente; Cenário 5 (mapa/labels) parcial (WebGL não DOM); Cenário 1 (limpo) não coberto — fluxo default gerou 2 blockers naturalmente. 7 achados: F1 (PDF sem feedback UI após 422 — Alto), F2 (drawer mobile não vai ao topo, blockers em y=-1068 — Alto), F3/F4/F5 (toolbar/zoom/PDF mobile < 44×44 — Médio/Baixo), F6 (caminho feliz default gera blockers — Médio), F7 (tolerância 0.1 m vs. desvio 7.00 m — Médio). Relatório: `docs/relatorios/2026-05-21-TASK-027.md`. Evidências (11 PNGs + traces): `docs/relatorios/evidencias/2026-05-21-TASK-027/`.
+>
+> **Pendências geradas (próximas tasks sugeridas):**
+> - TASK-028 (A) — Corrigir geração automática da lateral física sobre os aspersores — **concluída em 2026-05-21**
+> - TASK-029 (A) — Drawer mobile: scrollTop=0 ou auto-scroll até blockers ao abrir
+> - TASK-030 (B) — Áreas clicáveis ≥ 44×44 em mobile (toolbar, zoom, PDF)
+> - TASK-031 (A) — Revisar geração default de grade vs. laterais homologadas — **concluída em 2026-05-21** (absorveu TASK-025)
+> - TASK-032 (D) — Calibrar tolerância do gate "aspersor sobre lateral" — **escopo "algoritmo da grade" absorvido pela TASK-040** (decisão administrativa de 2026-05-21). Escopo remanescente: apenas calibração da tolerância, se ainda fizer sentido após TASK-040.
+> - TASK-033 (E) — Revalidação visual pós-TASK-028 — **concluída em 2026-05-21**
+> - TASK-034 (A) — Feedback visual no clique do PDF com blockers ativos
+> - TASK-035 (A) — BOM de curvas 90° em laterais com routeCoords (decorrente da TASK-028)
+> - TASK-036 (E) — Validação visual de labels de setor em 2/3/4 setores (TASK-014)
+> - TASK-037 (E) — Validação de busca por endereço/coordenadas (TASK-007)
+> - TASK-038 (E) — Validação visual do cenário 1 limpo / caminho feliz
+> - TASK-039 (E) — Revalidação visual pós-TASK-031 — **concluída em 2026-05-21**
+> - TASK-040 (A) — Revisar geração default da grade para projetos densos — **concluída em 2026-05-21** (split automático por capacidade hidráulica em `generatePhysicalColumns`)
+> - TASK-041 (E) — Revalidação visual pós-TASK-040 (obrigatória; medir antes/depois no Projeto A real)
+> - TASK-042 (D) — Diagnóstico profissional da arquitetura principal/ramais/laterais (estratégica; alternativas a "mais ramais")
+
+---
+
+### TASK-026-A — Investigar `generateSecondaries` com layout sintético válido
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** D — Correção rápida, com regra de escalada obrigatória (mantida — sem escalada)
+**Área:** layout / hidráulica / domínio (investigação)
+**Arquivo:** `tasks/TASK-026-A-investigar-generate-secondaries-layout-sintetico.md`
+**Concluída em:** 2026-05-21 · 738/738 testes · 0 erros tsc · `src/` não alterado
+
+> Investigação da causa-raiz dos achados A-1 ("`distribution.secondaries = 0`") e A-2 ("HMT undefined") do relatório da TASK-026. Reconstrução fiel do fixture sintético (Variant A — pipeline N-S, 4 col × 8 row, 12 m, 1 espaçamento a oeste da coluna 0) via teste temporário em `tmp/` + config Vitest dedicado, ambos apagados antes da validação final.
+>
+> **Causa-raiz identificada — falso positivo de instrumentação:**
+> - `generateSecondaries` retorna **4 ramais** (lengths 12, 24, 36, 48 m) no cenário fiel — não 0. `result.distribution.secondaries.length === 4`. A-1 **não é reproduzível**.
+> - O HMT correto está em `result.hydraulics.hmt.totalHMT` (campo de `HMTBreakdown` em `hydraulic-sizing.ts:140-149`). O campo `hmtMca` não existe em `HMTBreakdown` — existe apenas em `ProjectLayout.pump` (entrada do usuário). O agente da TASK-026 leu `hmt.hmtMca` → sempre `undefined` → falso achado A-2. Solver computou `totalHMT = 37,11 mca` corretamente.
+>
+> **Sem alteração em motor.** Nenhum arquivo em `src/` foi modificado. TASK-026-B permanece um gate defensivo válido (usa `hmt.totalHMT` corretamente em `bom.ts:1020-1023`). Erratum registrado no relatório `docs/relatorios/2026-05-21-TASK-026-A.md`.
+
+---
+
+### TASK-026-B — Bloquear emissão quando HMT ou cálculo hidráulico essencial estiver indefinido
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** A — Crítica
+**Área:** governança / pdf / hidráulica
+**Arquivo:** `tasks/TASK-026-B-bloquear-emissao-hmt-incompleta.md`
+**Concluída em:** 2026-05-21 · 738/738 testes (731 + 7 novos) · 0 erros tsc
+
+> Derivada do achado A-2 da TASK-026. Adicionado gate em `generateProposalDiagnostics()` (em `src/lib/bom.ts`) que produz blocker quando o projeto está completo (`isComplete=true`) mas a hidráulica essencial está ausente, inválida ou estruturalmente inconsistente. Dois blockers novos: (1) `Cálculo hidráulico incompleto: HMT total não computada ou inválida...` quando `hydraulics === null` ou `totalHMT` é NaN/Infinity/≤0; (2) `Cálculo hidráulico incompleto: N coluna(s) física(s) sem ramal correspondente na distribuição...` quando `physCols > 0 && sizedSecondaries.length === 0`. `pdfEmissionBlockers()` permanece passthrough puro. Otimizer de layout teve filtro estendido para também ignorar esses blockers (mesma lógica do filtro "BOM incompleta" existente — blockers de cálculo incompleto não são violações hidráulicas reais). 7 testes novos em `pdf-emission-hmt-gate.test.ts` (T26B-a..g). Causa-raiz (`generateSecondaries` retornando vazio) NÃO foi corrigida — pertence à TASK-026-A.
+>
+> **Pendências:**
+> - TASK-026-A — investigação de `generateSecondaries` retornando vazio para layout sintético válido
+
+---
+
+### TASK-026 — Validação sintética simples e com blocker
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico (governança)
+**Classe:** E — Exploratória
+**Área:** governança / qualidade
+**Arquivo:** `tasks/TASK-026-validacao-sintetica-simples-e-blocker.md`
+**Concluída em:** 2026-05-21 · 731/731 testes · 0 erros tsc (nenhum arquivo em `src/` alterado)
+
+> Passos 1 e 2 do roteiro mínimo da TASK-024D executados via chamada direta ao orquestrador `calculateIrrigationProject()` em arquivo de teste temporário (apagado após conclusão). Cenário 1 (sem bomba): isComplete=true, 4 colunas DN50, BOM sem pendente de aspersor, PDF seria emitido. Cenário 2 (bomba insuficiente): blocker de bomba gerado com texto legível e acionável, PDF bloqueado. Achados: (A-1) `distribution.secondaries=0` para layout válido → HMT undefined — investigação pendente (TASK-026-A, Classe D/A); (A-2) design gap — HMT undefined não gera blocker em `pdfEmissionBlockers` (TASK-026-B, Classe A); (A-3) DN50 para 12 m³/h é tecnicamente válido (V≈2,0 m/s). Relatório: `docs/relatorios/2026-05-21-TASK-026.md`.
+
+---
+
+### TASK-024D — Matriz de validação por épico antes da proposta real
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico (governança)
+**Classe:** C — Documental
+**Área:** governança / qualidade
+**Arquivo:** `tasks/TASK-024D-matriz-validacao-epicos-mvp.md`
+**Concluída em:** 2026-05-21 · 731/731 testes · 0 erros tsc (nenhum arquivo em `src/` alterado)
+
+> Criada a matriz de validação por épico (tipo de teste, evidência, critério, responsável) e o roteiro mínimo de 6 passos antes da primeira proposta real (fictício simples, fictício com blocker, projeto histórico, validação visual, PDF simulado, revisão interna). Regra central estabelecida: a primeira proposta a cliente NÃO deve ser a primeira validação do sistema. Escala de maturidade revisada para 7 níveis, adicionando "Validado em simulação sintética", "Validado em projeto histórico" e "Validado em piloto interno". Passos 1, 2 e 4 do roteiro podem ser executados imediatamente; passos 3, 5 e 6 aguardam TASK-025 e diâmetros de ramais no PDF.
+
+---
+
+### TASK-024C — Auditoria de conclusão dos épicos do MVP
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico (governança)
+**Classe:** C — Documental
+**Área:** governança / rastreabilidade
+**Arquivo:** `tasks/TASK-024C-auditoria-conclusao-epicos-mvp.md`
+**Concluída em:** 2026-05-21 · 731/731 testes · 0 erros tsc (nenhum arquivo em `src/` alterado)
+
+> Auditoria dos 9 épicos do Mapa Mestre contra escala de 7 níveis de maturidade (Não iniciado → Homologado Brasmáquinas). Resultado: todos os 7 épicos do MVP obrigatório em "Testado em código" ou abaixo. Nenhum atingiu "Validado visualmente" de forma documentada. Achado principal: a primeira proposta a cliente real será o primeiro projeto piloto (E09) e a primeira validação visual documentada de múltiplos épicos — deve ser tratada como evento formal de validação.
+
+---
+
+### TASK-024B — Classificação operacional de tasks
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico (governança)
+**Classe:** C — Documental
+**Área:** governança / metodologia
+**Arquivo:** `tasks/TASK-024-mapa-mestre-tasks.md` (seção 8)
+**Concluída em:** 2026-05-21 · 731/731 testes · 0 erros tsc (nenhum arquivo em `src/` alterado)
+
+> Adicionada ao Mapa Mestre a seção 8 de classificação operacional. Cinco classes (A–E) com critério objetivo binário e fluxo recomendado distinto. Regra de escalada para D e E. Classificação aplicada às próximas 5 tasks do backlog. Objetivo: evitar que tarefas documentais, explorações e correções rápidas sigam o fluxo pesado das tasks críticas.
+
+---
+
+### TASK-024 — Mapa Mestre de Tasks do Motor de Aspersão Convencional
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico (governança)
+**Área:** governança / rastreabilidade
+**Arquivo:** `tasks/TASK-024-mapa-mestre-tasks.md`
+**Concluída em:** 2026-05-21 · 704/704 testes · 0 erros tsc (nenhum arquivo em `src/` alterado)
+
+> Auditoria de backlog, relatórios, ADRs e premissas provisórias. Produto: mapa de 9 épicos com tasks concluídas e futuras classificadas, separação MVP obrigatório / desejável / pós-MVP, critério objetivo de fim de MVP (6 condições verificáveis), lista "não fazer agora" com 12 itens, e próximas 5 tasks recomendadas em ordem. Único bloqueio crítico identificado: TASK-023 (catálogo tê aspersor→lateral + curva 45° adutora).
+
+---
+
+### TASK-025 — Restringir seleção hidráulica de laterais a DN50/DN75 _(superseded)_
+
+**Status:** `superseded` pela TASK-031 (2026-05-21)
+**Prioridade original:** P2-importante
+**Classe original:** A — Crítica
+**Área original:** domínio / hidráulica / catálogo
+**Arquivo:** não criado — escopo absorvido por `tasks/TASK-031-revisar-geracao-default-grade-laterais-homologadas.md`
+
+> **Superseded.** O escopo desta task — restringir seletor hidráulico de laterais a DN50/DN75 e gerar blocker quando não atender — foi absorvido pela TASK-031, que amplia a investigação para a causa-raiz do crescimento da BOM (+23,6%) e do tubo Ø100mm LF (+240 barras) identificados na TASK-033. TASK-031 mantém todas as restrições e critérios técnicos originais de TASK-025 e acrescenta análise da geração default.
+>
+> **Decisão administrativa:** 2026-05-21 — pelo usuário; registrada na abertura da TASK-031.
+
+---
+
 ## Próximas tarefas sugeridas (não formalizadas)
 
-- **Calibração RT de campo — OPTIMIZER_PARAMS**: validar pesos provisionais (PREMISSA_PROVISORIA_MERCADO) e pesos aguardando campo (PENDENTE_CALIBRACAO_RT_CAMPO) com dados de projetos homologados; remover marcadores. Depende de TASK-010A–010Z ✅
-- **Diâmetro dos ramais no PDF**: `PropostaPDF.tsx` não exibe diâmetro individual dos ramais. Incluir coluna com SKU selecionado por `sizedSecondaries`.
+- **[Classe A] Pressão real por derivação (ramal/lateral)**: propagar `cumPrincipalHfM` até ponto de entrada de cada ramal; recalcular `PressureClassCheck` para `violation_confirmed` ou `ok` real; ≥ 3 testes incluindo caso confirmado de violação real vs. conservativo.
+- **[Classe E → D] Revisão RT — `TOLERANCIA_ASPERSOR_EIXO_LATERAL` > 500 m**: consultar RT Brasmáquinas; se aprovado, reclassifica para D e ajusta constante de 0,10 → 0,20 m com 1 teste de regressão > 500 m.
+- **[Classe B] Calibração RT de campo — OPTIMIZER_PARAMS**: validar pesos provisionais (PREMISSA_PROVISORIA_MERCADO) e pesos aguardando campo (PENDENTE_CALIBRACAO_RT_CAMPO) com dados de projetos homologados; remover marcadores. Depende de TASK-010A–010Z ✅

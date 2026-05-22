@@ -180,6 +180,67 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 
 ---
 
+### ROUTE_BUILD_TOL_X_M — **DEPRECATED (TASK-045B)**
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `ROUTE_BUILD_TOL_X_M` |
+| **Valor usado** | **deprecated — sem efeito no algoritmo novo** (constante mantida para compatibilidade de assinatura pública: terceiro parâmetro opcional de `buildLateralRoute`) |
+| **Status** | **`deprecated`** — substituída por eixo único (mediana de X) + gate `TOLERANCIA_ASPERSOR_EIXO_LATERAL` |
+| **Motivo da depreciação** | TASK-045 ajustou de 0,05 → 0,10 m mas a escada visual persistiu no Projeto A real. TASK-044 confirmou empiricamente que **o algoritmo greedy ponto-a-ponto é estruturalmente errado**: cada par de aspersores com desvio numérico pequeno gera cotovelo, propagando trilho deslocado a cada aspersor → escada visível. TASK-045B substituiu o algoritmo: rota agora é **reta única no eixo (mediana de X)** dos aspersores do segmento; aspersor fora de `TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,10 m` dispara blocker via `detectAxisDeviations` (ADR-011), sem compensação por cotovelo. |
+| **Histórico** | (1) TASK-028: criada com 0,05 m (metade do gate operacional); polilinha greedy passando por todos os aspersores. (2) TASK-045: ajustada para 0,10 m (alinhar com gate ADR-011); blocker angular sumiu mas escada visual persistiu. (3) **TASK-045B**: algoritmo de construção da rota mudou — mediana de X + reta de 2 pontos. Constante mantida apenas para compatibilidade. |
+| **Substituída por** | Algoritmo `buildLateralRoute` em `laterais.ts` (TASK-045B): `eixoX = mediana(pts.map(p => p.x))`; rota = `[(eixoX, yMin), (eixoX, yMax)]`. Mediana é **robusta contra outliers** (média seria contaminada e mascararia o blocker). |
+| **Responsável futuro** | Constante pode ser removida quando todos os chamadores forem refatorados para não passar mais o terceiro argumento — escopo de tarefa futura B de limpeza |
+
+---
+
+### MAX_VELOCITY_RAMAL_MS
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `MAX_VELOCITY_RAMAL_MS` |
+| **Valor usado** | `1,5 m/s` |
+| **Onde é usado** | `src/lib/layout/secondary-sizing.ts` — `DEFAULT_MAX_VEL_MS` em `sizeAllSecondaries`; também re-exportado por `src/lib/layout/architecture-selector.ts` para uso interno do motor de seleção arquitetural (TASK-043 / ADR-015). |
+| **Regra** | Velocidade máxima admissível em ramais (PVC rígido enterrado com válvulas) para limitar perda de carga e water-hammer. |
+| **Origem** | **Referência técnica:** NRCS National Engineering Handbook (Sprinkler Irrigation) adota ≈ 5 ft/s (≈ 1,524 m/s) como limite típico para tubulação plástica enterrada em irrigação por aspersão convencional. O valor atual 1,5 m/s é conservador-equivalente. **Não foi identificada NBR brasileira específica** que defina limite de velocidade em ramais de irrigação por aspersão (NBR 13245 trata de fabricação/desempenho do tubo; NBR 12266 trata de classificação — nenhuma de critério de projeto). |
+| **Risco** | Valor conservador pode forçar DN maior (ex.: DN100 R PN80) onde DN75 atenderia operacionalmente. Valor relaxado pode introduzir perdas/golpes inaceitáveis em projetos reais. |
+| **Responsável futuro** | RT Brasmáquinas — pode citar NBR específica brasileira (se conhecer) ou trazer dados de campo para calibração; até lá, manter referência NRCS. |
+| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+
+---
+
+### MAX_HEADLOSS_RAMAL_MCA
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `MAX_HEADLOSS_RAMAL_MCA` |
+| **Valor usado** | `3,0 mca` |
+| **Onde é usado** | `src/lib/layout/secondary-sizing.ts` — `DEFAULT_MAX_HF_MCA` em `sizeAllSecondaries`; também re-exportado por `src/lib/layout/architecture-selector.ts`. |
+| **Regra** | Perda de carga máxima admissível em ramais — 10% da pressão de serviço do aspersor padrão (30 mca × 10% = 3,0 mca). |
+| **Origem** | **Boa prática** da literatura de irrigação por aspersão: perda em ramal ≤ 10–15% da pressão de serviço para preservar uniformidade hidráulica entre laterais. Valor 10% (3,0 mca) é conservador dentro da faixa. |
+| **Risco** | Mais conservador que 15% (4,5 mca); pode forçar DN maior em ramais longos. Relaxar exige cuidado com perda agregada (principal + ramal + lateral) para que pressão real no aspersor permaneça ≥ 30 mca. |
+| **Responsável futuro** | RT Brasmáquinas |
+| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+
+---
+
+### Critério de vazão de projeto do ramal
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | Critério aplicado em `sizeAllSecondaries` |
+| **Valor usado** | `max(lateral.vazaoM3h)` em **todos os setores** da coluna física — cobertura por design (todos os aspersores da coluna ativos simultaneamente). Implementação: [`src/lib/layout/secondary-sizing.ts:179-183`](../../src/lib/layout/secondary-sizing.ts#L179-L183). |
+| **Onde é usado** | `src/lib/layout/secondary-sizing.ts` — `sizeAllSecondaries`. Também usado internamente pelo motor de seleção arquitetural (TASK-043) ao avaliar BOM estimada preliminar de cada candidato. |
+| **Regra** | Vazão de projeto de cada ramal define o DN selecionado por `selectSecondaryPipe`. Critério mais conservador (`max(setor)`) garante que o ramal atende qualquer combinação operacional, incluindo o pior cenário (todos os aspersores da coluna ativos). |
+| **Origem** | **Decisão de engenharia** — adotada como conservadora enquanto a operação real Brasmáquinas (rotativa por setor vs. múltiplos setores simultâneos) não é validada pelo RT. **Não foi alterada na TASK-043** para evitar subdimensionar ramais por baratear BOM sem confirmação operacional. |
+| **Alternativa pós-RT** | Se a operação Brasmáquinas é **rotativa por setor** (1 setor ativo por vez), o critério tecnicamente correto seria `max(setor_simultâneo)` — vazão do pior setor ativo simultaneamente. Reduziria significativamente Q por ramal e portanto DN selecionado em muitos casos. |
+| **Risco — manter conservador (atual)** | Possível over-spec persistente em ramais (DN100 onde DN75 atenderia em operação rotativa). Reflete-se em BOM mais alta. |
+| **Risco — relaxar para `max(setor_simultâneo)` sem RT** | Pode subdimensionar ramais em projetos onde a operação permite múltiplos setores simultâneos. Diretriz Brasmáquinas (TASK-042R): não usar para baratear BOM sem validação operacional. |
+| **Responsável futuro** | RT Brasmáquinas — confirma operação real e libera (se aplicável) mudança para `max(setor_simultâneo)`. |
+| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+
+---
+
 ## Histórico de revisões
 
 | Data | Autor | O que mudou |
@@ -190,3 +251,7 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | 2026-05-20 | Claude Sonnet 4.6 | TASK-015: Adicionada regra REGRA_CONSTRUTIBILIDADE_ANGULAR_REDE_INTERNA (rede interna=[0°,90°]; adutora=[0°,45°,90°]). |
 | 2026-05-20 | Claude Sonnet 4.6 | TASK-018: Adicionada premissa TOLERANCIA_ASPERSOR_EIXO_LATERAL (0,5 m). |
 | 2026-05-20 | Claude Sonnet 4.6 | TASK-019: TOLERANCIA_ASPERSOR_EIXO_LATERAL revisada: valor 0,5 m → 0,10 m; severidade warning → blocker; origem alterada para decisão operacional Brasmáquinas confirmada. |
+| 2026-05-21 | Claude Opus 4.7 | TASK-028: Adicionada premissa ROUTE_BUILD_TOL_X_M (0,05 m) — tolerância geométrica interna para construção da rota da lateral em `buildLateralRoute()`. Não é tolerância do blocker. |
+| 2026-05-21 | Claude Opus 4.7 | TASK-043 (ADR-015): Adicionadas 3 premissas — `MAX_VELOCITY_RAMAL_MS = 1,5 m/s` (origem NRCS NEH; sem NBR específica brasileira identificada); `MAX_HEADLOSS_RAMAL_MCA = 3,0 mca` (boa prática 10% × 30 mca); critério de vazão de projeto do ramal (`max(setor)` atual; mantido conservador enquanto RT não confirma operação real). Todas com status `PENDENTE_REVISAO_RT_BRASMAQUINAS`. Nenhum valor foi alterado nesta task — apenas formalização. |
+| 2026-05-21 | Claude Opus 4.7 | TASK-045: `ROUTE_BUILD_TOL_X_M` atualizado de **0,05 m → 0,10 m**. Justificativa: alinhar com `TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,10 m` (ADR-011); eliminar janela entre 0,05 e 0,10 onde aspersores operacionalmente aceitos geravam cotovelos espúrios → laterais visualmente em zigue-zague (regressão registrada em TASK-044). Blocker `detectAxisDeviations` continua disparando se desvio > 0,10 m. Status mantido `PENDENTE_REVISAO_RT_BRASMAQUINAS`. |
+| 2026-05-21 | Claude Opus 4.7 | **TASK-045B: `ROUTE_BUILD_TOL_X_M` marcada DEPRECATED.** TASK-045 não eliminou escada visual no Projeto A real: algoritmo greedy ponto-a-ponto era estruturalmente errado. TASK-045B substituiu por **eixo único via mediana de X** + reta de 2 pontos. Constante mantida só para compatibilidade. Aspersor fora de `TOLERANCIA_ASPERSOR_EIXO_LATERAL` continua bloqueado por `detectAxisDeviations` (ADR-011). ADR-012 recebeu emenda interpretativa (não criou ADR-016). |

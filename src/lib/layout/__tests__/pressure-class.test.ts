@@ -170,6 +170,15 @@ function makeMinimalBOM(): BOMResult {
       valvulasResolvidasCount: 0,
       valvulasSemCatalogoCount: 0,
       registrosManuaisSecaoCount: 0,
+      conexoesFisicasPendentes: [],
+      conexoesFisicasSemSkuCount: 0,
+      curvas90RamaisLCount: 0,
+      curvas90AdutoraCount: 0,
+      curvas45AdutoraCount: 0,
+      curvas90LateraisCount: 0,
+      curvas90LateraisSemSkuCount: 0,
+      kitAspersorResolvCount: 0,
+      kitAspersorDnNaoHomologadoCount: 0,
     },
   };
 }

@@ -315,16 +315,29 @@ export function detectNetworkAngleIssues(params: {
       // Corrige falso positivo de 180° quando sec.toCoord ≈ col.endLngLat:
       // sem a correção, start→end ficaria antiparalelo ao lastVec → deflexão 180° falsa.
       // Tolerância de snap: 1.0 m (cobre imprecisão de ponto flutuante e offsets de teste).
+      //
+      // TASK-028 ajuste 1: quando `col.routeCoords` existir, usar o vetor do
+      // PRIMEIRO segmento real da rota (inlet ≈ start) ou do ÚLTIMO segmento
+      // (inlet ≈ end). Isso evita falso blocker angular quando a lateral é
+      // polilinha com dobras 90° — start→end não representa mais o trecho
+      // que efetivamente sai do inlet.
       const INLET_SNAP_TOL_M = 1.0;
       const vecToStart = metricVec(sec.toCoord, col.startLngLat, mLng);
       const vecToEnd   = metricVec(sec.toCoord, col.endLngLat,   mLng);
       const dToStart = Math.sqrt(vecToStart[0] ** 2 + vecToStart[1] ** 2);
       const dToEnd   = Math.sqrt(vecToEnd[0]   ** 2 + vecToEnd[1]   ** 2);
+      const route = col.routeCoords && col.routeCoords.length >= 2 ? col.routeCoords : null;
       let latVec: [number, number];
       if (dToStart <= INLET_SNAP_TOL_M) {
-        latVec = metricVec(col.startLngLat, col.endLngLat, mLng); // inlet ≈ startLngLat
+        // Inlet ≈ start: vetor do primeiro segmento real da rota (saindo do inlet).
+        latVec = route
+          ? metricVec(route[0], route[1], mLng)
+          : metricVec(col.startLngLat, col.endLngLat, mLng);
       } else if (dToEnd <= INLET_SNAP_TOL_M) {
-        latVec = metricVec(col.endLngLat, col.startLngLat, mLng); // inlet ≈ endLngLat
+        // Inlet ≈ end: vetor do último segmento real, na ordem reversa (saindo do inlet).
+        latVec = route
+          ? metricVec(route[route.length - 1], route[route.length - 2], mLng)
+          : metricVec(col.endLngLat, col.startLngLat, mLng);
       } else {
         // sec.toCoord não coincide com nenhum extremo — inconsistência geométrica.
         // Fallback conservador: start→end (comportamento original).

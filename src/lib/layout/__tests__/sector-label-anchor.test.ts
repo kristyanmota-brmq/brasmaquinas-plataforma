@@ -8,17 +8,20 @@ function col(
   sectorsTouched: number[],
   startLngLat: [number, number] = [-46 + columnIndex * 0.001, -12],
 ): PhysicalColumn {
+  const endLngLat: [number, number] = [-46, -11.999];
   return {
     id: `col-${columnIndex}`,
     columnIndex,
     startLngLat,
-    endLngLat: [-46, -11.999],
+    endLngLat,
     comprimentoM: 100,
     sprinklerCount: 5,
     vazaoM3h: 1,
     selecao: { tubo: { sku: "T50", diametroMm: 50, diametroInternoMm: 46, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 }, perdaCargaM: 0, velocidadeMs: 0, perdaCargaPercentual: 0 },
     sectorsTouched,
     sprinklerIndices: [],
+    routeCoords: [startLngLat, endLngLat],
+    lateralCapacity: { ok: true, hfM: 0, velMs: 0 },
   };
 }
 

@@ -17,12 +17,15 @@
  *  9. Gerar diagnósticos
  */
 
-import { ASPERSOR_PADRAO, TUBOS_PVC_LF } from "@/lib/catalog/aspersores";
+import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
 import {
   generatePhysicalColumns,
   deriveLateraisFromNetwork,
   detectAxisDeviations,
+  detectLateralCapacityViolations,
+  getCatalogoLateraisHomologadas5022,
   type AxisDeviationReport,
+  type LateralCapacityReport,
   type PhysicalColumn,
   type Lateral,
 } from "@/lib/layout/laterais";
@@ -147,6 +150,13 @@ export interface IrrigationProjectResult {
   diagnostics: ProposalDiagnostics | null;
   networkAngle: NetworkAngleReport | null;
   axisDeviation: AxisDeviationReport | null;
+  /**
+   * Capacidade hidráulica da lateral no subset DN50/DN75 homologado para o
+   * aspersor 5022 (TASK-031). Quando `hasBlockers: true`, alguma coluna excede
+   * perda ou velocidade no maior DN homologado e `generateProposalDiagnostics`
+   * emite blocker técnico.
+   */
+  lateralCapacity: LateralCapacityReport | null;
   /** Null quando o projeto ainda não tem todos os dados necessários para o solver hidráulico. */
   hydraulics: HydraulicSizingReport | null;
 }
@@ -212,6 +222,7 @@ export function calculateIrrigationProject(
     diagnostics: null,
     networkAngle: null,
     axisDeviation: null,
+    lateralCapacity: null,
     hydraulics: null,
     ...partial,
   });
@@ -232,7 +243,7 @@ export function calculateIrrigationProject(
     centroid,
     sprinklers.espacamentoM,
     { vazao: vazaoPorAspersorM3h, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
-    TUBOS_PVC_LF,
+    getCatalogoLateraisHomologadas5022(),
     sectorIndices.length > 0 ? sectorIndices : undefined,
   );
 
@@ -283,7 +294,9 @@ export function calculateIrrigationProject(
     sprinklers.positions,
     sprinklers.espacamentoM,
     { vazao: vazaoPorAspersorM3h, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
-    TUBOS_PVC_LF,
+    getCatalogoLateraisHomologadas5022(),
+    sprinklers.gridAngleDegrees,
+    centroid,
   );
 
   const distributionNetwork: DistributionNetwork = {
@@ -379,6 +392,7 @@ export function calculateIrrigationProject(
     laterais,
     secondaries,
     constructability,
+    centroid: { lat: centroid.lat, lng: centroid.lng },
   };
 
   // BOM preliminar sem secondary sizing — solver ainda não rodou
@@ -402,6 +416,11 @@ export function calculateIrrigationProject(
     centroid,
   );
 
+  // TASK-031: capacidade hidráulica da lateral dentro do subset homologado
+  // DN50/DN75 (regra do aspersor 5022). Quando violações existem, blocker
+  // técnico é emitido em `generateProposalDiagnostics`.
+  const lateralCapacity = detectLateralCapacityViolations(physicalColumns);
+
   const partialResult: IrrigationProjectResult = {
     isComplete: true,
     missingFields: [],
@@ -416,6 +435,7 @@ export function calculateIrrigationProject(
     diagnostics: null,
     networkAngle,
     axisDeviation,
+    lateralCapacity,
     hydraulics: null,
   };
 
@@ -432,7 +452,14 @@ export function calculateIrrigationProject(
 
   // ── Diagnósticos (recebe BOM final + solver hidráulico) ──────────────────
 
-  const diagnostics = generateProposalDiagnostics(layout, bom, hydraulics, networkAngle, axisDeviation);
+  const diagnostics = generateProposalDiagnostics(
+    layout,
+    bom,
+    hydraulics,
+    networkAngle,
+    axisDeviation,
+    lateralCapacity,
+  );
 
   return { ...partialResult, bom, diagnostics, hydraulics };
 }

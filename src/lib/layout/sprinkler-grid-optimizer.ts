@@ -969,11 +969,22 @@ export function runTopKHydraulicValidation(
         continue;
       }
 
-      // Blockers reais do solver oficial (diagnostics.blockers = string[])
-      const blockers: HydraulicBlockerReal[] = result.diagnostics.blockers.map((msg) => ({
-        source: "diagnostics_blocker" as const,
-        message: msg,
-      }));
+      // Blockers reais do solver oficial (diagnostics.blockers = string[]).
+      // Blockers comerciais ("BOM incompleta") não representam restrição hidráulica
+      // e não devem penalizar candidatos na avaliação de layout.
+      // Blockers de cálculo hidráulico incompleto (TASK-026-B) representam falha
+      // de cálculo (HMT inválida ou ramais ausentes), não violação hidráulica de
+      // um layout viável; também não devem penalizar candidatos. O ranking do
+      // otimizer compara violações hidráulicas reais (velocidade, pressão, bomba).
+      const blockers: HydraulicBlockerReal[] = result.diagnostics.blockers
+        .filter((msg) =>
+          !msg.startsWith("BOM incompleta") &&
+          !msg.startsWith("Cálculo hidráulico incompleto"),
+        )
+        .map((msg) => ({
+          source: "diagnostics_blocker" as const,
+          message: msg,
+        }));
 
       const hmtRequired = result.hydraulics?.hmt.totalHMT ?? null;
       const invalidCount = result.hydraulics?.validation.invalidSegments.length ?? null;

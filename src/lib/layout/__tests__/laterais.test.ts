@@ -39,8 +39,13 @@ describe("selectDiameter — seleção de diâmetro de lateral", () => {
 const CENTROID = { lng: -46.0, lat: -12.0 };
 const SPACING = ASPERSOR_PADRAO.espacamentoPadraoM; // 12 m
 
+// Catálogo robusto para testes de agrupamento (não restringe por capacidade
+// hidráulica — assim o split por capacidade da TASK-040 não interfere e o
+// teste continua validando o agrupamento geométrico).
 const TEST_CATALOG: TuboCandidato[] = [
-  { sku: "TEST-50", diametroMm: 50, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
+  { sku: "TEST-50",  diametroMm: 50,  diametroInternoMm: 46, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
+  { sku: "TEST-75",  diametroMm: 75,  diametroInternoMm: 69, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
+  { sku: "TEST-100", diametroMm: 100, diametroInternoMm: 92, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
 ];
 const TEST_ASPERSOR = {
   vazao: ASPERSOR_PADRAO.vazaoM3PorHora,

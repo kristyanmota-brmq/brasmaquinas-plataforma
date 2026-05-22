@@ -50,6 +50,8 @@ function makeCol(
     selecao: MOCK_SELECAO,
     sectorsTouched: [0],
     sprinklerIndices: [],
+    routeCoords: [startLngLat, endLngLat],
+    lateralCapacity: { ok: true, hfM: 0, velMs: 0 },
   };
 }
 

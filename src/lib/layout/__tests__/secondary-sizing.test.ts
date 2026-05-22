@@ -30,15 +30,19 @@ function makeSecondary(id: string, colId: string, lengthM: number): SecondaryPip
 
 function makeLateral(colId: string, sectorId: number, flowM3h: number): Lateral {
   const smallestTube = TUBOS_PVC_RIGIDO[0];
+  const startLngLat: [number, number] = [0, 0];
+  const endLngLat: [number, number] = [0, 0];
   return {
     physicalColumnId: colId,
     sectorId,
     columnIndex: 0,
-    startLngLat: [0, 0],
-    endLngLat: [0, 0],
+    startLngLat,
+    endLngLat,
     sprinklerCount: 4,
     comprimentoM: 48,
     vazaoM3h: flowM3h,
+    routeCoords: [startLngLat, endLngLat],
+    lateralCapacity: { ok: true, hfM: 0, velMs: 0 },
     selecao: {
       tubo: smallestTube,
       perdaCargaM: 0,

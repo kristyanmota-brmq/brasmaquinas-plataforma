@@ -6,7 +6,11 @@
 
 import { generatePrincipalAndAdutora } from "./principal";
 import { buildSectorsByFlowWithColumnSplitting } from "./sectorization";
-import type { PhysicalColumn } from "./laterais";
+import {
+  selectArchitectureByBom,
+  type ArchitectureSelectionResult,
+} from "./architecture-selector";
+import type { PhysicalColumn, Lateral } from "./laterais";
 import type { ProjectLayout } from "@/app/projetos/[id]/layout-schema";
 
 const LAMINA_MM = 10 as const;
@@ -47,6 +51,53 @@ export function buildAutoPipelineCoords(
       : { principal: fallback, adutora: [] as [number, number][] };
 
   return { principal, adutora, lengthMeters: pipelineLength(principal) };
+}
+
+/**
+ * TASK-043 — Wrapper que delega ao motor de seleção arquitetural (ADR-015).
+ *
+ * Avalia candidatos A0/A2/A3 e retorna a principal/adutora vencedora —
+ * menor BOM estimada preliminar tecnicamente válida e operacionalmente executável.
+ *
+ * Quando `laterais.length === 0` (caso degenerado pré-distribuição), faz fallback
+ * para `buildAutoPipelineCoords` (A0 puro) — o motor precisa de laterais para
+ * dimensionar ramais.
+ *
+ * A BOM oficial continua sendo gerada por `buildBOM()` sobre o resultado do
+ * solver hidráulico após a arquitetura escolhida ser aplicada.
+ */
+export function buildSelectedPipelineCoords(
+  waterSource: { lng: number; lat: number },
+  physicalColumns: PhysicalColumn[],
+  centroid: { lng: number; lat: number },
+  gridAngleDegrees: number,
+  laterais: Lateral[],
+): {
+  principal: [number, number][];
+  adutora: [number, number][];
+  lengthMeters: number;
+  architectureSelection: ArchitectureSelectionResult | null;
+} {
+  // Fallback: sem colunas ou laterais não há o que selecionar.
+  if (physicalColumns.length === 0 || laterais.length === 0) {
+    const base = buildAutoPipelineCoords(waterSource, physicalColumns, centroid, gridAngleDegrees);
+    return { ...base, architectureSelection: null };
+  }
+
+  const selection = selectArchitectureByBom({
+    waterSource,
+    physicalColumns,
+    centroid,
+    gridAngleDegrees,
+    laterais,
+  });
+
+  return {
+    principal: selection.winnerCandidate.principal,
+    adutora: selection.winnerCandidate.adutora,
+    lengthMeters: selection.winnerCandidate.principalLengthM,
+    architectureSelection: selection,
+  };
 }
 
 /**

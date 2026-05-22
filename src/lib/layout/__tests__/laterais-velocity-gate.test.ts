@@ -117,6 +117,8 @@ describe("selectLateralTube — gate de velocidade com diâmetro interno", () =>
       selecao: { tubo: DN50, perdaCargaM: 0, velocidadeMs: 0, perdaCargaPercentual: 0 },
       sectorsTouched: [0],
       sprinklerIndices,
+      routeCoords: [positions[0], positions[n - 1]],
+      lateralCapacity: { ok: true, hfM: 0, velMs: 0 },
     };
 
     const seg: OperationalSegment = {
@@ -134,7 +136,7 @@ describe("selectLateralTube — gate de velocidade com diâmetro interno", () =>
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, CATALOG_2,
     );
     const laterais = deriveLateraisFromNetwork(
-      [physCol], [seg], positions, SPACING, ASPERSOR_MIN, CATALOG_2,
+      [physCol], [seg], positions, SPACING, ASPERSOR_MIN, CATALOG_2, 0, CENTROID,
     );
 
     expect(laterais[0].selecao.tubo.sku).toBe(cols[0].selecao.tubo.sku);

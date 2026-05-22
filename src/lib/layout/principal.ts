@@ -17,11 +17,32 @@ function dist2(a: [number, number], b: [number, number]): number {
 }
 
 /**
+ * Opções de override para a geração da principal — usadas pelo motor de seleção
+ * arquitetural (TASK-043) para gerar candidatos A2 (borda forçada) e A3 (central).
+ *
+ * Default (ambos undefined) preserva o comportamento original byte-a-byte:
+ * decisão de lado por proximidade da captação (A0 baseline).
+ */
+export interface GeneratePrincipalOptions {
+  /**
+   * Força o lado da principal (sem usar a regra de proximidade da captação).
+   * Usado por A2 para avaliar `min` e `max` separadamente e escolher por menor BOM.
+   */
+  forceSide?: "min" | "max";
+  /**
+   * Quando true, `principalY = (yMinGlobal + yMaxGlobal) / 2` (eixo central),
+   * sobrepondo `forceSide`. Usado por A3.
+   */
+  centralMode?: boolean;
+}
+
+/**
  * Gera principal (polilinha) e adutora (segmento captação → principal) de forma bottom-up.
  *
  * Recebe PhysicalColumn[] — a rede física já deduplicada, independente da setorização.
  * Cada PhysicalColumn gera exatamente um ponto de derivação na principal:
- * a extremidade da coluna que fica no lado da captação (yMin ou yMax no frame local).
+ * a extremidade da coluna que fica no lado da captação (yMin ou yMax no frame local),
+ * ou no eixo central quando `options.centralMode === true`.
  *
  * Separa fisico de operacional:
  *   - A principal é construída a partir de colunas físicas únicas.
@@ -39,6 +60,7 @@ export function generatePrincipalAndAdutora(
   physicalColumns: PhysicalColumn[],
   centroid: { lng: number; lat: number },
   gridAngleDegrees: number,
+  options?: GeneratePrincipalOptions,
 ): { principal: [number, number][]; adutora: [number, number][] } {
   const captacaoLngLat: [number, number] = [waterSource.lng, waterSource.lat];
 
@@ -81,8 +103,16 @@ export function generatePrincipalAndAdutora(
   const yMinGlobal = Math.min(...physColsLocal.map((l) => l.yMin));
   const yMaxGlobal = Math.max(...physColsLocal.map((l) => l.yMax));
 
+  // TASK-043: motor de seleção arquitetural pode forçar lado (A2) ou modo central (A3).
+  // Default (sem opções) preserva a regra original: proximidade da captação.
   let side: "min" | "max";
-  if (wsLocal[1] <= yMinGlobal) {
+  if (options?.centralMode) {
+    // A3 central: ordenação por Y crescente (side="min") é convenção arbitrária;
+    // não afeta a topologia, apenas a ordem dos pontos de derivação.
+    side = "min";
+  } else if (options?.forceSide) {
+    side = options.forceSide;
+  } else if (wsLocal[1] <= yMinGlobal) {
     side = "min";
   } else if (wsLocal[1] >= yMaxGlobal) {
     side = "max";
@@ -100,7 +130,11 @@ export function generatePrincipalAndAdutora(
   // Ordenação: X crescente; empate em X (colunas com gap físico = mesmo xRep)
   // resolve pelo Y mais próximo da captação, para que a primeira ocorrência seja
   // o segmento diretamente conectado à principal.
-  const principalY = side === "min" ? yMinGlobal : yMaxGlobal;
+  const principalY = options?.centralMode
+    ? (yMinGlobal + yMaxGlobal) / 2
+    : side === "min"
+      ? yMinGlobal
+      : yMaxGlobal;
   physColsLocal.sort((a, b) => {
     const dx = a.xLateral - b.xLateral;
     if (Math.abs(dx) > 1e-6) return dx;

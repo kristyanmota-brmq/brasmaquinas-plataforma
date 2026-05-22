@@ -234,6 +234,58 @@ export const ADESIVO_PVC: Produto = {
 };
 
 // ============================================================
+// TASK-023: Kit de ligação do aspersor 5022 por DN da lateral
+//
+// Regra operacional Brasmáquinas: laterais somente DN50 e DN75 para o 5022.
+// Esta estrutura é a trava de segurança na BOM. A restrição do seletor
+// hidráulico (generatePhysicalColumns) é escopo de TASK-025.
+//
+// Notas de dado:
+//   - precoVenda: homologado pelo RT (2026-05-21)
+//   - custo: 0 — custo de aquisição não informado; NÃO usar para margem real
+//   - marca: "" para SKUs 1819000, 1000843, 1000354 — pendente do RT
+// ============================================================
+
+export interface KitAspersor5022Item {
+  sku: string;
+  descricao: string;
+  /** Fornecedor; "" quando não informado pelo RT. */
+  marca: string;
+  unidade: string;
+  /** Custo de aquisição não informado — não usar para análise de margem. */
+  custo: 0;
+  precoVenda: number;
+}
+
+export const KIT_ASPERSOR_5022: { dnMm: number; itens: KitAspersor5022Item[] }[] = [
+  {
+    dnMm: 50,
+    itens: [
+      { sku: "1819000", descricao: 'Luva PVC BR 3/4"',                      marca: "",      unidade: "unid", custo: 0, precoVenda:  6.00 },
+      { sku: "1000843", descricao: 'Tubo de Subida PVC BR 3/4" x 3,0 m',   marca: "",      unidade: "unid", custo: 0, precoVenda: 30.25 },
+      { sku: "1000354", descricao: 'Tee de derivação roscável 50 mm x 3/4"', marca: "",    unidade: "unid", custo: 0, precoVenda: 15.00 },
+    ],
+  },
+  {
+    dnMm: 75,
+    itens: [
+      { sku: "1819000", descricao: 'Luva PVC BR 3/4"',                      marca: "",      unidade: "unid", custo: 0, precoVenda:  6.00 },
+      { sku: "1000843", descricao: 'Tubo de Subida PVC BR 3/4" x 3,0 m',   marca: "",      unidade: "unid", custo: 0, precoVenda: 30.25 },
+      { sku: "132789",  descricao: 'TE SOLD IRR PN80 DN75 X 1" - PTI',      marca: "PTI",   unidade: "unid", custo: 0, precoVenda: 36.75 },
+      { sku: "1464000", descricao: 'BUCHA RED. ROSC. 1" X 3/4" - TIGRE',    marca: "TIGRE", unidade: "unid", custo: 0, precoVenda:  5.70 },
+    ],
+  },
+];
+
+/**
+ * Retorna os itens do kit do aspersor 5022 para o DN de lateral informado.
+ * Retorna null para DNs não homologados (qualquer DN != 50 e != 75).
+ */
+export function selectKitAspersor5022(dnMm: number): KitAspersor5022Item[] | null {
+  return KIT_ASPERSOR_5022.find((k) => k.dnMm === dnMm)?.itens ?? null;
+}
+
+// ============================================================
 // SELEÇÃO DE TUBO POR DIÂMETRO MÍNIMO (Hazen-Williams V = 1.5 m/s)
 // ============================================================
 export function selectTubo(vazaoM3PorHora: number): (typeof TUBOS_PVC_RIGIDO)[number] {

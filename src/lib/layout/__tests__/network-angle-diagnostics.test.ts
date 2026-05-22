@@ -59,6 +59,8 @@ function makeCol(
     selecao: DUMMY_SELECAO,
     sectorsTouched: [0],
     sprinklerIndices: [0, 1, 2, 3, 4],
+    routeCoords: [start, end],
+    lateralCapacity: { ok: true, hfM: 0, velMs: 0 },
   };
 }
 

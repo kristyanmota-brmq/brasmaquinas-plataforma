@@ -534,21 +534,24 @@ describe("T10 — consistência mapa vs PDF: mesmo IrrigationProjectResult", () 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T19 — Desvio aspersor → eixo lateral em diagnostics.blockers
+// T28 — Desvio aspersor → eixo lateral coberto pela rota física (TASK-028)
 //
 // Regra operacional Brasmáquinas: aspersor fora do eixo da lateral física é
 // blocker (vala da lateral = vala do aspersor). TOLERANCIA = 0,10 m.
 //
-// T19-f: layout com positions[0] deslocado +0,15 m em X → col 0 tem desvio
-//   xSegRep = X + 0,15×1/5 = X + 0,03; dev_pos[0] = 0,12 m > 0,10 → blocker.
-// T19-g: layout sem offset → nenhum blocker de eixo.
-// T19-h: pdfEmissionBlockers retorna a mensagem de T19-f.
+// Após a TASK-028: o motor gera a lateral como polilinha (routeCoords) que
+// passa por todos os aspersores. O blocker continua existindo como fallback
+// quando a rota não puder ser construída — testado em unidade (lateral-route.test.ts).
+//
+// T28-f: layout com positions[0] deslocado +0,15 m em X → rota cobre o aspersor
+//   via dobra 90° → blocker NÃO dispara (mudança vs. T19-f original).
+// T28-g: layout sem offset → continua sem blocker.
+// T28-h: pdfEmissionBlockers não retorna o blocker quando a rota cobre.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("T19 — desvio aspersor → eixo lateral gera blocker", () => {
+describe("T28 — desvio aspersor coberto pela rota física da lateral", () => {
   const mPerLng = 111320 * Math.cos((CENTROID.lat * Math.PI) / 180);
   // Offset de 0,15 m em longitude no positions[0] da coluna 0.
-  // Com 5 sprinklers: xSegRep = X + 0,15/5 = X + 0,03; dev = 0,12 m > 0,10 → blocker.
   const xOffsetLng = 0.15 / mPerLng;
 
   function makeLayoutWithOffset(): ProjectLayout {
@@ -562,7 +565,10 @@ describe("T19 — desvio aspersor → eixo lateral gera blocker", () => {
     };
   }
 
-  it("T19-f: calculateIrrigationProject com posição deslocada → blocker de eixo", () => {
+  it("T28-f: posição deslocada 0,15 m → blocker DISPARA (TASK-045B emenda ADR-012)", () => {
+    // TASK-045B: rota é reta no eixo; aspersor a 0,15 m > TOLERANCIA (0,10 m)
+    // gera blocker. Comportamento esperado pós-emenda: detector volta a operar
+    // como gate genuíno, sem polilinha "salvadora".
     const result = calculateIrrigationProject(makeLayoutWithOffset());
     expect(result.diagnostics).not.toBeNull();
     const hasAxisBlocker = result.diagnostics!.blockers.some(
@@ -571,7 +577,7 @@ describe("T19 — desvio aspersor → eixo lateral gera blocker", () => {
     expect(hasAxisBlocker).toBe(true);
   });
 
-  it("T19-g: calculateIrrigationProject com grid correto → zero blockers de eixo", () => {
+  it("T28-g: grid correto → zero blockers de eixo (regressão)", () => {
     const result = calculateIrrigationProject(makeCompleteLayout(4, 5, 2));
     expect(result.diagnostics).not.toBeNull();
     const hasAxisBlocker = result.diagnostics!.blockers.some(
@@ -580,7 +586,8 @@ describe("T19 — desvio aspersor → eixo lateral gera blocker", () => {
     expect(hasAxisBlocker).toBe(false);
   });
 
-  it("T19-h: pdfEmissionBlockers retorna blocker de eixo quando presente", () => {
+  it("T28-h: pdfEmissionBlockers retorna o blocker quando há desvio (TASK-045B)", () => {
+    // TASK-045B: aspersor desalinhado >0,10 m gera blocker que bloqueia PDF.
     const result = calculateIrrigationProject(makeLayoutWithOffset());
     const blockers = pdfEmissionBlockers(result);
     const hasAxisBlocker = blockers.some(

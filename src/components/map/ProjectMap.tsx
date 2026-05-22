@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Map, {
   Marker,
@@ -56,7 +57,7 @@ import type { Lateral, PhysicalColumn } from "@/lib/layout/laterais";
 import { resolveSectorLabelAnchor } from "@/lib/layout/sector-label-anchor";
 import { calculateIrrigationProject } from "@/lib/layout/irrigation-project";
 import {
-  buildAutoPipelineCoords,
+  buildSelectedPipelineCoords,
   buildMainPipelineUpdate,
   buildSectorizationForJornada,
 } from "@/lib/layout/layout-use-cases";
@@ -66,6 +67,7 @@ interface Props {
   projectId: string;
   initialLayout?: ProjectLayout;
   projectName?: string;
+  statusLabel?: string;
   client?: string;
   city?: string;
   state?: string;
@@ -153,9 +155,10 @@ function calculatePipelineLength(coords: [number, number][]): number {
 }
 
 
-export function ProjectMap({ projectId, initialLayout, projectName, client, city, state }: Props) {
+export function ProjectMap({ projectId, initialLayout, projectName, statusLabel, client, city, state }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [mode, setMode] = useState<Mode>("view");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [layout, setLayout] = useState<ProjectLayout>(initialLayout ?? {});
   const [drawingCoords, setDrawingCoords] = useState<[number, number][]>([]);
   const [drawingPipeline, setDrawingPipeline] = useState<[number, number][]>(
@@ -244,7 +247,11 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
         properties: { id: col.id, isSplit: col.sectorsTouched.length > 1 },
         geometry: {
           type: "LineString" as const,
-          coordinates: [col.startLngLat, col.endLngLat],
+          // TASK-028: consome a polilinha real da lateral; fallback para
+          // reta start→end se routeCoords estiver ausente.
+          coordinates: col.routeCoords && col.routeCoords.length >= 2
+            ? col.routeCoords
+            : [col.startLngLat, col.endLngLat],
         },
       })),
   }), [physicalColumns]);
@@ -291,11 +298,12 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
     if (layout.mainPipeline?.source === "manual") return;
     if (!layout.centroid) return;
 
-    const { principal, adutora, lengthMeters } = buildAutoPipelineCoords(
+    const { principal, adutora, lengthMeters } = buildSelectedPipelineCoords(
       layout.waterSource,
       physicalColumns,
       layout.centroid,
       layout.sprinklers?.gridAngleDegrees ?? 0,
+      laterais,
     );
 
     // Adutora conecta sempre ao endpoint mais próximo da captação (nearest, via principal.ts).
@@ -545,11 +553,12 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   const resetToAutoPipeline = useCallback(() => {
     if (!layout.waterSource || !layout.centroid) return;
 
-    const { principal, adutora, lengthMeters } = buildAutoPipelineCoords(
+    const { principal, adutora, lengthMeters } = buildSelectedPipelineCoords(
       layout.waterSource,
       physicalColumns,
       layout.centroid,
       layout.sprinklers?.gridAngleDegrees ?? 0,
+      laterais,
     );
 
     const elevationStartM = queryElevation(principal[0][0], principal[0][1]);
@@ -562,7 +571,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
       ...l,
       mainPipeline: buildMainPipelineUpdate(principal, adutora, lengthMeters, elevationStartM, elevationEndM),
     }));
-  }, [layout.waterSource, layout.centroid, layout.sprinklers, physicalColumns, queryElevation]);
+  }, [layout.waterSource, layout.centroid, layout.sprinklers, physicalColumns, laterais, queryElevation]);
 
   const clearPipeline = useCallback(() => {
     setLayout((l) => {
@@ -997,7 +1006,8 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
   }, [selectedSector, layout.sprinklers, layout.sectorization]);
 
   return (
-    <div className="grid grid-cols-[1fr_360px] gap-0 h-[calc(100vh-220px)] min-h-[600px] border border-border rounded-md overflow-hidden bg-background">
+    // Workspace full-screen. Header = h-16 = 64px (sticky). 100dvh evita overflow em mobile/Safari onde 100vh inclui a barra do navegador.
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] h-[calc(100dvh-64px)] bg-background overflow-hidden">
       <div className="relative">
         <Map
           ref={mapRef}
@@ -1545,63 +1555,6 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
           </button>
         </div>
 
-        {pdfError && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-red-300 rounded-md shadow-lg p-3 max-w-lg w-max max-h-[70vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs text-red-700 flex-1">
-                {pdfError.kind === "blocked" ? (
-                  <>
-                    <p className="font-semibold mb-1">Projeto bloqueado para emissão</p>
-                    <ul className="space-y-0.5 list-disc list-inside mb-2">
-                      {pdfError.blockers.map((b, i) => (
-                        <li key={i}>{b}</li>
-                      ))}
-                    </ul>
-                    {pdfError.invalidHydraulicSegments.length > 0 && (
-                      <div className="mt-2 border-t border-red-200 pt-2">
-                        <p className="font-semibold mb-1">
-                          Segmentos hidráulicos inválidos ({pdfError.invalidHydraulicSegments.length} total
-                          {pdfError.invalidHydraulicSegments.length > 3 ? " — exibindo os 3 primeiros" : ""}):
-                        </p>
-                        <div className="space-y-2">
-                          {pdfError.invalidHydraulicSegments.slice(0, 3).map((seg) => (
-                            <div key={seg.id} className="bg-red-50 rounded p-1.5 font-mono text-[10px] leading-snug">
-                              <div className="font-sans font-semibold text-[10px] mb-0.5 text-red-800">
-                                {seg.type} · {REJECTION_REASON_LABEL[seg.rejectionReason] ?? seg.rejectionReason}
-                              </div>
-                              <div>
-                                DN {seg.diameterNominalMm} mm
-                                {seg.internalDiameterMm != null && ` (Øint ${seg.internalDiameterMm} mm)`}
-                                {" · "}Q {seg.flowM3h.toFixed(1)} m³/h
-                              </div>
-                              <div>
-                                v {seg.velocityMs.toFixed(2)} m/s
-                                {" > lim "}{seg.maxVelocityMs.toFixed(1)} m/s
-                              </div>
-                              <div>
-                                hf {seg.headLossMca.toFixed(2)} mca
-                                {seg.maxHeadLossMca != null && ` > lim ${seg.maxHeadLossMca.toFixed(1)} mca`}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p>Erro técnico ao gerar o PDF. Tente novamente ou contacte o suporte.</p>
-                )}
-              </div>
-              <button
-                onClick={() => setPdfError(null)}
-                className="text-red-400 hover:text-red-600 flex-shrink-0"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
-
         {showMemorial && (
           <MemorialPanel
             laterais={laterais}
@@ -1683,6 +1636,16 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
           </div>
         )}
 
+        {/* Botão de toggle do sidebar — visível apenas em mobile (md:hidden) */}
+        <button
+          className="absolute bottom-4 right-16 z-10 md:hidden min-h-[44px] min-w-[44px] bg-white/95 backdrop-blur-sm border border-border rounded-md shadow-md px-3 py-2 text-xs text-ink flex items-center gap-1.5"
+          onClick={() => setSidebarOpen((v) => !v)}
+          aria-label="Abrir painel de layout do projeto"
+        >
+          <Spline className="w-3.5 h-3.5" />
+          <span>Layout</span>
+        </button>
+
         {/* Legenda técnica mínima */}
         {layout.sprinklers && (
           <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-border rounded-md shadow-md px-3 py-2 pointer-events-none">
@@ -1711,7 +1674,142 @@ export function ProjectMap({ projectId, initialLayout, projectName, client, city
         <SaveStatus saving={saving} savedAt={savedAt} />
       </div>
 
-      <aside className="border-l border-border bg-surface p-6 overflow-y-auto">
+      {/* Overlay mobile — fecha o drawer ao clicar fora */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <aside
+        className={clsx(
+          "border-l border-border bg-surface p-6 overflow-y-auto",
+          // Mobile: drawer fixo saindo de baixo
+          "fixed bottom-0 left-0 right-0 z-40 h-[60dvh]",
+          "transition-transform duration-300 ease-in-out",
+          sidebarOpen ? "translate-y-0" : "translate-y-full",
+          // Desktop: estático no grid, ocupa a altura inteira da row
+          "md:static md:h-full md:translate-y-0 md:z-auto md:transition-none",
+        )}
+      >
+        {/* ── Header do projeto ────────────────────────────────── */}
+        <div className="-mx-6 -mt-6 px-6 py-4 border-b border-border mb-5">
+          <Link
+            href="/projetos"
+            className="text-[11px] text-ink-3 hover:text-ink-2 inline-block mb-2 transition-colors"
+          >
+            ← Projetos
+          </Link>
+          {projectName && (
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-ink leading-snug truncate">
+                  {projectName}
+                </h2>
+                {(client || city || state) && (
+                  <div className="text-[11px] text-ink-3 mt-0.5 truncate">
+                    {[client, [city, state].filter(Boolean).join("/")]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                )}
+              </div>
+              {statusLabel && (
+                <span className="flex-shrink-0 inline-block px-2 py-0.5 rounded-sm text-[10px] font-medium border border-border bg-background text-ink-2 uppercase tracking-[0.08em]">
+                  {statusLabel}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Blockers (derivados de projectResult.diagnostics — sempre reativos) ── */}
+        {(projectResult.diagnostics?.blockers.length ?? 0) > 0 && (
+          <div className="mb-5 bg-red-50 border border-red-200 rounded-md p-3">
+            <p className="text-[11px] font-semibold text-red-700 uppercase tracking-[0.08em] mb-2">
+              Bloqueios ativos
+            </p>
+            <ul className="space-y-1 max-h-32 overflow-y-auto">
+              {projectResult.diagnostics!.blockers.map((b, i) => (
+                <li key={i} className="text-xs text-red-700 flex items-start gap-1.5">
+                  <span className="flex-shrink-0 mt-0.5">·</span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+            {/* Detalhes de segmentos inválidos do último attempt de PDF */}
+            {pdfError?.kind === "blocked" && pdfError.invalidHydraulicSegments.length > 0 && (
+              <div className="mt-2 border-t border-red-200 pt-2">
+                <p className="text-[11px] font-semibold text-red-700 mb-1.5">
+                  Segmentos inválidos ({pdfError.invalidHydraulicSegments.length}
+                  {pdfError.invalidHydraulicSegments.length > 3 ? " — exibindo 3 primeiros" : ""}):
+                </p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {pdfError.invalidHydraulicSegments.slice(0, 3).map((seg) => (
+                    <div key={seg.id} className="bg-red-100 rounded p-1.5 font-mono text-[10px] leading-snug">
+                      <div className="font-sans font-semibold text-[10px] mb-0.5 text-red-800">
+                        {seg.type} · {REJECTION_REASON_LABEL[seg.rejectionReason] ?? seg.rejectionReason}
+                      </div>
+                      <div>
+                        DN {seg.diameterNominalMm}mm
+                        {seg.internalDiameterMm != null && ` (Øint ${seg.internalDiameterMm}mm)`}
+                        {" · "}Q {seg.flowM3h.toFixed(1)} m³/h
+                      </div>
+                      <div>
+                        v {seg.velocityMs.toFixed(2)} m/s{" > lim "}{seg.maxVelocityMs.toFixed(1)} m/s
+                      </div>
+                      <div>
+                        hf {seg.headLossMca.toFixed(2)} mca
+                        {seg.maxHeadLossMca != null && ` > lim ${seg.maxHeadLossMca.toFixed(1)} mca`}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setPdfError(null)}
+                  className="mt-2 text-[10px] text-red-400 hover:text-red-600"
+                >
+                  Dispensar detalhes
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Erro técnico inesperado do PDF ───────────────────── */}
+        {pdfError?.kind === "technical" && (
+          <div className="mb-5 bg-red-50 border border-red-200 rounded-md p-3">
+            <p className="text-xs text-red-700">
+              Erro técnico ao gerar o PDF. Tente novamente ou contacte o suporte.
+            </p>
+            <button
+              onClick={() => setPdfError(null)}
+              className="mt-1.5 text-[10px] text-red-400 hover:text-red-600"
+            >
+              Dispensar
+            </button>
+          </div>
+        )}
+
+        {/* ── Warnings (derivados de projectResult.diagnostics) ── */}
+        {(projectResult.diagnostics?.warnings.length ?? 0) > 0 && (
+          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-md p-3">
+            <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-[0.08em] mb-2">
+              Avisos
+            </p>
+            <ul className="space-y-1 max-h-32 overflow-y-auto">
+              {projectResult.diagnostics!.warnings.map((w, i) => (
+                <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
+                  <span className="flex-shrink-0 mt-0.5">·</span>
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* ── Layout do projeto ─────────────────────────────────── */}
         <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-5">
           Layout do projeto
         </h3>
