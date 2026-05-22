@@ -351,10 +351,10 @@
 - Busca por coordenadas brasileiras (vírgula decimal) ainda não suportada.
 
 **Status real**
-- **Testado em código.** Evidência: 18 testes puros; navegação no Projeto A confirmada (TASK-046); TASK-048 (2026-05-22) validou Cenário 1 (drawer mobile) e Cenário 6 (coluna fragmentada — 17 splits) como PASS, mas Cenários 2-5 ficaram NÃO EXECUTADOS por limitação ambiental — E06 **não promovido**.
+- **Validado visualmente no Projeto A + fixtures E06 — caso único.** Evidência: 18 testes puros; TASK-046 (navegação Projeto A); TASK-048 (Cenários 1 drawer mobile + 6 coluna fragmentada PASS); TASK-049 (4 fixtures plantados); **TASK-050 (6/6 cenários PASS — listagem, blocker visível, HTTP 422 + erro pós-PDF, labels com 3 setorizações distintas).** Ressalva "caso único": fixtures e Projeto A são artefatos fictícios — não substituem projeto histórico real, piloto interno ou homologação RT.
 
-**Tasks vinculadas — concluídas:** TASK-007, TASK-014, TASK-021, TASK-048 (parcial), TASK-049 (fixtures plantados)
-**Tasks vinculadas — pendentes/futuras:** TASK-050 — re-execução TASK-048 cenários 2-5 com fixtures E06 (habilita promoção); `aria-expanded` no toggle do drawer (H1); suporte a vírgula decimal brasileira na busca
+**Tasks vinculadas — concluídas:** TASK-007, TASK-014, TASK-021, TASK-048 (parcial), TASK-049 (fixtures), TASK-050 (validação browser completa)
+**Tasks vinculadas — pendentes/futuras:** `aria-expanded` no toggle do drawer (H1 — Classe D); suporte a vírgula decimal brasileira na busca; comparação com projeto real (E09) habilita promoção acima de "caso único"
 
 ---
 
@@ -652,8 +652,8 @@
 
 | Prioridade | Título                                                              | Bloqueante para        |
 |------------|---------------------------------------------------------------------|------------------------|
-| ✅ concluída | Seed de fixtures via `scripts/seed-e06-fixtures.ts` (TASK-049)    | Habilita TASK-050 (cobertura 9/14/21 em vez de 2/3/4 — restrição de schema) |
-| P2         | TASK-050 — Re-execução TASK-048 cenários 2-5 com fixtures E06       | Promoção de E06        |
+| ✅ concluída | Seed de fixtures via `scripts/seed-e06-fixtures.ts` (TASK-049)    | Habilita TASK-050      |
+| ✅ concluída | TASK-050 — Validação browser dos cenários 2-5 com fixtures (6/6 PASS) | E06 promovido a "Validado visualmente — caso único" |
 | P3         | `aria-expanded` no toggle do drawer mobile (H1 da TASK-048)         | Acessibilidade         |
 | P3         | Suporte a vírgula decimal brasileira na busca de coordenadas        | TASK-007 pendência     |
 
@@ -978,3 +978,6 @@ Uma task recebe a **classe mais restritiva** que se aplica (A > B > D > C > E).
 - Task TASK-049: `tasks/TASK-049-fixtures-validacao-visual-e06.md`
 - Script seed E06: `scripts/seed-e06-fixtures.ts`
 - Documentação scripts: `scripts/README.md`
+- Relatório TASK-050: `docs/relatorios/2026-05-22-TASK-050.md`
+- Task TASK-050: `tasks/TASK-050-reexecucao-browser-fixtures-e06.md`
+- Evidências TASK-050: `docs/relatorios/evidencias/2026-05-22-TASK-050/` (6 PNGs)

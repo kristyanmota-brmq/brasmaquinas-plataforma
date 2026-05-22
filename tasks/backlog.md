@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-22
-Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + TASK-048 + TASK-049 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) + Mapa Mestre com épicos como blocos de valor (TASK-024E) + Validação browser parcial (TASK-048) + Fixtures E06 via seed (TASK-049; 4 projetos: 1 blocker + jornadas 9/14/21)**
+Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + TASK-048 + TASK-049 + TASK-050 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) + Mapa Mestre com épicos como blocos de valor (TASK-024E) + Validação browser parcial (TASK-048) + Fixtures E06 via seed (TASK-049) + E06 PROMOVIDO a "Validado visualmente" via TASK-050 (6/6 cenários PASS)**
 
 ---
 
@@ -997,6 +997,19 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 **Concluída em:** 2026-05-21 · 731/731 testes · 0 erros tsc (nenhum arquivo em `src/` alterado)
 
 > Passos 1 e 2 do roteiro mínimo da TASK-024D executados via chamada direta ao orquestrador `calculateIrrigationProject()` em arquivo de teste temporário (apagado após conclusão). Cenário 1 (sem bomba): isComplete=true, 4 colunas DN50, BOM sem pendente de aspersor, PDF seria emitido. Cenário 2 (bomba insuficiente): blocker de bomba gerado com texto legível e acionável, PDF bloqueado. Achados: (A-1) `distribution.secondaries=0` para layout válido → HMT undefined — investigação pendente (TASK-026-A, Classe D/A); (A-2) design gap — HMT undefined não gera blocker em `pdfEmissionBlockers` (TASK-026-B, Classe A); (A-3) DN50 para 12 m³/h é tecnicamente válido (V≈2,0 m/s). Relatório: `docs/relatorios/2026-05-21-TASK-026.md`.
+
+---
+
+### TASK-050 — Reexecutar cenários 2–5 da TASK-048 com fixtures E06
+
+**Status:** `concluída` — **6/6 cenários PASS**
+**Prioridade:** P2-importante
+**Classe:** E — Exploratória
+**Área:** ui / validação / governança
+**Arquivo:** `tasks/TASK-050-reexecucao-browser-fixtures-e06.md`
+**Concluída em:** 2026-05-22 · 826/826 testes preservados · 0 erros tsc · `src/` não alterado · fixtures não alterados · Projeto A não alterado
+
+> Sessão Playwright MCP cobrindo 6 cenários de E06 usando os 4 fixtures plantados pela TASK-049. **Resultado 6/6 PASS:** (1) Listagem `/projetos` com 5 projetos (Projeto A + 4 fixtures); (2a) `fixture-e06-blocker` exibe blocker vermelho "Bomba insuficiente em vazão: 5.0 m³/h < setor crítico 25.5 m³/h"; (2b) clique PDF → `POST .../pdf → 422` + UI exibe "PDF bloqueado" + "BLOQUEIOS ATIVOS" detalhado (equivalência semântica de `pdfError.invalidHydraulicSegments` confirmada); (3) `fixture-e06-9setores` com 38 asp/setor (=round(344/9)) × 1,5 m³/h = 57,0 m³/h ✓; (4) `fixture-e06-14setores` com 25 asp/setor × 1,5 = 37,5 ✓; (5) `fixture-e06-21setores` com 16 asp/setor × 1,5 = 24,0 ✓. BOM recalculou automaticamente em runtime (fixture 9 setores trouxe Ø150mm rígido principal — comportamento esperado). **E06 PROMOVIDO** de `Testado em código` → `Validado visualmente no Projeto A + fixtures E06 — caso único`. Conservadorismo mantido pela ressalva "caso único" (fixtures são artefatos fictícios; não substitui projeto histórico real, piloto interno ou homologação RT). Nenhum bug encontrado. Achados positivos O1-O3 documentados. H1 (aria-expanded do drawer) permanece pendente Classe D futura. 6 PNGs em `docs/relatorios/evidencias/2026-05-22-TASK-050/`. Relatório: `docs/relatorios/2026-05-22-TASK-050.md`.
 
 ---
 
