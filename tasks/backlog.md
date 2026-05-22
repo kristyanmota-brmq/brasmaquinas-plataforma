@@ -1147,6 +1147,20 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 > Trilha paralela para tarefas de governança e infraestrutura de desenvolvimento — não tocam código de produto. Usam o mesmo fluxo `/iniciar-task → /planejar → /implementar → /fechar-task`.
 
+### TOOL-003 — Reduzir copy/paste com comando de GPT Review pós-handoff
+
+**Status:** `aguardando_fechamento` (terminal estável; aguarda aprovação humana de commit/push)
+**Prioridade:** P2-importante
+**Classe:** A — Governança / tooling / DX
+**Área:** tooling / handoff / DX
+**Arquivo:** `tasks/TOOL-003-gpt-review-pos-handoff.md`
+**Concluída em:** 2026-05-22 · baseline preservado (`src/` não alterado) · produto intocado
+**Relatório:** `docs/relatorios/2026-05-22-TOOL-003.md`
+
+> Elimina o copy/paste manual entre Claude Code (VS Code) e GPT (ChatGPT) durante o ciclo de revisão LLM pós-handoff, mantendo **dois comandos seguros e modulares**: (1) `/handoff-claude-report TASK-XXX` (já existente — TOOL-001) e (2) `/gpt-review TASK-XXX` (novo). O novo comando orquestra sequencialmente: `run-gpt-review.mjs` (chamada real à Responses API) → `validate-structure.mjs` (read-only) → `print-review-summary.mjs` (resumo executivo no terminal). Aborta cedo se `ai/claude-report.md` ausente, desatualizado ou com `task_id` divergente — evitando custo de API desperdiçado. Sem retry automática; sem cap automático de custo (Fase 2). CLI novo `scripts/ai/print-review-summary.mjs` é testável standalone com 7 cenários (T20–T26) cobrindo aprovado, ausência, divergência, blockers, invariante violada, telemetria zerada e argumento ausente. Tooling tests subiram de 20/20 para **27/27**. `npx tsc --noEmit` → 0 erros (preservado). **Nenhum arquivo de produto alterado** (`src/**`, motor hidráulico, layout, catálogo, BOM, PDF, UI/mapa intocados). **Nenhuma aprovação humana automatizada**: `decision-log.md` permanece append-only e editado apenas pelo humano; `current-task.md.status` não é transicionado pelo comando. Conflito de naming com TOOL-002 (que reservara TOOL-003 para captura de `response.usage`) resolvido: orquestração = TOOL-003; captura de `usage` = **TOOL-004 futura**. Limitação V1 herdada (tokens/custo zerados no JSON do modelo) explicitamente documentada no resumo terminal e em `ai/README.md`.
+
+---
+
 ### TOOL-002 — Homologar fluxo real Claude Code ↔ GPT Reviewer
 
 **Status:** `concluída`

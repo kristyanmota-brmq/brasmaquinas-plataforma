@@ -32,13 +32,12 @@ Este diretório materializa o handoff manual entre o Claude Code (planejador/imp
 /handoff-claude-report TOOL-XXX              (Claude serializa para ai/claude-report.md)
    │                                          status: aguardando_revisao_gpt
    ▼
-node scripts/ai/run-gpt-review.mjs --task TOOL-XXX
-   │                                          gera ai/gpt-review.md (markdown + JSON canônico)
-   │                                          NÃO altera status
-   ▼
-node scripts/ai/validate-structure.mjs --task TOOL-XXX
-   │                                          read-only; deriva override_permitido
-   │                                          reporta consistência e status sugerido
+/gpt-review TOOL-XXX                         (TOOL-003 — orquestra revisão GPT)
+   │                                          executa, em sequência:
+   │                                            • run-gpt-review.mjs    (gera ai/gpt-review.md)
+   │                                            • validate-structure.mjs (read-only)
+   │                                            • print-review-summary.mjs (resumo no terminal)
+   │                                          NÃO altera status; NÃO toca decision-log.
    ▼
 Humano abre ai/gpt-review.md
 Humano edita ai/decision-log.md (entry append-only)
@@ -50,6 +49,30 @@ node scripts/ai/validate-structure.mjs --task TOOL-XXX  (confirma estado coerent
    ▼
 /implementar TOOL-XXX
 ```
+
+### `/gpt-review TASK-XXX` (TOOL-003)
+
+Comando único que orquestra o ciclo de revisão GPT pós-handoff sem copy/paste entre VS Code e ChatGPT. Não substitui `/handoff-claude-report` — assume que ele já foi rodado.
+
+O comando:
+
+1. Valida `ai/current-task.md` (task_id + status compatível).
+2. Valida `ai/claude-report.md` (existe e cita TASK-XXX no cabeçalho).
+3. Aborta se o handoff não estiver pronto, com mensagem fixa:
+   > "Rode primeiro `/handoff-claude-report TASK-XXX` e depois `/gpt-review TASK-XXX`."
+4. Executa `node scripts/ai/run-gpt-review.mjs --task TASK-XXX` (chamada real à Responses API).
+5. Executa `node scripts/ai/validate-structure.mjs --task TASK-XXX` (read-only).
+6. Executa `node scripts/ai/print-review-summary.mjs --task TASK-XXX` (resumo executivo).
+7. Imprime instruções da próxima ação humana (ler gpt-review.md completo, calcular hash, registrar entry em decision-log, atualizar status).
+
+Garantias do comando:
+
+- Nunca edita `ai/decision-log.md`.
+- Nunca transita `ai/current-task.md.status`.
+- Nunca chama `/implementar`, `/fechar-task` nem cria commit/push.
+- Nunca chama `run-gpt-review.mjs` mais de uma vez por execução (custo).
+- Sem retry automática em caso de HTTP ≠ 200 — aborta com stderr.
+- Sem cap automático de custo na V1 (Fase 2).
 
 ---
 
