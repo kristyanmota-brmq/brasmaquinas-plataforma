@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-22
-Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) concluída**
+Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) concluída + Mapa Mestre com épicos como blocos de valor verificáveis (TASK-024E)**
 
 ---
 
@@ -1000,6 +1000,19 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 ---
 
+### TASK-024E — Padronizar épicos como blocos de valor verificáveis
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico (governança)
+**Classe:** C — Documental
+**Área:** governança / rastreabilidade / metodologia
+**Arquivo:** `tasks/TASK-024E-padronizar-epicos-blocos-valor-verificaveis.md`
+**Concluída em:** 2026-05-22 · 817/817 testes preservados · 0 erros tsc preservado · nenhum arquivo em `src/` alterado
+
+> Adicionada ao Mapa Mestre a **Seção 2 — "Épicos como blocos de valor verificáveis"** com 9 sub-seções (E01..E09), cada uma contendo 11 campos padronizados: Propósito, Capacidade entregue, Escopo, Fora do escopo, Critérios de aceite, Métricas, Dependências, Decisões (em 4 categorias: Regra técnica / Boa prática / Decisão de engenharia / Decisão comercial), Riscos, Status real e Tasks vinculadas. Status real conservador: E02/E04/E05/E07 promovidos para "Validado visualmente no Projeto A — caso único" com base estrita no relatório TASK-046; E03/E06 permanecem "Testado em código"; E08 e E09 permanecem "Não iniciado" (E09 com nuance "parcial em validação interna"). Renumeração das Seções 2..11 → 3..12 e sub-seções 8.x → 9.x e 10.x → 11.x; referências cruzadas externas ajustadas onde apontam para o Mapa Mestre (`backlog.md` linha da TASK-024B, `TASK-024D-...md` rastreabilidade). Relatórios históricos TASK-024B/C/D preservados. Nenhum arquivo em `src/`, catálogo, PDF, mapa UI, ADR ou premissa técnica alterado. Relatório: `docs/relatorios/2026-05-22-TASK-024E.md`.
+
+---
+
 ### TASK-024D — Matriz de validação por épico antes da proposta real
 
 **Status:** `concluída`
@@ -1035,7 +1048,7 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 **Arquivo:** `tasks/TASK-024-mapa-mestre-tasks.md` (seção 8)
 **Concluída em:** 2026-05-21 · 731/731 testes · 0 erros tsc (nenhum arquivo em `src/` alterado)
 
-> Adicionada ao Mapa Mestre a seção 8 de classificação operacional. Cinco classes (A–E) com critério objetivo binário e fluxo recomendado distinto. Regra de escalada para D e E. Classificação aplicada às próximas 5 tasks do backlog. Objetivo: evitar que tarefas documentais, explorações e correções rápidas sigam o fluxo pesado das tasks críticas.
+> Adicionada ao Mapa Mestre a seção 9 de classificação operacional (renumerada de 8 → 9 após TASK-024E). Cinco classes (A–E) com critério objetivo binário e fluxo recomendado distinto. Regra de escalada para D e E. Classificação aplicada às próximas 5 tasks do backlog. Objetivo: evitar que tarefas documentais, explorações e correções rápidas sigam o fluxo pesado das tasks críticas.
 
 ---
 
