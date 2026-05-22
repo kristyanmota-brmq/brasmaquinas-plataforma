@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-22
-Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + TASK-048 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) + Mapa Mestre com épicos como blocos de valor (TASK-024E) + Validação browser parcial TASK-021/014 (TASK-048; Cenários 1 e 6 PASS, 2-5 NÃO EXECUTADOS por limitação ambiental)**
+Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + TASK-048 + TASK-049 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) + Mapa Mestre com épicos como blocos de valor (TASK-024E) + Validação browser parcial (TASK-048) + Fixtures E06 via seed (TASK-049; 4 projetos: 1 blocker + jornadas 9/14/21)**
 
 ---
 
@@ -997,6 +997,19 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 **Concluída em:** 2026-05-21 · 731/731 testes · 0 erros tsc (nenhum arquivo em `src/` alterado)
 
 > Passos 1 e 2 do roteiro mínimo da TASK-024D executados via chamada direta ao orquestrador `calculateIrrigationProject()` em arquivo de teste temporário (apagado após conclusão). Cenário 1 (sem bomba): isComplete=true, 4 colunas DN50, BOM sem pendente de aspersor, PDF seria emitido. Cenário 2 (bomba insuficiente): blocker de bomba gerado com texto legível e acionável, PDF bloqueado. Achados: (A-1) `distribution.secondaries=0` para layout válido → HMT undefined — investigação pendente (TASK-026-A, Classe D/A); (A-2) design gap — HMT undefined não gera blocker em `pdfEmissionBlockers` (TASK-026-B, Classe A); (A-3) DN50 para 12 m³/h é tecnicamente válido (V≈2,0 m/s). Relatório: `docs/relatorios/2026-05-21-TASK-026.md`.
+
+---
+
+### TASK-049 — Criar fixtures de validação visual para E06
+
+**Status:** `concluída` (com adaptação documentada — jornadas 9/14/21 em vez de 2/3/4)
+**Prioridade:** P2-importante
+**Classe:** B — Importante
+**Área:** infraestrutura / fixtures / governança
+**Arquivo:** `tasks/TASK-049-fixtures-validacao-visual-e06.md`
+**Concluída em:** 2026-05-22 · 826/826 testes preservados · 0 erros tsc · `src/` não alterado · Projeto A não alterado · `package.json` não alterado
+
+> Criado script standalone `scripts/seed-e06-fixtures.ts` + documentação `scripts/README.md`. Script lê o Projeto A (`cmpfu7e4b0001ulshh0ni8jhd`) read-only via `findUnique`, faz snapshot de `updatedAt`, usa `data`+`ownerId` como template e grava 4 fixtures via `prisma.project.upsert` por ID explícito. **Restrição estrutural descoberta durante a implementação** (parei e reportei via AskUserQuestion antes de gravar qualquer fixture): `setoresCount === jornadaHoras` ([line 154](../src/lib/layout/layout-use-cases.ts#L154)) e `jornadaHoras: 9 | 14 | 21` ([line 89](../src/app/projetos/[id]/layout-schema.ts#L89)) — logo, fixtures "2/3/4 setores" são impossíveis sem alterar `src/`. Usuário escolheu opção A (trocar para jornadas 9/14/21). Resultado: `fixture-e06-blocker` (bomba `hmtMca:5,vazaoMaxM3h:5` → blocker `pump_insufficient_head` real, confirmado via `calculateIrrigationProject`), `fixture-e06-9setores` (setoresCount=9 exato), `fixture-e06-14setores` (=14 exato), `fixture-e06-21setores` (=21 exato). Validações pré-gravação via orquestrador (blocker presente quando esperado; setoresCount = alvo). Validação pós-gravação: Projeto A `updatedAt` idêntico ao snapshot (assert no script com rollback automático em caso de divergência). `--clean` testado: remove só os 4 IDs whitelisted, Projeto A preservado. ownerId dos fixtures = ownerId do Projeto A (visibilidade garantida em `/projetos`). Nenhuma alteração em `src/`, catálogo, PDF, mapa, orquestrador, ADR, premissa, schema Prisma, migração, `package.json`. Relatório: `docs/relatorios/2026-05-22-TASK-049.md`. **Não promove E06 — depende da TASK-050 sugerida.**
 
 ---
 
