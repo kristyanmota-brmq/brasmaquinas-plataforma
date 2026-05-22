@@ -346,7 +346,7 @@
 - **Decisão comercial:** —
 
 **Riscos**
-- Toggle do drawer sem `aria-expanded` (acessibilidade — achado H1 da TASK-048).
+- Toggle do drawer sem `aria-expanded` (acessibilidade — achado H1 da TASK-048) — **✅ RESOLVIDO pela TASK-051** (2026-05-22; rastro histórico preservado).
 - `pdfError.invalidHydraulicSegments` e labels 2/3/4 setores **não validados visualmente** — TASK-048 marcou NÃO EXECUTADO por limitação ambiental (sem fixtures + canvas Mapbox bloqueia automação de desenho).
 - Busca por coordenadas brasileiras (vírgula decimal) ainda não suportada.
 
@@ -354,7 +354,8 @@
 - **Validado visualmente no Projeto A + fixtures E06 — caso único.** Evidência: 18 testes puros; TASK-046 (navegação Projeto A); TASK-048 (Cenários 1 drawer mobile + 6 coluna fragmentada PASS); TASK-049 (4 fixtures plantados); **TASK-050 (6/6 cenários PASS — listagem, blocker visível, HTTP 422 + erro pós-PDF, labels com 3 setorizações distintas).** Ressalva "caso único": fixtures e Projeto A são artefatos fictícios — não substituem projeto histórico real, piloto interno ou homologação RT.
 
 **Tasks vinculadas — concluídas:** TASK-007, TASK-014, TASK-021, TASK-048 (parcial), TASK-049 (fixtures), TASK-050 (validação browser completa)
-**Tasks vinculadas — pendentes/futuras:** `aria-expanded` no toggle do drawer (H1 — Classe D); suporte a vírgula decimal brasileira na busca; comparação com projeto real (E09) habilita promoção acima de "caso único"
+**Tasks vinculadas — concluídas (acréscimo TASK-051):** TASK-051 (H1 do drawer mobile — `aria-expanded` + `aria-controls` + `aria-label` dinâmico)
+**Tasks vinculadas — pendentes/futuras:** suporte a vírgula decimal brasileira na busca; comparação com projeto real (E09) habilita promoção acima de "caso único"
 
 ---
 
@@ -654,7 +655,7 @@
 |------------|---------------------------------------------------------------------|------------------------|
 | ✅ concluída | Seed de fixtures via `scripts/seed-e06-fixtures.ts` (TASK-049)    | Habilita TASK-050      |
 | ✅ concluída | TASK-050 — Validação browser dos cenários 2-5 com fixtures (6/6 PASS) | E06 promovido a "Validado visualmente — caso único" |
-| P3         | `aria-expanded` no toggle do drawer mobile (H1 da TASK-048)         | Acessibilidade         |
+| ✅ concluída | `aria-expanded` no toggle do drawer mobile (H1 da TASK-048; resolvido por TASK-051) | Acessibilidade — ✅ entregue |
 | P3         | Suporte a vírgula decimal brasileira na busca de coordenadas        | TASK-007 pendência     |
 
 ### E07 — Proposta e PDF

@@ -1640,7 +1640,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
         <button
           className="absolute bottom-4 right-16 z-10 md:hidden min-h-[44px] min-w-[44px] bg-white/95 backdrop-blur-sm border border-border rounded-md shadow-md px-3 py-2 text-xs text-ink flex items-center gap-1.5"
           onClick={() => setSidebarOpen((v) => !v)}
-          aria-label="Abrir painel de layout do projeto"
+          aria-expanded={sidebarOpen}
+          aria-controls="project-layout-drawer"
+          aria-label={sidebarOpen ? "Fechar painel de layout do projeto" : "Abrir painel de layout do projeto"}
         >
           <Spline className="w-3.5 h-3.5" />
           <span>Layout</span>
@@ -1683,6 +1685,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
       )}
 
       <aside
+        id="project-layout-drawer"
         className={clsx(
           "border-l border-border bg-surface p-6 overflow-y-auto",
           // Mobile: drawer fixo saindo de baixo

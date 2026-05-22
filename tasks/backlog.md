@@ -1000,6 +1000,19 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 ---
 
+### TASK-051 — Adicionar aria-expanded ao toggle do drawer mobile
+
+**Status:** `concluída`
+**Prioridade:** P3-melhoria (acessibilidade)
+**Classe:** D — correção pequena / acessibilidade / UI
+**Área:** ui / mapa / acessibilidade
+**Arquivo:** `tasks/TASK-051-aria-expanded-drawer-mobile.md`
+**Concluída em:** 2026-05-22 · 826/826 testes preservados · 0 erros tsc · `src/lib/**` intocado · escopo ~5 linhas em `src/`
+
+> Resolve o **achado H1 da TASK-048** (toggle do drawer mobile sem `aria-expanded`). Edição cirúrgica em `src/components/map/ProjectMap.tsx`: 3 atributos ARIA no botão (`aria-expanded={sidebarOpen}`, `aria-controls="project-layout-drawer"`, `aria-label` dinâmico alternando entre "Abrir..." / "Fechar painel de layout do projeto") + `id="project-layout-drawer"` no `<aside>`. Validação Playwright (mini sessão, viewport mobile 375×812): 8/8 verificações PASS — botão e drawer existem; `aria-expanded` alterna de `"false"` → `"true"` ao clicar; `aria-label` muda dinamicamente; `aria-controls` preservado; `#project-layout-drawer` acessível por id. 2 PNGs em `docs/relatorios/evidencias/2026-05-22-TASK-051/`. Nenhuma lógica de domínio adicionada. Nenhum arquivo em `src/lib/**`, catálogo, BOM, PDF, Mapbox/canvas/layers tocado. Nenhuma dependência npm nova. Histórico do H1 preservado na TASK-048 como rastro do ciclo descoberta → resolução. Relatório: `docs/relatorios/2026-05-22-TASK-051.md`.
+
+---
+
 ### TASK-050 — Reexecutar cenários 2–5 da TASK-048 com fixtures E06
 
 **Status:** `concluída` — **6/6 cenários PASS**
@@ -1184,7 +1197,6 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 
 ## Próximas tarefas sugeridas (não formalizadas)
 
-- **[Classe D] `aria-expanded` no toggle do drawer mobile**: achado H1 da TASK-048 (acessibilidade menor); ≤ 5 linhas em `src/components/map/ProjectMap.tsx` + 1 teste E2E ou snapshot.
 - **[Classe A] Pressão real por derivação (ramal/lateral)**: propagar `cumPrincipalHfM` até ponto de entrada de cada ramal; recalcular `PressureClassCheck` para `violation_confirmed` ou `ok` real; ≥ 3 testes incluindo caso confirmado de violação real vs. conservativo.
 - **[Classe E → D] Revisão RT — `TOLERANCIA_ASPERSOR_EIXO_LATERAL` > 500 m**: consultar RT Brasmáquinas; se aprovado, reclassifica para D e ajusta constante de 0,10 → 0,20 m com 1 teste de regressão > 500 m.
 - **[Classe B] Calibração RT de campo — OPTIMIZER_PARAMS**: validar pesos provisionais (PREMISSA_PROVISORIA_MERCADO) e pesos aguardando campo (PENDENTE_CALIBRACAO_RT_CAMPO) com dados de projetos homologados; remover marcadores. Depende de TASK-010A–010Z ✅
