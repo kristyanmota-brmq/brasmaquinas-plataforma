@@ -7,6 +7,7 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import type { IrrigationProjectResult } from "@/lib/layout/irrigation-project";
+import { mapSizedSecondariesToRows } from "@/lib/pdf/secondary-rows";
 
 const C = {
   ink: "#0A0A0A",
@@ -229,6 +230,16 @@ const s = StyleSheet.create({
   metaItem: { flex: 1 },
   metaLabel: { fontSize: 6.5, color: C.ink3 },
   metaValue: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: C.ink, marginTop: 1 },
+  // ── Tabela de ramais (TASK-047) ──────────────────────────
+  colRamal: { width: 44 },
+  colSku: { width: 90 },
+  colDN: { width: 58, textAlign: "center" },
+  colLen: { width: 64, textAlign: "right" },
+  colVel: { width: 60, textAlign: "right" },
+  colHf: { width: 56, textAlign: "right" },
+  colStatus: { flex: 1 },
+  statusBadgeOk: { fontSize: 7, color: C.ink3 },
+  statusBadgeWarn: { fontSize: 7.5, color: "#92400E", fontFamily: "Helvetica-Bold" },
 });
 
 function fmt(n: number) {
@@ -788,6 +799,42 @@ export function PropostaPDF({ projectName, client, city, state, result, geradoEm
                 ou validada contra curva Q-H pelo engenheiro responsável.
               </Text>
             </View>
+          )}
+
+          {/* ── Dimensionamento dos ramais (TASK-047) ── */}
+          {result.hydraulics.sizedSecondaries.length > 0 && (
+            <>
+              <Text style={s.sectionTitle}>Dimensionamento dos ramais</Text>
+              <View style={s.table}>
+                <View style={s.tableHeader}>
+                  <Text style={[s.tableHeaderText, s.colRamal]}>Ramal</Text>
+                  <Text style={[s.tableHeaderText, s.colSku]}>SKU</Text>
+                  <Text style={[s.tableHeaderText, s.colDN]}>DN</Text>
+                  <Text style={[s.tableHeaderText, s.colLen]}>Comprimento</Text>
+                  <Text style={[s.tableHeaderText, s.colVel]}>Velocidade</Text>
+                  <Text style={[s.tableHeaderText, s.colHf]}>Hf</Text>
+                  <Text style={[s.tableHeaderText, s.colStatus]}>Status</Text>
+                </View>
+                {mapSizedSecondariesToRows(result.hydraulics.sizedSecondaries).map((row, i) => (
+                  <View key={row.id} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
+                    <Text style={[s.tableCellBold, s.colRamal]}>{row.ramalLabel}</Text>
+                    <Text style={[s.tableCell, s.colSku]}>{row.sku}</Text>
+                    <Text style={[s.tableCell, s.colDN]}>{row.dnLabel}</Text>
+                    <Text style={[s.tableCell, s.colLen]}>{row.lengthLabel}</Text>
+                    <Text style={[s.tableCell, s.colVel]}>{row.velocityLabel}</Text>
+                    <Text style={[s.tableCell, s.colHf]}>{row.hfLabel}</Text>
+                    <Text
+                      style={[
+                        row.statusLabel.severity === "ok" ? s.statusBadgeOk : s.statusBadgeWarn,
+                        s.colStatus,
+                      ]}
+                    >
+                      {row.statusLabel.text}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
           )}
 
           <View style={s.footer} fixed>

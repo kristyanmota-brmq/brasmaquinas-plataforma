@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-22
-Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + TASK-048 + TASK-049 + TASK-050 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) + Mapa Mestre com épicos como blocos de valor (TASK-024E) + Validação browser parcial (TASK-048) + Fixtures E06 via seed (TASK-049) + E06 PROMOVIDO a "Validado visualmente" via TASK-050 (6/6 cenários PASS)**
+Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK-024E + TASK-026-A/B + TASK-027 + TASK-028 + TASK-033 + TASK-031 + TASK-035 + TASK-039 + TASK-040 + TASK-041 + TASK-042 + TASK-042R + TASK-043 + TASK-044 + TASK-045 + TASK-045B + TASK-046 + TASK-047 + TASK-048 + TASK-049 + TASK-050 + ADR-012-emenda/013/014/015) — **série de validação visual TASK-027→046 FECHADA + BOM de curvas 90° de laterais (TASK-035) + Mapa Mestre com épicos como blocos de valor (TASK-024E) + Diâmetros de ramais no PDF (TASK-047) + Validação browser parcial (TASK-048) + Fixtures E06 via seed (TASK-049) + E06 PROMOVIDO a "Validado visualmente" via TASK-050 (6/6 cenários PASS)**
 
 ---
 
@@ -1036,6 +1036,19 @@ Testes na base: 826/826 · TypeScript: 0 erros · Working tree: modificado (TASK
 **Concluída em:** 2026-05-22 · 826/826 testes preservados · 0 erros tsc preservado · `src/` não alterado · banco do Projeto A não alterado
 
 > Sessão Playwright MCP no Projeto A (`cmpfu7e4b0001ulshh0ni8jhd`) cobrindo 6 cenários de E06. **Cenário 1 (drawer mobile)** e **Cenário 6 (coluna fragmentada — 17 laterais divididas confirmadas via DOM regex + screenshot)** classificados como **PASS**. **Cenários 2-5 (pdfError + labels 2/3/4 setores) classificados como NÃO EXECUTADOS** por 3 limitações ambientais combinadas: (L1) Projeto A está em 0 blockers pós-TASK-046 — proibido alterá-lo; (L2) apenas 1 projeto existe no banco — proibido alterar `jornadaHoras` do Projeto A para forçar setorização variável; (L3) criar projeto fictício via `/projetos/novo` esbarra no canvas Mapbox WebGL, que não aceita cliques precisos via Playwright para desenhar polígono e captação. **E06 NÃO promovido** — permanece `Testado em código` no Mapa Mestre conforme regra conservadora do briefing. 4 achados: H1 (menor — toggle do drawer sem `aria-expanded`); H2 (processo — ambiente requer fixtures pré-criadas); H3 (infraestrutura — Mapbox WebGL bloqueia automação de desenho); H4 (confirmação positiva do Cenário 6). 3 follow-ups sugeridos: (1) seed de fixtures via Prisma para desbloquear Cenários 2-5; (2) re-execução de TASK-048 cenários 2-5 após fixtures; (3) adicionar `aria-expanded` ao toggle (Classe D, ≤ 5 linhas). 6 PNGs em `docs/relatorios/evidencias/2026-05-22-TASK-048/`. Relatório: `docs/relatorios/2026-05-22-TASK-048.md`. Nenhuma alteração em `src/`, catálogo, PDF, mapa, ADRs, premissas ou banco do Projeto A.
+
+---
+
+### TASK-047 — Diâmetros individuais de ramais no PDF
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Classe:** B — Importante
+**Área:** pdf / proposta
+**Arquivo:** `tasks/TASK-047-diametros-ramais-pdf.md`
+**Concluída em:** 2026-05-22 · 826/826 testes (+9 vs. 817 baseline) · 0 erros tsc · catálogo intocado · orquestrador intocado
+
+> Adicionada ao Memorial Hidráulico do PDF (Página 3) a seção **"Dimensionamento dos ramais"** com 7 colunas: Ramal, SKU, DN, Comprimento, Velocidade, Hf, Status. Fonte exclusiva: `result.hydraulics?.sizedSecondaries` (já calculados desde HIST-002). Helper puro `mapSizedSecondariesToRows()` em `src/lib/pdf/secondary-rows.ts` mantém `PropostaPDF.tsx` livre de lógica de domínio — apenas formata, ordena (por id numérico/natural) e rotula. Status `ok` exibido discreto (cinza); demais valores do enum (`velocity_exceeded`, `headloss_exceeded`, `both_exceeded`, `fallback_largest`) exibidos como warning âmbar com texto descritivo. Quando `sizedSecondaries` está vazio ou ausente, a seção é omitida — sem erro, sem warning, sem blocker novo. Inconsistência tratada antes da implementação: briefing original sugeria `distribution.sizedSecondaries`, mas o campo vive em `HydraulicSizingReport` — caminho real confirmado pelo usuário (opção A do plano). 9 testes novos em `src/lib/pdf/__tests__/secondary-rows.test.ts` (T47-1..T47-9) cobrindo todos os 5 valores do enum + caso vazio + mapeamento completo + ordenação determinística + função pura (sem mutação). Orquestrador, solver, dimensionamento de ramais, catálogo, gate HTTP 422, mapa UI, ADRs e premissas técnicas intocados. Relatório: `docs/relatorios/2026-05-22-TASK-047.md`.
 
 ---
 
