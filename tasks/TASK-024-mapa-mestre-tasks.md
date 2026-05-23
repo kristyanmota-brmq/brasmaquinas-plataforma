@@ -133,7 +133,7 @@
 - E01 (governança). Habilita E03 (hidráulica) via `physicalColumns` + `routeCoords`.
 
 **Decisões**
-- **Regra técnica:** grid 12×12 fixo; frame métrico local (TASK-046); gate de desvio aspersor-eixo (ADR-011); seleção arquitetural por menor BOM válida (ADR-015).
+- **Regra técnica:** grid 12×12 fixo; frame métrico local (TASK-046); gate de desvio aspersor-eixo (ADR-011); seleção arquitetural por menor BOM válida (ADR-015); **sequência profissional de design laterais → sub-coletores → principal** ([docs/metodologia/13-arquitetura-de-rede-principal-subcoletores-laterais.md](../docs/metodologia/13-arquitetura-de-rede-principal-subcoletores-laterais.md)).
 - **Boa prática:** rankeamento por 112 candidatos com pesos provisórios documentados em `12-premissas-...md`; motor preliminar com badge na UI (ADR-006).
 - **Decisão de engenharia:** Top-K=5 (`TOP_K_HYDRAULIC_CANDIDATES`); `WEIGHT_HYDRAULIC_BLOCKER=0,50`; empate em arquitetura prefere A0 ("menor mudança").
 - **Decisão comercial:** layout do optimizer é experimental — nunca usado em proposta sem revisão.
@@ -186,7 +186,7 @@
 **Decisões**
 - **Regra técnica:** Hazen-Williams com diâmetro interno (ADR-002); validação PN/classe de pressão (ADR-008); restrição DN homologado por aspersor (ADR-013); split por capacidade (ADR-014).
 - **Boa prática:** `MAX_VELOCITY_RAMAL_MS=1,5 m/s` (referência NRCS NEH); `MAX_HEADLOSS_RAMAL_MCA=3,0 mca` (10% pressão de serviço 30 mca).
-- **Decisão de engenharia:** critério de vazão de projeto do ramal = `max(setor)` (conservador, `PENDENTE_REVISAO_RT_BRASMAQUINAS`); blocker conservativo via HMT para ramal/lateral até pressão real por derivação ser implementada.
+- **Decisão de engenharia:** critério de vazão de projeto do ramal = `max(setor)` (conservador, `PENDENTE_REVISAO_RT_BRASMAQUINAS`); blocker conservativo via HMT para ramal/lateral até pressão real por derivação ser implementada; **hidráulica é restrição dura do motor de comparação arquitetural** ([docs/metodologia/13](../docs/metodologia/13-arquitetura-de-rede-principal-subcoletores-laterais.md)).
 - **Decisão comercial:** seleção arquitetural por menor BOM válida (ADR-015) — função objetivo "custo", restrições duras "hidráulica + construtibilidade".
 
 **Riscos**
@@ -237,7 +237,7 @@
 **Decisões**
 - **Regra técnica:** rede interna apenas 0° e 90° (ADR-010); aspersor obrigatoriamente sobre lateral física (ADR-011); lateral física como polilinha construtível (ADR-012, emenda TASK-045B = eixo único via mediana de X).
 - **Boa prática:** tolerância angular ±5° absorve variações de montagem; mediana é estatística robusta contra outliers (substitui média).
-- **Decisão de engenharia:** `TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,10 m` (decisão operacional Brasmáquinas; valor pendente revisão para fazendas > 500 m).
+- **Decisão de engenharia:** `TOLERANCIA_ASPERSOR_EIXO_LATERAL = 0,10 m` (decisão operacional Brasmáquinas; valor pendente revisão para fazendas > 500 m); **construtibilidade é restrição dura do motor de comparação arquitetural** ([docs/metodologia/13](../docs/metodologia/13-arquitetura-de-rede-principal-subcoletores-laterais.md)).
 - **Decisão comercial:** —
 
 **Riscos**
@@ -290,7 +290,7 @@
 - **Regra técnica:** catálogo read-only (`CLAUDE.md`); registros VIQUA PN80 por homologação interna (ADR-005); curvas 90° de lateral usam apenas `CURVAS_90` LF (nunca rígidas em LF) — TASK-035.
 - **Boa prática:** agrupamento de itens por SKU antes de emitir; meta com contadores específicos (`kitAspersorResolvCount`, `valvulasResolvidasCount`, `curvas90LateraisCount`).
 - **Decisão de engenharia:** kit aspersor 5022 homologado apenas para DN50/DN75; regra do tubo de subida = 1 unidade por aspersor.
-- **Decisão comercial:** blocker comercial "BOM incompleta" bloqueia proposta enquanto houver `BOMPendingConnection` no projeto.
+- **Decisão comercial:** blocker comercial "BOM incompleta" bloqueia proposta enquanto houver `BOMPendingConnection` no projeto; **BOM total é a função objetivo do motor de comparação arquitetural** ([docs/metodologia/13](../docs/metodologia/13-arquitetura-de-rede-principal-subcoletores-laterais.md), ADR-015).
 
 **Riscos**
 - `curva_45_adutora` sem SKU → `BOMPendingConnection` permanente em projetos com adutora diagonal.

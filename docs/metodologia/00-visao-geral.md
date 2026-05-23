@@ -81,6 +81,11 @@ SKUs existentes em `src/lib/catalog/aspersores.ts` não mudam. Novas peças são
 | `06-orcamento-proposta.md` | Preços, margens, exportação, gate de emissão |
 | `07-checklists-aprovacoes.md` | Checklists pré-implementação e pré-emissão |
 | `08-logs-e-auditoria.md` | ADRs, handoffs, rastreabilidade |
+| `09-classificacao-de-projetos.md` | Classificação A/B/C de projetos (governança) |
+| `10-validacao-de-campo.md` | Critérios e protocolo de validação RT/campo |
+| `11-disciplina-operacional.md` | Fluxo `/iniciar-task` → `/planejar` → `/implementar` → `/fechar-task` |
+| `12-premissas-provisorias-e-revisao-rt.md` | Parâmetros e pesos com status de revisão RT |
+| `13-arquitetura-de-rede-principal-subcoletores-laterais.md` | Sequência laterais → sub-coletores → principal; classificação 4-tier; candidatos arquiteturais |
 
 ---
 
