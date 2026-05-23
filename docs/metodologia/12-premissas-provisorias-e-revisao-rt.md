@@ -254,6 +254,93 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 
 ---
 
+## Penalidades operacionais TASK-056 (não são custos de material)
+
+As entradas abaixo são **penalidades operacionais provisórias** usadas pelo motor
+de seleção arquitetural (`architecture-selector.ts`) para comparar candidatos
+A0/A2/A3 com base em qualidade operacional, **não em custos reais de material**.
+Não correspondem a SKU do catálogo. Status: `PENDENTE_CALIBRACAO_RT_CAMPO`.
+
+A BOM oficial do projeto continua sendo gerada por `buildBOM()` em `src/lib/bom.ts`
+sobre o solver hidráulico oficial — estas penalidades **só servem para comparação
+arquitetural**.
+
+---
+
+### WEIGHT_PRINCIPAL_CROSSES
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `WEIGHT_PRINCIPAL_CROSSES` em `architecture-selector.ts` |
+| **Valor usado** | **`0` (desativada no MVP da TASK-056)** |
+| **Onde é usado** | `evaluateCandidate()`: `penalty = WEIGHT × P1 × bomEstimadaPreliminar` (com WEIGHT=0, contribuição zero) |
+| **Motivo da desativação** | Penalizar A3 (principal central) via score transformaria "principal aproveita bordas/central conforme conveniente" — que é **boa prática** no doc 13 §3.2 — em **regra técnica absoluta**. Viola ajuste 3 da TASK-055 (preservar distinção 4-tier). O custo real de A3 (mais cotovelos + spine_entries longos) já é capturado por P2 e P3 — não há necessidade de penalty estética redundante. |
+| **O helper continua exposto** | `computePrincipalSplitsColumnsRatio` permanece exportado e populado em `CandidateEvaluation.p1_principalSplitsColumnsRatio` — métrica diagnóstica para sidebar/auditoria. |
+| **Warning textual preservado** | "principal central atravessa área irrigada — validar construtibilidade operacional/RT" continua ATIVO em `CandidateEvaluation.warnings` (desde TASK-043). |
+| **Reativação futura** | RT/E09 pode reintroduzir `WEIGHT > 0` com base empírica concreta de construtibilidade operacional (não estética). |
+| **Status** | `PENDENTE_CALIBRACAO_RT_CAMPO` (peso 0 desativado por princípio metodológico) |
+
+---
+
+### WEIGHT_FRAGMENTATION e PENALTY_FRAGMENTATION_PER_M_R$
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `WEIGHT_FRAGMENTATION` + `PENALTY_FRAGMENTATION_PER_M_R$` em `architecture-selector.ts` |
+| **Valor usado** | `WEIGHT = 1.0`; `PENALTY = R$ 35,00/m` (penalidade equivalente, **não preço de material**) |
+| **Onde é usado** | `penalty = WEIGHT × P2 × PENALTY_PER_M_R$` onde P2 = comprimento total de spine_entries |
+| **Motivo** | Spine_entry longo indica sub-coletor desconectado da principal (proxy de fragmentação visual). Penalidade equivalente a R$/m de tubo estrutural extra. |
+| **Origem** | Premissa provisória. R$ 35/m é proxy operacional (não SKU). Sem dado de campo. |
+| **Risco** | P2 pode ser zero em todos os candidatos quando a topologia v12 produz spine_entries semelhantes, neutralizando a métrica. Calibração via RT/E09. |
+| **Responsável futuro** | RT Brasmáquinas + engenheiro de campo |
+| **Status** | `PENDENTE_CALIBRACAO_RT_CAMPO` |
+
+---
+
+### PENALTY_ROUTE_BREAK_R$
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `PENALTY_ROUTE_BREAK_R$` em `architecture-selector.ts` |
+| **Valor usado** | `R$ 100,00 por cotovelo` (penalidade operacional, **não preço de luva real**) |
+| **Onde é usado** | `penalty = P3 × PENALTY_ROUTE_BREAK_R$` onde P3 = contagem de cotovelos internos em principal + adutora + spines + spine_entries |
+| **Motivo** | Cada cotovelo adicional = uma conexão extra + tempo de montagem. Proxy operacional de complexidade. Não é preço de SKU do catálogo. |
+| **Origem** | Premissa provisória. Valor escolhido como referência conservadora. |
+| **Risco** | Pode subestimar/superestimar custo real de cotovelos. Calibração via RT/E09. |
+| **Responsável futuro** | RT Brasmáquinas + engenheiro de campo |
+| **Status** | `PENDENTE_CALIBRACAO_RT_CAMPO` |
+
+---
+
+### WEIGHT_VALVE_DISPERSION e PENALTY_VALVE_DISPERSION_PER_M_R$
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `WEIGHT_VALVE_DISPERSION` + `PENALTY_VALVE_DISPERSION_PER_M_R$` em `architecture-selector.ts` |
+| **Valor usado** | `WEIGHT = 0` (desativado no MVP); `PENALTY = R$ 30,00/m` (preparado para TASK-056B) |
+| **Onde é usado** | Helper `computeValveDispersionM` exposto; **peso 0 no score** — métrica não contribui para `scoreFinal` |
+| **Motivo** | section_valves hoje (TASK-006B + constructability.ts) são gerados a partir de `sectorIndices + positions[]` (arch-independente). Passar `controlPoints` ao motor introduziria circularidade. Após TASK-053-valves (relocação para spine_entry), P4 torna-se arch-dependente e o peso pode ser ativado. |
+| **Origem** | Premissa provisória reservada. Calibração quando TASK-053-valves entregar. |
+| **Risco** | Métrica permanece 0 até TASK-053-valves; comparação arquitetural não considera dispersão de registros. |
+| **Responsável futuro** | RT Brasmáquinas + engenheiro de campo (pós-TASK-053-valves) |
+| **Status** | `PENDENTE_CALIBRACAO_RT_CAMPO` (desativado no MVP da TASK-056) |
+
+---
+
+### A3_MIN_ECONOMY_BOM_PCT
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `A3_MIN_ECONOMY_BOM_PCT` em `architecture-selector.ts` |
+| **Valor usado** | **`0` (gate desativado no MVP da TASK-056)** |
+| **Onde é usado** | Gate em `selectArchitectureByBom()`: quando `≤ 0`, qualquer A3 tecnicamente válido compete livremente por `scoreFinal` (gate ignorado). |
+| **Motivo da desativação** | Gate impedindo A3 sem economia mínima transformaria "boa prática" (principal central admissível) em "regra técnica absoluta". Viola ajuste 3 da TASK-055 (preservar distinção 4-tier). Com gate desativado, A3 vence ou perde pelo custo real (BOM + P2 + P3), respeitando ADR-015 puro. |
+| **Warning textual preservado** | "principal central atravessa área irrigada — validar construtibilidade operacional/RT" continua ATIVO em `CandidateEvaluation.warnings` para que usuário/RT possa sobrescrever em projetos específicos. |
+| **Reativação futura** | RT/E09 pode reintroduzir gate > 0 com base empírica concreta de construtibilidade operacional (não estética). |
+| **Status** | `PENDENTE_CALIBRACAO_RT_CAMPO` (gate desativado por princípio metodológico) |
+
+---
+
 ## Histórico de revisões
 
 | Data | Autor | O que mudou |
@@ -273,3 +360,5 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | 2026-05-23 | Claude Opus 4.7 (TASK-053 v6) | **Premissa "Topologia de ramais" atualizada para espinha de peixe modelada como 3 entidades lineares (spine + spine_entry + N ribs).** v3 stair-step preservado como fallback (sem `gridAngleDegrees`). Razão: v3 falhou visualmente em grid rotacionado 59° (ordenação por LngLat); v4 "T deitado" em polilinha única era geometricamente ambíguo; v5 omitiu paths kind-aware. v6 aprovado_com_ajustes pelo GPT (2 blockers técnicos não-terminais: TECH-053-V6-01 path errado de tooling — corrigido para `node scripts/ai/__tests__/run-all.mjs`; TECH-053-V6-02 T12 testado via 4 chamadas isoladas por kind — opção B1, sem mudar API de `validateNetworkAngles`). Implementação: `routeEspinhaDePeixe` no frame local rotacionado (técnica TASK-046); `sizeAllSecondaries` em 3 paths (Path 0 legado preservado byte-a-byte; Path 1 ribs max; Path 2 spine/spine_entry SUM ribs do sectorId); `detectNetworkAngleIssues` kind-aware (legado completo; spine_entry só principal; rib só lateral; spine skip). Spine posicionado no headland (midpoint entre principal_y_local e inlet_y_median_local) — ribs com lengthM > 0 para validar hydraulic graph. 21 testes T53-9 a T53-14 novos. Status: `PENDENTE_REVISAO_RT_BRASMAQUINAS` — validação visual no Projeto A continua sendo pré-requisito de homologação. |
 | 2026-05-23 | Claude Opus 4.7 (TASK-053 v7) | **REPROVAÇÃO VISUAL v6 + Premissa "Topologia de ramais" reformulada para v7.** v6 foi implementada e passou todos os testes funcionais (tsc 0 + vitest 877/877 + tooling 27/27) mas RT validou em Projeto A e observou padrão stair-step indesejado em vez de espinha de peixe limpa. **Causa raiz**: v6 assumiu falsamente que "spine paralelo à principal" equivalia a "spine ao longo do eixo X do frame rotacionado por `gridAngleDegrees`". Isso só é verdade se principal está alinhada com a grade (cardinal). Em Projeto A, principal segue borda do campo (vertical) enquanto grade está em ângulo diferente — `xLeftLocal === xRightLocal` gerava spine com lengthM≈0 + ribs sobrepostos no mesmo X. **Correção v7**: `routeEspinhaDePeixe` reescrito para usar **direção REAL da principal** (vetor unitário do primeiro ao último vértice da polilinha em métrico), `principalNormal` perpendicular com sinal apontando para o interior do campo, `gap = mediana das projeções perpendiculares dos inlets`, spine deslocado por `gap/2` perpendicular. Geometria toda em vetor métrico, sem rotação de frame — INDEPENDENTE de `gridAngleDegrees` (parâmetro cosmético na assinatura). v7 aprovado_com_ajustes pelo GPT (0 blockers + 3 recomendações documentais não-bloqueantes: (1) alinhar body de `current-task.md` com v7 — APLICADO; (2) validação visual em Projeto A continua sendo critério REAL de aceite; (3) tratar principal não-reta com cuidado — mitigação: direção média do primeiro/último vértice). +10 testes T53-15..T53-17 (principal vertical Projeto A; principal em 30°; independência de gridAngleDegrees). Total 887 testes (vs 877 baseline v6). Status: `PENDENTE_REVISAO_RT_BRASMAQUINAS` — aguardando validação visual em Projeto A pelo RT. |
 | 2026-05-23 | Claude Opus 4.7 (TASK-053 v12) | **REPROVAÇÃO ARQUITETURAL v7 + iterações v8/v9/v10/v11 + v12 IMPLEMENTADO.** v7 foi reprovado arquiteturalmente porque a topologia "spine paralelo à principal" INVERTEU a definição correta da espinha de peixe (topologia REAL = spine PERPENDICULAR aos laterais, conforme análise de especialista em irrigação convencional). v8 propôs heurística X-vs-Y que invertia topologia em caso degenerado (reprovada GPT). v9 executou DIAGNÓSTICO-ONLY que identificou causa raiz da degenerescência v6 em Projeto A: probe central de `principalYLocal` coincide com a principal quando inlets estão na borda do campo (setor 0 Projeto A: 3 inlets rentes + 2 afastados → mediana coincide com principal → spine degenera). v10 propôs cohorts (rentes via legacy direto vs afastados via espinha) reprovado porque mediana de gaps com zeros = 0 → fallback indesejado. **Nova regra RT absoluta inserida em v11**: "Nenhuma lateral conecta diretamente à principal; toda lateral conecta via sub-coletor". v11 reprovado por `Math.sign(0) === 0` colapsar fallback. v12 (CORRENTE) corrige com `fieldSideSign` via centroid LngLat (independente do range dos inlets) + gate explícito `throw` quando `operationalSegments` sem `gridAngleDegrees`. v12 reprovado pelo GPT (2 blockers metodológicos: body dessincronizado + critério de fechamento implícito) mas APROVADO via OVERRIDE técnico humano (Caminho 2). Compromissos do override: (1) body de `current-task.md` atualizado PRIMEIRO no /implementar; (2) blocker `spine_entry→principal` permanece ATIVO ao fechar — fechamento técnico ≠ comercial; emissão comercial bloqueada até decisão RT explícita. Implementação v12: `routeEspinhaDePeixe` no frame rotacionado por `gridAngleDegrees`, spine SEMPRE perpendicular aos laterais, spineY via midpoint (principalY + farthestInletY) / 2 com fallback MIN_HEADLAND_M=3m. `cols.length === 1` → espinha degenerada topologicamente válida. Section_valve relocation para spine_entry DEFERIDA para TASK-053-valves sucessora (decisão via AskUserQuestion). 870 testes passando (888 → 870 após remoção de testes v3/v6/v7 incompatíveis e adição de testes v12 T53-18..T53-30). Status: `PENDENTE_REVISAO_RT_BRASMAQUINAS` — aguardando validação visual em Projeto A pelo RT (gatekeeper de homologação). |
+| 2026-05-23 | Claude Opus 4.7 (TASK-056) | **Adicionadas 5 penalidades operacionais provisórias** para o motor de seleção arquitetural (`architecture-selector.ts`): `WEIGHT_PRINCIPAL_CROSSES = 0.05`; `WEIGHT_FRAGMENTATION = 1.0` + `PENALTY_FRAGMENTATION_PER_M_R$ = 35.0`; `PENALTY_ROUTE_BREAK_R$ = 100.0`; `WEIGHT_VALVE_DISPERSION = 0` (desativado no MVP) + `PENALTY_VALVE_DISPERSION_PER_M_R$ = 30.0` (reservado para TASK-056B pós-TASK-053-valves); `A3_MIN_ECONOMY_BOM_PCT = 0.05`. Todas com status `PENDENTE_CALIBRACAO_RT_CAMPO`. **Não são custos de material** — proxies operacionais; sem SKU do catálogo; BOM oficial continua via `buildBOM()`. Nenhuma premissa existente alterada nesta task; apenas adições. ADR-015 preservada (função objetivo "menor BOM válida e operacionalmente executável" — `executável` agora inclui critérios objetivos P1-P4). 870 → 887 testes vitest. |
+| 2026-05-23 | Claude Opus 4.7 (TASK-056 — correção metodológica) | **`WEIGHT_PRINCIPAL_CROSSES` e `A3_MIN_ECONOMY_BOM_PCT` reduzidos a 0** (desativados no MVP). Razão: usuário identificou que penalizar A3 (principal central) via score transformava **boa prática** (doc 13 §3.2 — "principal aproveita bordas, central ou corredores conforme conveniente") em **regra técnica absoluta**, violando ajuste 3 da TASK-055 (preservar distinção 4-tier). O custo real de A3 (mais cotovelos + spine_entries longos) já é capturado por P2 + P3 — penalty estética P1 e gate A3 eram redundantes. Helper `computePrincipalSplitsColumnsRatio` permanece exposto em `CandidateEvaluation.p1_*` como métrica diagnóstica; warning textual "principal central atravessa área — validar com RT/operacional" permanece ATIVO. Calibração RT/E09 pode reintroduzir peso > 0 com base empírica concreta (não estética). Testes vitest 887/887 preservados — comportamento da seleção arquitetural é equivalente no Projeto A pois A3 ainda perde naturalmente por scoreFinal (BOM A3 > BOM A0 por causa de secondaries mais longas). |

@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-23
-Testes na base: 870/870 · TypeScript: 0 erros · 27/27 testes tooling · Working tree: modificado (TASK-055 — formalização documental da arquitetura de rede) — **TASK-053 v12 publicada em `origin/main` (commit `bd74234`) + rename `/handoff-claude-report → /handoff` publicado em `5637e68` + TASK-055 entrega formalização da lógica profissional de arquitetura de rede principal/sub-coletores/laterais homologada pelo RT em 2026-05-23. Produto estritamente documental: cria `docs/metodologia/13-arquitetura-de-rede-principal-subcoletores-laterais.md` (8 seções; 12 princípios fundamentais; classificação 4-tier explícita; restrições duras enumeradas; catálogo A0/A2/A3 implementados + A1/A4-A8 reservados; mapa código↔metodologia sem reproduzir conteúdo); atualiza tabela em `00-visao-geral.md` (incluí 09-13); insere 4 referências cruzadas no Mapa Mestre (E02/E03/E04/E05 seções Decisões); registra TASK-056 como Classe A futura (motor de comparação A0/A2/A3+). **Sem ADR nova** (ADR-015 referenciada como base). **Sem alterar valores em `12-premissas-...md`** (apenas referência unidirecional 13→12). **`src/**` integralmente intocado.** Blocker TECH-053-01 (rib→lateral) preservado ATIVO; emissão comercial bloqueada por default até decisão RT explícita**
+Testes na base: **887/887** vitest · TypeScript: 0 erros · 27/27 testes tooling · Working tree: modificado (TASK-056 — motor de qualidade operacional A0/A2/A3) — **TASK-055 publicada em `origin/main` (commit `15ebcbb`) + TASK-056 entrega motor de qualidade operacional sobre `selectArchitectureByBom()`: 4 métricas operacionais objetivas (P1 principalSplitsColumnsRatio com peso 0; P2 subCollectorDisconnectM; P3 routeBreaksCount; P4 valveDispersionM com peso 0) + score multi-objetivo (`scoreFinal = BOM + penalidadesOperacionais`). **Correção metodológica aplicada antes do commit**: `WEIGHT_PRINCIPAL_CROSSES = 0` e gate `A3_MIN_ECONOMY_BOM_PCT = 0` (desativados) após challenge do usuário — penalizar A3 via score transformava boa prática (doc 13 §3.2) em regra técnica, violando ajuste 3 da TASK-055. P2 + P3 capturam custo real de A3 (mais cotovelos + spine_entries longos); P1 helper e warning textual preservados como diagnóstico. Topologia espinha de peixe v12 ativada no evaluator quando `operationalSegments` fornecido; caminho legado 1:1 preservado byte-a-byte (compat T43). Helpers puros em `architecture-quality-metrics.ts`; testes T56 (+17): 13 testes do módulo de métricas + 4 testes do selector. 5 novas penalidades operacionais em `12-premissas-...md` (`PENDENTE_CALIBRACAO_RT_CAMPO`) — NÃO são preços de material; apenas proxies operacionais. **`bom.ts`, `hydraulic-connectivity.ts`, catálogo, PDF, UI/mapa intocados**. **Sem ADR nova** (ADR-015 preservada). Blocker TECH-053-01 preservado ATIVO; emissão comercial bloqueada. Validação visual no Projeto A executada via Playwright MCP — veredito INTEGRAL (`docs/relatorios/evidencias/2026-05-23-TASK-056/validacao-visual-projeto-a.md`). A1/A4-A8 reservados para **TASK-056B** (catálogo expandido pós-MVP).**
 
 ---
 
@@ -173,7 +173,7 @@ Testes na base: 870/870 · TypeScript: 0 erros · 27/27 testes tooling · Workin
 
 ### TASK-055 — Formalizar lógica profissional da arquitetura principal/sub-coletores/laterais
 
-**Status:** `concluída` (aguarda commit/push autorizado pelo humano)
+**Status:** `concluída` (publicada em `origin/main` commit `15ebcbb`)
 **Prioridade:** P2-importante
 **Classe:** C — Documental
 **Área:** metodologia / governança
@@ -185,15 +185,39 @@ Testes na base: 870/870 · TypeScript: 0 erros · 27/27 testes tooling · Workin
 
 ---
 
-### TASK-056 — Motor de comparação de arquiteturas A0/A2/A3+ por menor BOM válida e operacionalmente executável
+### TASK-056 — Motor de qualidade operacional da arquitetura A0/A2/A3 (MVP)
+
+**Status:** `concluída` (aguarda commit/push autorizado pelo humano)
+**Prioridade:** P1-crítico
+**Classe:** A — motor de layout / domínio
+**Área:** layout / domínio / hidráulica / governança
+**Arquivo:** `tasks/TASK-056-motor-qualidade-operacional.md`
+**Concluída em:** 2026-05-23 · **887/887 testes vitest** (+17 vs 870 baseline) · 0 erros tsc · 27/27 testes tooling
+**Relatório:** `docs/relatorios/2026-05-23-TASK-056.md`
+**Evidências:** `docs/relatorios/evidencias/2026-05-23-TASK-056/` (script de diagnóstico + protocolo de execução)
+**Predecessores:** TASK-043 (A0/A2/A3 implementados); TASK-053 v12 (topologia sub-coletor); TASK-055 (formalização metodológica)
+
+> Adiciona ao motor `selectArchitectureByBom()` em [`src/lib/layout/architecture-selector.ts`](../src/lib/layout/architecture-selector.ts) **4 métricas operacionais objetivas (P1-P4)** + **score multi-objetivo**. ADR-015 preservada: função objetivo continua "menor BOM válida e operacionalmente executável". **Correção metodológica antes do commit**: `WEIGHT_PRINCIPAL_CROSSES = 0` e gate `A3_MIN_ECONOMY_BOM_PCT = 0` (desativados) após o usuário identificar que penalizar A3 via score transformava **boa prática** (doc 13 §3.2 — "principal aproveita bordas/central conforme conveniente") em **regra técnica absoluta**, violando ajuste 3 da TASK-055 (preservar distinção 4-tier). P2 (`subCollectorDisconnectM`) e P3 (`routeBreaksCount`) capturam o custo REAL de A3 central (mais cotovelos + spine_entries longos) — não há necessidade de penalty estética redundante. Helper `computePrincipalSplitsColumnsRatio` (P1) permanece exposto em `CandidateEvaluation.p1_*` como métrica diagnóstica; warning textual de A3 ("principal central atravessa área — validar com RT/operacional") preservado desde TASK-043. **Sem A4-A8 (reservados para TASK-056B); sem Pareto; sem BOM; sem section_valve relocation; sem relaxar TECH-053-01.** Novo módulo puro [`architecture-quality-metrics.ts`](../src/lib/layout/architecture-quality-metrics.ts) com 4 helpers exportados. `CandidateEvaluation` agora expõe `p1_*`, `p2_*`, `p3_*`, `p4_*`, `operationalPenaltyR$`, `scoreFinal`. `ArchitectureSelectorInput` aceita `operationalSegments?` opcional (ativa topologia v12 espinha de peixe no evaluator; sem ele, mantém caminho legado 1:1 byte-a-byte → 11 testes T43 preservados). Score: `scoreFinal = bomEstimadaPreliminar + 0×P1×BOM + WEIGHT_FRAGMENTATION × P2 × PENALTY_FRAGMENTATION_PER_M_R$ + P3 × PENALTY_ROUTE_BREAK_R$ + 0×P4`. Tie-breaker A0 preservado. 5 novas penalidades operacionais em [`12-premissas-...md`](../docs/metodologia/12-premissas-provisorias-e-revisao-rt.md) com status `PENDENTE_CALIBRACAO_RT_CAMPO` — **não são preços de material** (sem SKU; proxies operacionais). +17 testes T56: 13 do módulo de métricas (T56-2..T56-5) + 4 do selector (T56-6, T56-7, T56-8, T56-9). **`bom.ts`, `hydraulic-connectivity.ts`, `constructability.ts`, `principal.ts`, catálogo, PDF, UI/mapa intocados**. **Sem ADR nova**. Wiring opcional em `layout-use-cases.ts` (6º arg `operationalSegments?` retrocompat). Script manual `scripts/diagnose/diagnose-architecture-projeto-a.mjs` aprovado mas não rodado em CI (depende de banco + tsx). **Validação visual no Projeto A executada via Playwright MCP — veredito INTEGRAL** (A0/A2-borda vence naturalmente por scoreFinal; arquitetura defensável; 12 blockers ATIVOS são TECH-053-01 preservado por escopo).
+
+---
+
+### TASK-056B — Catálogo arquitetural expandido (A1 externa + A4-A8)
 
 **Status:** `pendente`
 **Prioridade:** P2-importante (pós-MVP)
 **Classe:** A — motor de layout / domínio
-**Área:** layout / domínio / hidráulica / comercial
-**Predecessores:** TASK-043 (A0/A2/A3 implementados); TASK-053 v12 (topologia sub-coletor); TASK-055 (formalização metodológica)
+**Área:** layout / domínio
+**Predecessores:** TASK-056 (motor de qualidade operacional MVP); TASK-053-valves (necessário para P4 ativar)
 
-> Expandir o motor `selectArchitectureByBom()` em [`src/lib/layout/architecture-selector.ts`](../src/lib/layout/architecture-selector.ts) para incluir candidatos arquiteturais pós-MVP atualmente reservados: **A1** (principal externa — lado oposto à área irrigada com detecção de "lado externo preferencial"); **A4** (espinha — múltiplas principais paralelas); **A5** (subprincipais paralelas); **A6** (cabeçal único central com alimentação radial); **A7** (orientação automática por rotação livre); **A8** (blocos independentes). Manter função objetivo (menor BOM estimada preliminar válida) e restrições duras (hidráulica + construtibilidade + operação) inalteradas — ADR-015 preservada. Inclui validação visual no Projeto A para cada novo candidato. **Não escalar escopo para mudanças em invariantes** (ADR-011, ADR-012, ADR-013) — A1/A4-A8 devem respeitar todas as regras técnicas existentes. Critérios pendentes: detecção determinística de "lado externo preferencial" para A1; critério de quando subdividir em A4/A5 (limiar por área? por vazão? por número de setores?); regra de "cabeçal único" em A6 (fan-out máximo); reservar A7 só para casos onde orientação cardinal não satisfaça nenhuma restrição. Premissas operacionais que motivam esta task: framework de motor de otimização homologado RT 2026-05-23 (registrado em [`docs/metodologia/13-arquitetura-de-rede-principal-subcoletores-laterais.md`](../docs/metodologia/13-arquitetura-de-rede-principal-subcoletores-laterais.md) §5).
+> Expandir o motor `selectArchitectureByBom()` para incluir candidatos arquiteturais pós-MVP atualmente reservados:
+> - **A1** — principal externa (lado oposto à área irrigada; requer detecção determinística de "lado externo preferencial" e tratamento de corredor técnico/estrada)
+> - **A4** — espinha (múltiplas principais paralelas)
+> - **A5** — subprincipais paralelas (variante hierárquica de A4)
+> - **A6** — cabeçal único central com fan-out radial
+> - **A7** — orientação automática (rotação livre da principal, independente do grid)
+> - **A8** — blocos independentes (talhões grandes divididos em sub-projetos)
+>
+> Quando TASK-053-valves entregar (relocação de section_valve para spine_entry), ativar peso `WEIGHT_VALVE_DISPERSION > 0` (P4 vira arch-dependente). Calibração final dos pesos das penalidades operacionais via E09 (validação de campo). Manter função objetivo (`scoreFinal = BOM + penalidades operacionais`) e gate A3 inalterados — ADR-015 preservada. **Não escalar escopo para mudanças em invariantes** (ADR-011, ADR-012, ADR-013). Inclui validação visual no Projeto A para cada novo candidato.
 
 ---
 

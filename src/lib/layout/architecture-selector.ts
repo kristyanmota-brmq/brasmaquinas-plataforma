@@ -34,8 +34,15 @@ import {
 import { generateSecondaries, type SecondaryPipe } from "./hydraulic-connectivity";
 import { sizeAllSecondaries, type SizedSecondaryPipe } from "./secondary-sizing";
 import { detectNetworkAngleIssues } from "./network-angle-diagnostics";
+import {
+  computePrincipalSplitsColumnsRatio,
+  computeSubCollectorDisconnectM,
+  computeRouteBreaksCount,
+  computeValveDispersionM,
+} from "./architecture-quality-metrics";
 import { TUBOS_PVC_RIGIDO } from "@/lib/catalog/aspersores";
 import type { PhysicalColumn, Lateral } from "./laterais";
+import type { OperationalSegment } from "./sectorization";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes — referências técnicas formalizadas em 12-premissas (TASK-043)
@@ -72,6 +79,102 @@ const METROS_POR_BARRA = 6;
  * Em empate, preferimos A0 (princípio "menor mudança").
  */
 const EPSILON_BOM_R$ = 1.0;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-056 — Penalidades operacionais provisórias
+// (status PENDENTE_CALIBRACAO_RT_CAMPO; ver 12-premissas-...)
+//
+// IMPORTANTE: estes são pesos de PENALIDADE OPERACIONAL, não custo de material.
+// Não usam SKU do catálogo. A BOM oficial continua sendo gerada por buildBOM()
+// sobre o solver hidráulico — penalidades aqui só servem para comparar candidatos
+// arquiteturais.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Peso da penalidade quando a principal "corta" colunas pelo meio (proxy operacional).
+ *
+ * **VALOR = 0 no MVP da TASK-056.** Razão metodológica: o documento 13 (TASK-055)
+ * classifica "principal aproveita bordas/central conforme conveniente" como **boa
+ * prática** (§3.2), não como regra técnica. Penalizar A3 via score transformaria
+ * boa prática em regra técnica — viola o ajuste 3 da TASK-055 ("preservar distinção
+ * 4-tier; não transformar boa prática em regra técnica absoluta").
+ *
+ * O custo REAL de A3 (mais cotovelos + spine_entries mais longos) já é capturado
+ * por P2 (`subCollectorDisconnectM`) e P3 (`routeBreaksCount`) — não há
+ * necessidade de penalty estética redundante.
+ *
+ * O helper `computePrincipalSplitsColumnsRatio` permanece exposto em
+ * `CandidateEvaluation.p1_principalSplitsColumnsRatio` como métrica diagnóstica
+ * (auditoria/sidebar/UI). Calibração via RT/E09 pode reintroduzir peso > 0 com
+ * base empírica concreta.
+ *
+ * O warning textual de A3 ("principal central atravessa área — validar
+ * construtibilidade operacional/RT") permanece ATIVO desde TASK-043; usuário/RT
+ * decide caso a caso, sem penalty automática.
+ */
+export const WEIGHT_PRINCIPAL_CROSSES = 0;
+
+/**
+ * Peso da penalidade por comprimento de spine_entry (sub-coletor desconectado
+ * da principal). Multiplica o comprimento em metros pela penalidade R$/m.
+ */
+export const WEIGHT_FRAGMENTATION = 1.0;
+
+/**
+ * Penalidade R$/m equivalente para spine_entry longo.
+ * Não é preço de material — é proxy operacional de "tubo extra estrutural".
+ */
+export const PENALTY_FRAGMENTATION_PER_M_R$ = 35.0;
+
+/**
+ * Penalidade R$ por cotovelo/quebra na rota da principal/adutora/spines.
+ * Proxy operacional de complexidade de montagem (cada cotovelo = uma luva-curva
+ * + tempo de execução). Não corresponde a SKU do catálogo.
+ */
+export const PENALTY_ROUTE_BREAK_R$ = 100.0;
+
+/**
+ * Peso da penalidade de dispersão de section_valves (P4).
+ *
+ * **VALOR = 0 no MVP da TASK-056.** Razão técnica: hoje os `section_valves` são
+ * gerados em `constructability.ts` a partir de `sectorIndices + positions[]`
+ * (arch-independente). Passar `controlPoints` ao motor de seleção introduziria
+ * circularidade — o motor compararia candidatos contra valves baseados em uma
+ * arquitetura prévia, não no candidato corrente.
+ *
+ * Quando TASK-053-valves entregar (relocação de section_valve para spine_entry),
+ * P4 vira arch-dependente e este peso pode ser ativado em TASK-056B com
+ * calibração RT/campo.
+ *
+ * O helper `computeValveDispersionM` permanece exportado para testabilidade e
+ * diagnóstico, mas com peso 0 não contribui para o `scoreFinal`.
+ */
+export const WEIGHT_VALVE_DISPERSION = 0;
+
+/**
+ * Penalidade R$/m equivalente para dispersão de section_valve em relação ao
+ * spine_entry mais próximo. Não usado no MVP (WEIGHT_VALVE_DISPERSION = 0);
+ * mantido para ativação em TASK-056B.
+ */
+export const PENALTY_VALVE_DISPERSION_PER_M_R$ = 30.0;
+
+/**
+ * Economia mínima (fração do BOM A0) que A3 (principal central) precisa atingir
+ * vs. A0 para entrar na comparação por scoreFinal.
+ *
+ * **VALOR = 0 no MVP da TASK-056.** Razão metodológica: gate impedindo A3 sem
+ * economia mínima transformaria "boa prática" em "regra técnica" — viola ajuste 3
+ * da TASK-055 (preservar distinção 4-tier).
+ *
+ * Com gate = 0, qualquer A3 válido tecnicamente compete por `scoreFinal`; A3 vence
+ * naturalmente quando o custo real (BOM + P2 + P3) é menor que A0/A2. O warning
+ * textual "principal central atravessa área — validar com RT/operacional" permanece
+ * ATIVO para que usuário/RT possa sobrescrever em projetos específicos.
+ *
+ * Calibração via RT/E09 pode reintroduzir gate > 0 com base empírica concreta de
+ * construtibilidade operacional.
+ */
+export const A3_MIN_ECONOMY_BOM_PCT = 0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos públicos
@@ -114,6 +217,22 @@ export interface CandidateEvaluation {
   principalCrossesArea: boolean;
   numPrincipalSegments: number;
   warnings: string[];
+  // ── TASK-056: métricas operacionais (P1–P4) ──
+  /** P1 — fração de colunas físicas que a principal "corta" pelo meio (proxy operacional). */
+  p1_principalSplitsColumnsRatio: number;
+  /** P2 — comprimento total (m) de spine_entry (sub-coletor desconectado da principal). */
+  p2_subCollectorDisconnectM: number;
+  /** P3 — contagem de cotovelos/vértices internos em principal + adutora + spines/spine_entries. */
+  p3_routeBreaksCount: number;
+  /** P4 — média (m) de distâncias section_valve → spine_entry mais próximo (peso=0 no MVP). */
+  p4_valveDispersionM: number;
+  /** Penalidade operacional total em R$ aplicada ao BOM estimado preliminar para formar scoreFinal. */
+  operationalPenaltyR$: number;
+  /**
+   * Score final = bomEstimadaPreliminar + operationalPenaltyR$.
+   * É a métrica usada para ordenar candidatos na seleção arquitetural.
+   */
+  scoreFinal: number;
 }
 
 export type ArchitectureSelectionDecision =
@@ -150,6 +269,13 @@ export interface ArchitectureSelectorInput {
   maxVelocityRamalMs?: number;
   /** Override do limite de perda em ramal. Default: MAX_HEADLOSS_RAMAL_MCA. */
   maxHeadlossRamalMca?: number;
+  /**
+   * TASK-056: segmentos operacionais para ativar topologia "espinha de peixe SEMPRE
+   * sub-coletor" (TASK-053 v12) na avaliação dos candidatos. Quando ausente,
+   * `generateSecondaries` cai no caminho legado 1:1 (`kind === undefined`) —
+   * comportamento compatível com testes T43 pré-TASK-056.
+   */
+  operationalSegments?: OperationalSegment[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -205,12 +331,23 @@ function evaluateCandidate(
   candidate: ArchitectureCandidate,
   physicalColumns: PhysicalColumn[],
   centroid: { lng: number; lat: number },
+  gridAngleDegrees: number,
   laterais: Lateral[],
   maxVelocityRamalMs: number,
   maxHeadlossRamalMca: number,
+  operationalSegments: OperationalSegment[] | undefined,
 ): CandidateEvaluation {
   // Gerar ramais com base na principal deste candidato.
-  const secondaries = generateSecondaries(physicalColumns, candidate.principal, centroid);
+  // TASK-056: quando `operationalSegments` é fornecido, ativa topologia v12
+  // (espinha de peixe SEMPRE sub-coletor). Sem operationalSegments, mantém
+  // caminho legado 1:1 (kind === undefined) — compat com testes T43.
+  const secondaries =
+    operationalSegments !== undefined
+      ? generateSecondaries(physicalColumns, candidate.principal, centroid, undefined, {
+          operationalSegments,
+          gridAngleDegrees,
+        })
+      : generateSecondaries(physicalColumns, candidate.principal, centroid);
 
   // Dimensionar ramais (preview — não substitui o solver oficial).
   // Critério L2 conservador: sizeAllSecondaries usa max(lateral.vazaoM3h) por coluna.
@@ -296,6 +433,37 @@ function evaluateCandidate(
     );
   }
 
+  // ── TASK-056: Métricas operacionais P1–P4 + scoreFinal ──
+  // Helpers puros computados aqui para que CandidateEvaluation exponha valores
+  // auditáveis junto com a BOM. P4 é exposto mas tem peso 0 no score (ver
+  // WEIGHT_VALVE_DISPERSION docstring).
+  const p1 = computePrincipalSplitsColumnsRatio(
+    candidate.principal,
+    physicalColumns,
+    centroid,
+    gridAngleDegrees,
+  );
+  const p2 = computeSubCollectorDisconnectM(secondaries);
+  const p3 = computeRouteBreaksCount(candidate.principal, candidate.adutora, secondaries);
+  // P4 helper sempre exposto; sem controlPoints fornecidos retorna 0 (ver doc).
+  // No MVP da TASK-056 não recebemos controlPoints — P4 permanece 0.
+  const p4 = computeValveDispersionM([], secondaries, centroid);
+
+  // Penalidades operacionais (R$) — proxies, não custos de material.
+  const penaltyPrincipalCrosses = WEIGHT_PRINCIPAL_CROSSES * p1 * bomEstimadaPreliminar;
+  const penaltyFragmentation = WEIGHT_FRAGMENTATION * p2 * PENALTY_FRAGMENTATION_PER_M_R$;
+  const penaltyRouteBreaks = p3 * PENALTY_ROUTE_BREAK_R$;
+  const penaltyValveDispersion =
+    WEIGHT_VALVE_DISPERSION * p4 * PENALTY_VALVE_DISPERSION_PER_M_R$;
+
+  const operationalPenaltyR$ =
+    penaltyPrincipalCrosses +
+    penaltyFragmentation +
+    penaltyRouteBreaks +
+    penaltyValveDispersion;
+
+  const scoreFinal = bomEstimadaPreliminar + operationalPenaltyR$;
+
   return {
     candidate,
     isValid: invalidReason === null,
@@ -310,6 +478,12 @@ function evaluateCandidate(
     principalCrossesArea,
     numPrincipalSegments: Math.max(0, candidate.principal.length - 1),
     warnings,
+    p1_principalSplitsColumnsRatio: p1,
+    p2_subCollectorDisconnectM: p2,
+    p3_routeBreaksCount: p3,
+    p4_valveDispersionM: p4,
+    operationalPenaltyR$,
+    scoreFinal,
   };
 }
 
@@ -342,6 +516,7 @@ export function selectArchitectureByBom(
     laterais,
     maxVelocityRamalMs = MAX_VELOCITY_RAMAL_MS,
     maxHeadlossRamalMca = MAX_HEADLOSS_RAMAL_MCA,
+    operationalSegments,
   } = input;
 
   // Caso degenerado: sem colunas, não há o que selecionar. Retorna A0 puro.
@@ -358,9 +533,11 @@ export function selectArchitectureByBom(
       a0,
       physicalColumns,
       centroid,
+      gridAngleDegrees,
       laterais,
       maxVelocityRamalMs,
       maxHeadlossRamalMca,
+      operationalSegments,
     );
     return {
       winner: "A0",
@@ -414,20 +591,20 @@ export function selectArchitectureByBom(
   );
 
   // Avaliar todos.
-  const evalA0 = evaluateCandidate(a0, physicalColumns, centroid, laterais, maxVelocityRamalMs, maxHeadlossRamalMca);
-  const evalA2Min = evaluateCandidate(a2Min, physicalColumns, centroid, laterais, maxVelocityRamalMs, maxHeadlossRamalMca);
-  const evalA2Max = evaluateCandidate(a2Max, physicalColumns, centroid, laterais, maxVelocityRamalMs, maxHeadlossRamalMca);
-  const evalA3 = evaluateCandidate(a3, physicalColumns, centroid, laterais, maxVelocityRamalMs, maxHeadlossRamalMca);
+  const evalA0 = evaluateCandidate(a0, physicalColumns, centroid, gridAngleDegrees, laterais, maxVelocityRamalMs, maxHeadlossRamalMca, operationalSegments);
+  const evalA2Min = evaluateCandidate(a2Min, physicalColumns, centroid, gridAngleDegrees, laterais, maxVelocityRamalMs, maxHeadlossRamalMca, operationalSegments);
+  const evalA2Max = evaluateCandidate(a2Max, physicalColumns, centroid, gridAngleDegrees, laterais, maxVelocityRamalMs, maxHeadlossRamalMca, operationalSegments);
+  const evalA3 = evaluateCandidate(a3, physicalColumns, centroid, gridAngleDegrees, laterais, maxVelocityRamalMs, maxHeadlossRamalMca, operationalSegments);
 
-  // Dentre as variantes de A2 (min/max), escolher a de menor BOM válida.
-  // Se ambas inválidas, manter a de menor BOM mesmo assim (para diagnóstico).
+  // Dentre as variantes de A2 (min/max), escolher a de menor scoreFinal válido.
+  // Se ambas inválidas, manter a de menor scoreFinal mesmo assim (para diagnóstico).
   let evalA2: CandidateEvaluation;
   if (evalA2Min.isValid && !evalA2Max.isValid) {
     evalA2 = evalA2Min;
   } else if (!evalA2Min.isValid && evalA2Max.isValid) {
     evalA2 = evalA2Max;
   } else {
-    evalA2 = evalA2Min.bomEstimadaPreliminar <= evalA2Max.bomEstimadaPreliminar ? evalA2Min : evalA2Max;
+    evalA2 = evalA2Min.scoreFinal <= evalA2Max.scoreFinal ? evalA2Min : evalA2Max;
   }
 
   const evaluations: CandidateEvaluation[] = [evalA0, evalA2, evalA3];
@@ -449,36 +626,74 @@ export function selectArchitectureByBom(
     };
   }
 
-  // Função objetivo: menor BOM estimada preliminar entre os válidos.
+  // TASK-056: Gate A3 — principal central exige economia mínima vs A0 para entrar
+  // na comparação por scoreFinal.
+  //
+  // **Gate desativado por princípio metodológico** (MVP TASK-056): quando
+  // `A3_MIN_ECONOMY_BOM_PCT <= 0`, qualquer A3 tecnicamente válido compete
+  // livremente — A3 vence ou perde por `scoreFinal` natural (BOM + P2 + P3),
+  // sem proxy estético. O warning textual "principal central atravessa área"
+  // permanece ATIVO para sinalizar ao usuário/RT.
+  //
+  // Calibração via RT/E09 pode reintroduzir gate > 0 com base empírica concreta.
+  const a3PassesEconomyGate = (() => {
+    if (!evalA3.isValid) return false;
+    if (A3_MIN_ECONOMY_BOM_PCT <= 0) return true; // gate desativado
+    if (!evalA0.isValid) return true; // A0 inválido → A3 não tem com quem comparar
+    const economia = evalA0.bomEstimadaPreliminar - evalA3.bomEstimadaPreliminar;
+    const economyRatio = evalA0.bomEstimadaPreliminar > 0
+      ? economia / evalA0.bomEstimadaPreliminar
+      : 0;
+    return economyRatio >= A3_MIN_ECONOMY_BOM_PCT;
+  })();
+
+  const competingEvals = validEvals.filter((e) => {
+    if (e.candidate.id !== "A3") return true;
+    return a3PassesEconomyGate;
+  });
+
+  // Se A3 foi rejeitado pelo gate, mas era o único válido — fallback para A0.
+  const finalists = competingEvals.length > 0 ? competingEvals : [evalA0];
+
+  // Função objetivo: menor scoreFinal (BOM + penalidades operacionais) entre os finalistas.
   // Empate (< EPSILON_BOM_R$) prefere A0 (princípio "menor mudança").
-  validEvals.sort((a, b) => a.bomEstimadaPreliminar - b.bomEstimadaPreliminar);
-  const minBom = validEvals[0].bomEstimadaPreliminar;
-  const tied = validEvals.filter(
-    (e) => Math.abs(e.bomEstimadaPreliminar - minBom) < EPSILON_BOM_R$,
+  finalists.sort((a, b) => a.scoreFinal - b.scoreFinal);
+  const minScore = finalists[0].scoreFinal;
+  const tied = finalists.filter(
+    (e) => Math.abs(e.scoreFinal - minScore) < EPSILON_BOM_R$,
   );
   const winnerEval = tied.find((e) => e.candidate.id === "A0") ?? tied[0];
 
   const bomDeltaVsBaseline = winnerEval.bomEstimadaPreliminar - evalA0.bomEstimadaPreliminar;
 
+  const formatPenalty = (e: CandidateEvaluation): string =>
+    `BOM=R$ ${e.bomEstimadaPreliminar.toFixed(2)} + penalidades R$ ${e.operationalPenaltyR$.toFixed(2)} ` +
+    `(P1=${e.p1_principalSplitsColumnsRatio.toFixed(2)}, P2=${e.p2_subCollectorDisconnectM.toFixed(0)}m, ` +
+    `P3=${e.p3_routeBreaksCount}, P4=${e.p4_valveDispersionM.toFixed(1)}m) ` +
+    `= score R$ ${e.scoreFinal.toFixed(2)}`;
+
+  const a3GateNote = !a3PassesEconomyGate && evalA3.isValid
+    ? ` A3 reprovado pelo gate de economia mínima (${(A3_MIN_ECONOMY_BOM_PCT * 100).toFixed(0)}% vs A0 — provisional).`
+    : "";
+
   let decision: ArchitectureSelectionDecision;
   let reason: string;
   if (winnerEval.candidate.id === "A0") {
     decision = "baseline_preserved";
-    const a2Bom = evalA2.bomEstimadaPreliminar.toFixed(2);
-    const a3Bom = evalA3.bomEstimadaPreliminar.toFixed(2);
-    const a0Bom = evalA0.bomEstimadaPreliminar.toFixed(2);
     reason =
-      `Baseline (A0) preservado por ter a menor BOM estimada preliminar entre os candidatos válidos. ` +
-      `A0=R$ ${a0Bom}; A2=R$ ${a2Bom}; A3=R$ ${a3Bom}. ` +
-      `BOM diferencial (apenas tubos principal/adutora/ramais — não é BOM oficial).`;
+      `Baseline (A0) preservado por ter o menor scoreFinal entre os candidatos válidos. ` +
+      `A0: ${formatPenalty(evalA0)}. A2: ${formatPenalty(evalA2)}. A3: ${formatPenalty(evalA3)}.${a3GateNote} ` +
+      `scoreFinal = BOM diferencial + penalidades operacionais (P1-P4). ` +
+      `Não é BOM oficial — apenas comparação entre candidatos arquiteturais.`;
   } else {
     decision = "winner_reduces_bom";
-    const economia = Math.abs(bomDeltaVsBaseline).toFixed(2);
+    const deltaScore = Math.abs(winnerEval.scoreFinal - evalA0.scoreFinal).toFixed(2);
     reason =
-      `Candidato ${winnerEval.candidate.id} escolhido por ter menor BOM estimada preliminar ` +
-      `(economia diferencial vs. A0: R$ ${economia}). ` +
+      `Candidato ${winnerEval.candidate.id} escolhido por ter menor scoreFinal ` +
+      `(delta vs. A0: R$ ${deltaScore}). ` +
       `Restrições técnicas preservadas (velocidade ≤ ${maxVelocityRamalMs.toFixed(1)} m/s; ` +
       `perda ≤ ${maxHeadlossRamalMca.toFixed(1)} mca em todos os ramais). ` +
+      `Vencedor: ${formatPenalty(winnerEval)}. A0 baseline: ${formatPenalty(evalA0)}.${a3GateNote} ` +
       `BOM final será gerada por buildBOM() sobre o solver oficial.`;
   }
 

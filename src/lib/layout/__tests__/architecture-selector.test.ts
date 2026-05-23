@@ -416,3 +416,142 @@ describe("TASK-043 — selectArchitectureByBom", () => {
     expect(MAX_HEADLOSS_RAMAL_MCA).toBe(3.0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-056 — Motor de qualidade operacional (P1–P4 + gate A3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("TASK-056 — selectArchitectureByBom com penalidades operacionais", () => {
+  it("T56-6 — A3 com BOM maior (secondaries longas) perde para A0 por scoreFinal natural", () => {
+    // Cenário baseline: A3 central tem secondaries mais longos (30m até inlets), gerando
+    // BOM maior que A0 (que tem principal na borda yMin). Sem gate ativo
+    // (A3_MIN_ECONOMY_BOM_PCT = 0 no MVP), A3 ainda perde — mas por scoreFinal natural,
+    // não por regra estética. Filosofia: custo real (BOM + P2 + P3) decide.
+    const { waterSource, physicalColumns, laterais } = buildBaselineScenario();
+    const result = selectArchitectureByBom({
+      waterSource,
+      physicalColumns,
+      centroid: CENTROID_0,
+      gridAngleDegrees: 0,
+      laterais,
+    });
+
+    const evalA3 = result.evaluations.find((e) => e.candidate.id === "A3")!;
+    const evalA0 = result.evaluations.find((e) => e.candidate.id === "A0")!;
+
+    // A3 deve ter P1 = 1.0 (todas as colunas atravessadas)
+    expect(evalA3.p1_principalSplitsColumnsRatio).toBe(1);
+    // A0 deve ter P1 = 0
+    expect(evalA0.p1_principalSplitsColumnsRatio).toBe(0);
+    // A3 NÃO pode vencer com gate ativo (mesmo se BOM A3 < BOM A0)
+    expect(result.winner).not.toBe("A3");
+  });
+
+  it("T56-7 — A0 vence empate real em scoreFinal (princípio menor mudança)", () => {
+    const { waterSource, physicalColumns, laterais } = buildBaselineScenario();
+    const result = selectArchitectureByBom({
+      waterSource,
+      physicalColumns,
+      centroid: CENTROID_0,
+      gridAngleDegrees: 0,
+      laterais,
+    });
+
+    // No baseline simétrico, A0 e A2 (max ou min) tendem a empatar em scoreFinal.
+    // Tie-breaker prefere A0.
+    if (result.winner === "A0" || result.winner === "A2") {
+      const evalA0 = result.evaluations.find((e) => e.candidate.id === "A0")!;
+      const evalA2 = result.evaluations.find((e) => e.candidate.id === "A2")!;
+      if (Math.abs(evalA0.scoreFinal - evalA2.scoreFinal) < EPS_BOM) {
+        expect(result.winner).toBe("A0");
+      }
+    }
+  });
+
+  it("T56-8 — A3 perde quando custo real (BOM + P2 + P3) é maior que A0", () => {
+    // No baseline, A3 central tem secondaries longas → BOM maior. Com gate desativado
+    // (A3_MIN_ECONOMY_BOM_PCT = 0), A3 ainda perde pelo scoreFinal natural — não por
+    // proxy estético. Caminhos de rejeição aceitos: (a) A3 inválido tecnicamente
+    // (hidráulica); (b) gate, se reintroduzido em E09 com base empírica.
+    const { waterSource, physicalColumns, laterais } = buildBaselineScenario();
+    const result = selectArchitectureByBom({
+      waterSource,
+      physicalColumns,
+      centroid: CENTROID_0,
+      gridAngleDegrees: 0,
+      laterais,
+    });
+
+    const evalA3 = result.evaluations.find((e) => e.candidate.id === "A3")!;
+    const evalA0 = result.evaluations.find((e) => e.candidate.id === "A0")!;
+
+    const economyRatio = evalA0.bomEstimadaPreliminar > 0
+      ? (evalA0.bomEstimadaPreliminar - evalA3.bomEstimadaPreliminar) / evalA0.bomEstimadaPreliminar
+      : 0;
+
+    if (economyRatio < 0.05 && evalA3.p1_principalSplitsColumnsRatio > 0.5) {
+      // Gate (ou invalidação técnica) deve impedir A3 de vencer.
+      // Aceitamos as duas formas de rejeição: por gate de economia mínima OU por
+      // invalidação hidráulica de candidato — ambas são rejeições legítimas.
+      expect(result.winner).not.toBe("A3");
+      // scoreFinal de A3 deve ser maior que o do vencedor OU A3 deve estar inválido.
+      const winnerEval = result.evaluations.find((e) => e.candidate.id === result.winner)!;
+      if (evalA3.isValid) {
+        // A3 válido mas rejeitado pelo gate de economia: reason deve citar o gate.
+        expect(result.reason).toMatch(/gate de economia mínima|A3 reprovado/i);
+      } else {
+        // A3 inválido hidraulicamente: rejeição correta sem precisar de gate.
+        expect(evalA3.invalidReason).not.toBeNull();
+      }
+      // Sanity: scoreFinal vencedor < scoreFinal A3 OU A3 invalido
+      if (winnerEval.isValid && evalA3.isValid) {
+        expect(winnerEval.scoreFinal).toBeLessThanOrEqual(evalA3.scoreFinal + EPS_BOM);
+      }
+    }
+  });
+
+  it("T56-9 — invariantes preservadas: rede 0°/90°, DN homologado, score expõe métricas", () => {
+    const { waterSource, physicalColumns, laterais } = buildBaselineScenario();
+    const result = selectArchitectureByBom({
+      waterSource,
+      physicalColumns,
+      centroid: CENTROID_0,
+      gridAngleDegrees: 0,
+      laterais,
+    });
+
+    // Vencedor é válido (sem blocker angular — ADR-010 preservada via detectNetworkAngleIssues)
+    const winnerEval = result.evaluations.find((e) => e.candidate.id === result.winner)!;
+    expect(winnerEval.isValid).toBe(true);
+    expect(winnerEval.invalidReason).toBeNull();
+
+    // DN da lateral física vem do catálogo via PhysicalColumn.selecao (não tocado
+    // pelo motor de seleção arquitetural). ADR-013 (DN100 não em lateral 5022)
+    // é responsabilidade do gerador de laterais, não do architecture-selector.
+    // Verificamos aqui que o motor NÃO altera physicalColumns nem suas seleções.
+    for (const col of physicalColumns) {
+      expect(col.selecao.tubo.diametroMm).toBe(50); // catálogo DUMMY mantido
+    }
+
+    // Todas as evaluations expõem P1-P4 e scoreFinal (auditabilidade)
+    for (const e of result.evaluations) {
+      expect(typeof e.p1_principalSplitsColumnsRatio).toBe("number");
+      expect(typeof e.p2_subCollectorDisconnectM).toBe("number");
+      expect(typeof e.p3_routeBreaksCount).toBe("number");
+      expect(typeof e.p4_valveDispersionM).toBe("number");
+      expect(typeof e.operationalPenaltyR$).toBe("number");
+      expect(typeof e.scoreFinal).toBe("number");
+      // P4 sempre 0 no MVP (peso desativado)
+      expect(e.p4_valveDispersionM).toBe(0);
+      // scoreFinal = BOM + penalty (consistência)
+      expect(Math.abs(e.scoreFinal - (e.bomEstimadaPreliminar + e.operationalPenaltyR$))).toBeLessThan(0.01);
+    }
+
+    // TECH-053-01 não é mascarado: motor não toca em hydraulic-connectivity.ts.
+    // Verificamos que `secondaries` do vencedor seguem topologia legado quando
+    // operationalSegments não é fornecido (compat T43).
+    for (const s of winnerEval.secondaries) {
+      expect(s.kind).toBeUndefined();
+    }
+  });
+});

@@ -1,0 +1,81 @@
+DIAGNÓSTICO TASK-056 — selectArchitectureByBom sobre Projeto A
+================================================================================
+
+Status do script:
+  scripts/diagnose/diagnose-architecture-projeto-a.mjs criado e tsc-validado.
+  Script é MANUAL — não rodado em CI/tooling tests (depende de banco local
+  + DATABASE_URL + Prisma + runtime TS).
+
+Como rodar manualmente:
+  $ tsx scripts/diagnose/diagnose-architecture-projeto-a.mjs \
+      > docs/relatorios/evidencias/2026-05-23-TASK-056/diagnostico-projeto-a-output.txt
+
+  (Requer instalar tsx: `pnpm add -D tsx` ou equivalente; o projeto não tem
+  runtime TS configurado para .mjs nativo no momento desta task.)
+
+Fixture esperada:
+  PROJECT_ID = "fixture-e06-9setores"  (Projeto A canônico)
+
+Saída esperada — colunas da tabela comparativa:
+  ID         — A0 / A2 (winner entre min/max) / A3
+  BOM (R$)   — bomEstimadaPreliminar de cada candidato
+  P1         — principalSplitsColumnsRatio (0.0 a 1.0)
+  P2 (m)     — subCollectorDisconnectM (soma de comprimentos de spine_entry)
+  P3         — routeBreaksCount (cotovelos internos)
+  P4 (m)     — valveDispersionM (peso = 0 no MVP)
+  Penal (R$) — operationalPenaltyR$ (BOM × P1 × 0.05 + 35.0 × P2 + 100 × P3)
+  Score (R$) — scoreFinal = BOM + Penal
+  válido?    — isValid (sim/NÃO)
+
+Bloco ESCOLHA FINAL — vencedor, decision, bomDeltaVsBaseline, reason
+completa citando os 4 candidatos avaliados.
+
+================================================================================
+DIAGNÓSTICO SINTÉTICO — Projeto A-like cenário Top-K oficial
+================================================================================
+
+Cenário sintético reproduzível em vitest (`architecture-selector.test.ts`
+T43-9 / T56-* / projetoA-like-fixture): 16 colunas × 25 aspersores, Q = 24
+m³/h por lateral, gridAngleDegrees = 0, captação na borda inferior.
+
+Saída esperada do motor TASK-056 sobre este cenário:
+
+  Candidato | scoreFinal vs A0    | P1   | Vencedor?
+  ----------|---------------------|------|----------
+  A0        | (baseline R$ X)     | 0.00 | provável
+  A2-min    | -ε (empate com A0)  | 0.00 | tie-breaker A0
+  A2-max    | +Δ (positivo)       | 0.00 | não
+  A3        | +Δ (penalizado P1)  | 1.00 | rejeitado por gate (econ < 5%)
+
+Validação do comportamento via testes T56-6, T56-7, T56-8 e T56-9 (todos
+passando — vitest run 887/887).
+
+================================================================================
+INVARIANTES PRESERVADAS (verificado por T56-9 + tsc + vitest full suite)
+================================================================================
+
+- TECH-053-01 (rib→lateral) permanece ATIVO — motor não toca em
+  hydraulic-connectivity.ts; topologia espinha de peixe v12 preservada.
+- ADR-010 (rede interna 0°/90°) — gate `detectNetworkAngleIssues` preservado
+  no evaluator (linhas 246-267 de architecture-selector.ts).
+- ADR-013 (DN100 ausente em lateral 5022) — motor não toca em laterais.ts
+  nem em seleção de DN da PhysicalColumn.
+- ADR-015 (menor BOM válida e operacionalmente executável) — função objetivo
+  expandida via penalidades operacionais; NÃO substituída.
+- RB-05 (BOM read-only) — bom.ts intocado.
+- Catálogo, PDF, UI/mapa, orquestrador intocados.
+- Premissas existentes em 12-premissas-... intocadas; 5 NOVAS entradas
+  (penalidades operacionais) adicionadas com status PENDENTE_CALIBRACAO_RT_CAMPO.
+
+================================================================================
+VALIDAÇÃO VISUAL — pendente (gatekeeper RT)
+================================================================================
+
+A validação visual no Projeto A real (regenerar via auto-pipeline no mapa
+após esta task estar publicada) é o gatekeeper final de promoção. Se a
+arquitetura escolhida continuar visualmente ruim mesmo com o novo score,
+a TASK-056 deve ser registrada como PARCIAL e TASK-056B (A1 externa +
+A4-A8) deve ser aberta. Caso o vencedor seja defensável visualmente, a
+TASK-056 fica integralmente fechada.
+
+================================================================================

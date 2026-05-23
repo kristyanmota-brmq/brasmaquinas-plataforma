@@ -5,7 +5,10 @@
  */
 
 import { generatePrincipalAndAdutora } from "./principal";
-import { buildSectorsByFlowWithColumnSplitting } from "./sectorization";
+import {
+  buildSectorsByFlowWithColumnSplitting,
+  type OperationalSegment,
+} from "./sectorization";
 import {
   selectArchitectureByBom,
   type ArchitectureSelectionResult,
@@ -72,6 +75,7 @@ export function buildSelectedPipelineCoords(
   centroid: { lng: number; lat: number },
   gridAngleDegrees: number,
   laterais: Lateral[],
+  operationalSegments?: OperationalSegment[],
 ): {
   principal: [number, number][];
   adutora: [number, number][];
@@ -90,6 +94,7 @@ export function buildSelectedPipelineCoords(
     centroid,
     gridAngleDegrees,
     laterais,
+    operationalSegments,
   });
 
   return {
