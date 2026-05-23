@@ -157,10 +157,21 @@ export function selectSecondaryPipe(input: SelectSecondaryPipeInput): {
 // ── Batch sizing ───────────────────────────────────────────────────────────────
 
 /**
- * Dimensiona todos os ramais individualmente.
+ * Dimensiona todos os ramais (TASK-053 v6 — 3 paths kind-aware).
  *
- * Vazão de projeto de cada ramal = máxima vazão lateral na coluna física
- * (cobre todos os setores em que a coluna opera).
+ * Paths de dimensionamento:
+ *   - **Path 0 (`kind === undefined`)** — caminho legado preservado byte-a-byte.
+ *     Vazão = `max(lateral.vazaoM3h)` sobre `physicalColumnIds ?? [physicalColumnId]`.
+ *     Cobre: ramal individual 1:1 (TASK-046), coluna isolada com fallback legado,
+ *     sub-coletor v3 stair-step (multi-coluna sem `gridAngleDegrees`).
+ *   - **Path 1 (`kind === "rib"`)** — vazão = `max(lateral.vazaoM3h)` da coluna em
+ *     `physicalColumnIds[0]` (1 coluna por rib).
+ *   - **Path 2 (`kind === "spine" || "spine_entry"`)** — vazão = `SUM` das vazões das
+ *     ribs no mesmo `sectorId` (TASK-052 — operação rotativa: todas ribs do setor
+ *     ativas simultaneamente quando o setor está rotacionando).
+ *
+ * Pass 1 (loop A): processa Path 0 e Path 1 + agrega vazão por setor em `flowSumBySectorId`.
+ * Pass 2 (loop B): processa Path 2 consultando o mapa de soma.
  *
  * @param secondaries  Ramais gerados por generateSecondaries().
  * @param laterais     Laterais derivadas pela rede (todas as laterais do projeto).
@@ -175,7 +186,7 @@ export function sizeAllSecondaries(
   maxVelocityMs: number = DEFAULT_MAX_VEL_MS,
   maxHeadLossMca: number = DEFAULT_MAX_HF_MCA,
 ): SizedSecondaryPipe[] {
-  // Design flow por coluna = max lateral flow em todos os setores
+  // Design flow por coluna = max lateral flow em todos os setores (operação rotativa — TASK-052)
   const maxFlowByColId = new Map<string, number>();
   for (const lat of laterais) {
     const prev = maxFlowByColId.get(lat.physicalColumnId) ?? 0;
@@ -185,9 +196,8 @@ export function sizeAllSecondaries(
   const sorted = [...candidatePipes].sort((a, b) => a.diametroMm - b.diametroMm);
   const smallest = sorted[0] ?? candidatePipes[0];
 
-  return secondaries.map((sec): SizedSecondaryPipe => {
-    const flowM3h = maxFlowByColId.get(sec.physicalColumnId) ?? 0;
-
+  // ── helper interno: aplica selectSecondaryPipe ou retorna fallback de smallest ──
+  const buildSized = (sec: SecondaryPipe, flowM3h: number): SizedSecondaryPipe => {
     if (flowM3h <= 0 || sec.lengthM <= 0) {
       const tube = smallest;
       return {
@@ -203,7 +213,6 @@ export function sizeAllSecondaries(
         status: "ok",
       };
     }
-
     const result = selectSecondaryPipe({
       flowM3h,
       lengthM: sec.lengthM,
@@ -211,7 +220,6 @@ export function sizeAllSecondaries(
       maxVelocityMs,
       maxHeadLossMca,
     });
-
     return {
       ...sec,
       flowM3h,
@@ -224,5 +232,47 @@ export function sizeAllSecondaries(
       headLossExceeds: result.headLossExceeds,
       status: result.status,
     };
-  });
+  };
+
+  // ── Pass 1: Path 0 (legado) + Path 1 (rib); soma vazões por sectorId ──
+  // Pre-aloca o array final mantendo a ordem original; preenche slot a slot.
+  const sized: (SizedSecondaryPipe | null)[] = new Array(secondaries.length).fill(null);
+  const flowSumBySectorId = new Map<number, number>();
+
+  for (let i = 0; i < secondaries.length; i++) {
+    const sec = secondaries[i];
+    if (sec.kind === "spine" || sec.kind === "spine_entry") {
+      // Path 2 — adiado para Pass 2 (depende da soma dos ribs)
+      continue;
+    }
+    // Path 0 (kind === undefined) ou Path 1 (kind === "rib"):
+    // ambos usam max(lateral.vazaoM3h) sobre as colunas servidas.
+    // Para spine/spine_entry físicos do v6, physicalColumnIds === []  → flowM3h = 0
+    // (impossível alcançar aqui pois já desviamos acima).
+    const colIds = sec.physicalColumnIds ?? [sec.physicalColumnId];
+    let flowM3h = 0;
+    for (const colId of colIds) {
+      const v = maxFlowByColId.get(colId) ?? 0;
+      if (v > flowM3h) flowM3h = v;
+    }
+    sized[i] = buildSized(sec, flowM3h);
+
+    // Para ribs com sectorId, agregar para Pass 2.
+    if (sec.kind === "rib" && sec.sectorId != null) {
+      const prev = flowSumBySectorId.get(sec.sectorId) ?? 0;
+      flowSumBySectorId.set(sec.sectorId, prev + flowM3h);
+    }
+  }
+
+  // ── Pass 2: Path 2 (spine + spine_entry) — vazão = SUM ribs no sectorId ──
+  for (let i = 0; i < secondaries.length; i++) {
+    const sec = secondaries[i];
+    if (sec.kind !== "spine" && sec.kind !== "spine_entry") continue;
+    const flowM3h = sec.sectorId != null
+      ? (flowSumBySectorId.get(sec.sectorId) ?? 0)
+      : 0;
+    sized[i] = buildSized(sec, flowM3h);
+  }
+
+  return sized as SizedSecondaryPipe[];
 }

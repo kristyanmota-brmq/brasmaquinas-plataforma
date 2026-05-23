@@ -269,6 +269,11 @@ export function detectNetworkAngleIssues(params: {
   const colById = new Map(physicalColumns.map((c) => [c.id, c]));
 
   for (const sec of secondaries) {
+    // TASK-053 v6: skip total para spine (estrutural — junções rib↔spine e spine_entry↔spine
+    // garantidas por construção em routeEspinhaDePeixe via ortogonalidade no frame rotacionado).
+    // Spines NÃO conectam principal nem lateral diretamente — não há junções para validar.
+    if (sec.kind === "spine") continue;
+
     // Usar coords da rota se disponível; caso contrário, fallback para [fromCoord, toCoord].
     const routeCoords = sec.coords ?? [sec.fromCoord, sec.toCoord];
     const n = routeCoords.length;
@@ -282,8 +287,16 @@ export function detectNetworkAngleIssues(params: {
     // Ramais de comprimento zero (inlet toca a principal) não geram ângulo de junção.
     if (firstLen < 1e-3) continue;
 
+    // TASK-053 v6: branch kind-aware. Define quais junções validar:
+    //   - undefined (legado/v3): valida junção→principal + cotovelos internos + junção→lateral
+    //   - "spine_entry": valida APENAS junção→principal (não conecta lateral)
+    //   - "rib": valida APENAS junção→lateral (não conecta principal — conecta spine via construção)
+    const validatePrincipalJunction = sec.kind === undefined || sec.kind === "spine_entry";
+    const validateInternalBends = sec.kind === undefined;
+    const validateLateralJunction = sec.kind === undefined || sec.kind === "rib";
+
     // 2a. Junção ramal → principal (usando primeiro segmento da rota)
-    if (principalCoords.length >= 2) {
+    if (validatePrincipalJunction && principalCoords.length >= 2) {
       const principalDir = nearestSegmentDir(sec.fromCoord, principalCoords, mLng);
       if (principalDir) {
         const deflection = angleBetweenDeg(firstVec, principalDir);
@@ -308,8 +321,46 @@ export function detectNetworkAngleIssues(params: {
       }
     }
 
+    // 2a-bis (TASK-053): Cotovelos internos do sub-coletor stair-step (v3 legado).
+    // Para sub-coletor multi-coluna com geometria stair-step, a polilinha pode ter
+    // vértices intermediários (cotovelos 90°) entre fromCoord e toCoord. Cada cotovelo
+    // interno deve ter deflexão 0°/90° conforme ALLOWED_DEFLECTIONS_INTERNAL.
+    // Para ramais legados 1:1 (n ≤ 3), o loop não executa nenhuma iteração — preserva comportamento.
+    // v6: spine_entry e rib têm polilinhas 2 vértices por construção (n === 2; loop não executa
+    // de qualquer forma). validateInternalBends explicita a intenção arquitetural.
+    if (validateInternalBends) for (let v = 1; v < n - 1; v++) {
+      const A = routeCoords[v - 1];
+      const B = routeCoords[v];
+      const C = routeCoords[v + 1];
+      const vIn = metricVec(A, B, mLng);
+      const vOut = metricVec(B, C, mLng);
+      const lenIn = Math.sqrt(vIn[0] ** 2 + vIn[1] ** 2);
+      const lenOut = Math.sqrt(vOut[0] ** 2 + vOut[1] ** 2);
+      if (lenIn < 1e-3 || lenOut < 1e-3) continue;
+      const deflectionInternal = angleBetweenDeg(vIn, vOut);
+      checkedElements++;
+      if (!isAllowedDeflection(deflectionInternal, toleranceDeg)) {
+        const angleInternal = 180 - deflectionInternal;
+        issues.push({
+          elementType: "secondary",
+          elementId: `${sec.id}-internal-bend-${v}`,
+          connectionType: "bend",
+          angleDeg: Math.round(angleInternal * 10) / 10,
+          deflectionDeg: Math.round(deflectionInternal * 10) / 10,
+          nearestAllowedAngleDeg: nearestAllowedFitting(deflectionInternal),
+          requiredFitting: fittingName(deflectionInternal, "bend", toleranceDeg),
+          severity: "blocker",
+          reason:
+            `Sub-coletor ${sec.id} tem cotovelo interno no ponto ${v} com deflexão ` +
+            `${deflectionInternal.toFixed(1)}° fora dos padrões construtíveis da rede interna ` +
+            `(apenas 0°/90° permitidos).`,
+        });
+      }
+    }
+
     // 2b. Junção ramal → lateral (usando último segmento da rota)
-    const col = colById.get(sec.physicalColumnId);
+    // v6: spine_entry NÃO valida junção→lateral (não conecta lateral); rib SIM valida.
+    const col = validateLateralJunction ? colById.get(sec.physicalColumnId) : undefined;
     if (col) {
       // latVec aponta do inlet real para a extremidade oposta (direção do fluxo).
       // Corrige falso positivo de 180° quando sec.toCoord ≈ col.endLngLat:

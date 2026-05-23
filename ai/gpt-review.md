@@ -1,43 +1,44 @@
-# Revisão GPT — TASK-052
+# Revisão GPT — TASK-053
 
-> Gerado automaticamente por `scripts/ai/run-gpt-review.mjs` em 2026-05-23T00:00:00Z.
+> Gerado automaticamente por `scripts/ai/run-gpt-review.mjs` em 2026-05-23T12:10:00-03:00.
 > Modelo: `gpt-5.5`. Schema: `v1.0`.
 
 ## Resumo executivo
 
-**Veredito:** `aprovado_com_ajustes`
-**Recomendação:** `aprovado_com_ajustes`
+**Veredito:** `reprovado`
+**Recomendação:** `reprovado`
 **Override permitido (declarado pelo GPT):** `true`
 
-Plano respeita as 7 invariantes permanentes e é coerente com uma task Classe C documental. O único ajuste necessário é metodológico: alinhar ou justificar as contagens de testes/verificações citadas, pois divergem do snapshot fornecido. Não há violação terminal de invariante.
+Nenhuma invariante permanente foi marcada como violada, portanto não há blocker terminal. Porém o plano deve ser reprovado nesta rodada por inconsistência metodológica entre `current-task.md` v7 e o plano v12, além de risco técnico/metodológico de fechar a task com blocker angular esperado sem critério de aceite suficientemente explícito.
 
 ## Blockers
 
-- **BLK-MET-001 (metodologico):** As contagens de testes/verificações citadas no plano não estão consistentes com o snapshot fornecido: snapshot informa produto 817/817 e tooling 20/20, enquanto TASK-052/claude-report citam vitest 836/836 e run-all 27/27. Como a task é documental e não altera src/**, isso não viola invariante permanente, mas deve ser ajustado ou justificado antes do fechamento para não registrar evidência de não-regressão ambígua.
+- **MET-053-01 (metodologico):** O snapshot de `ai/current-task.md` ainda descreve a TASK-053 como v7, com objetivo de orientar a espinha pela direção real da principal e ignorar `gridAngleDegrees`; o plano proposto v12 muda materialmente para espinha orientada pelo frame rotacionado por `gridAngleDegrees` e torna esse parâmetro obrigatório quando há `operationalSegments`. Antes de implementação/fechamento, a fonte de verdade da task precisa estar alinhada com o plano corrente para evitar execução contra objetivo geométrico contraditório.
+- **TECH-053-01 (tecnico):** O plano aceita explicitamente um blocker angular esperado em `spine_entry→principal` e cita mitigação por override manual via decision-log. Embora não altere `ALLOWED_DEFLECTIONS_INTERNAL`, o critério de aceite não deixa claro que a task pode ser fechada com blocker técnico ativo sem mascarar a pendência construtiva. É necessário explicitar o estado esperado do blocker ao final da task e o gate humano/RT aplicável, sem tratá-lo como sucesso construtivo.
 
 ## Análise das invariantes permanentes
 
 - **INV-CATALOGO-SEM-HOMOLOGACAO** — _ok_
   - Não alterar catálogo sem SKU homologado.
-  - O plano declara escopo estritamente documental e proíbe alterações em src/**, incluindo catálogo. Não há inclusão ou alteração de itens de catálogo.
+  - O plano declara que `src/lib/catalog/*` não será alterado e não propõe inclusão ou alteração de itens de catálogo.
 - **INV-NAO-INVENTAR-SKU** — _ok_
   - Não inventar SKU.
-  - O plano não cria, altera ou referencia novos SKUs. A mudança é apenas na documentação de uma premissa hidráulica/operacional.
+  - Não há criação, renomeação ou uso de SKU novo no plano.
 - **INV-DN100-LATERAL-5022** — _ok_
   - Não voltar DN100 como lateral 5022.
-  - Não há alteração de lógica de dimensionamento, catálogo, BOM ou seleção de tubulação. O plano explicitamente preserva src/**.
+  - O plano não altera regras de laterais, dimensionamento DN relacionado à 5022, catálogo ou ADR-013.
 - **INV-BLOCKERS-TECNICOS** — _ok_
   - Não relaxar blockers técnicos.
-  - A promoção de PENDENTE_REVISAO_RT_BRASMAQUINAS para APROVADO_RT é fundamentada na confirmação explícita do RT registrada no plano. O plano não propõe relaxar blockers técnicos nem alterar regras bloqueantes.
+  - O plano preserva `ALLOWED_DEFLECTIONS_INTERNAL = [0°, 90°]`, não altera `network-angle-diagnostics.ts` e afirma que blockers não serão tratados como warnings. Há risco técnico não-terminal sobre aceite com blocker angular esperado, registrado em blocker técnico separado, mas sem relaxamento explícito da regra no código.
 - **INV-MASCARAR-PENDENCIA** — _ok_
   - Não mascarar pendência.
-  - A task tem como objetivo explicitar uma confirmação RT e corrigir contradição documental entre a premissa escrita e o comportamento real do código. Desde que o relatório registre claramente a fonte/data da confirmação, o plano aumenta transparência em vez de mascarar pendência.
+  - As pendências conhecidas são explicitadas: relocation de `section_valve` é deferida, `MIN_HEADLAND_M` é documentado como premissa, e o blocker angular em `spine_entry→principal` é reconhecido. Recomenda-se apenas clarificar o gate de aceite para não converter blocker ativo em sucesso implícito.
 - **INV-DOMINIO-FORA-UI** — _ok_
   - Não colocar lógica de domínio na UI.
-  - Não há alteração em UI nem em src/**. A documentação apenas descreve a regra operacional já implementada em domínio existente.
+  - O escopo fica em `src/lib/layout/hydraulic-connectivity.ts`, testes e documentação; `src/components/` e `src/app/` são declarados fora do escopo.
 - **INV-LAYOUT-INSTAVEL-COMERCIAL** — _ok_
   - Não avançar para BOM/comercial se layout/hidráulica/construtibilidade estiverem instáveis.
-  - O plano não avança BOM, catálogo, orçamento ou decisão comercial. Apenas documenta a homologação da operação rotativa por setor; TASK-053 topológica permanece separada.
+  - O plano não altera `src/lib/bom.ts`, catálogo, ADR comercial ou lógica de BOM; declara explicitamente que BOM/comercial ficam congelados enquanto a topologia ainda está em validação.
 
 ## Metadata
 
@@ -51,16 +52,22 @@ Plano respeita as 7 invariantes permanentes e é coerente com uma task Classe C 
 
 ```json
 {
-  "task_id": "TASK-052",
+  "task_id": "TASK-053",
   "schema_version": "1.0",
   "modelo_gpt": "gpt-5.5",
-  "timestamp": "2026-05-23T00:00:00Z",
-  "veredito": "aprovado_com_ajustes",
+  "timestamp": "2026-05-23T12:10:00-03:00",
+  "veredito": "reprovado",
   "blockers": [
     {
-      "id": "BLK-MET-001",
+      "id": "MET-053-01",
       "categoria": "metodologico",
-      "descricao": "As contagens de testes/verificações citadas no plano não estão consistentes com o snapshot fornecido: snapshot informa produto 817/817 e tooling 20/20, enquanto TASK-052/claude-report citam vitest 836/836 e run-all 27/27. Como a task é documental e não altera src/**, isso não viola invariante permanente, mas deve ser ajustado ou justificado antes do fechamento para não registrar evidência de não-regressão ambígua.",
+      "descricao": "O snapshot de `ai/current-task.md` ainda descreve a TASK-053 como v7, com objetivo de orientar a espinha pela direção real da principal e ignorar `gridAngleDegrees`; o plano proposto v12 muda materialmente para espinha orientada pelo frame rotacionado por `gridAngleDegrees` e torna esse parâmetro obrigatório quando há `operationalSegments`. Antes de implementação/fechamento, a fonte de verdade da task precisa estar alinhada com o plano corrente para evitar execução contra objetivo geométrico contraditório.",
+      "invariante_id": null
+    },
+    {
+      "id": "TECH-053-01",
+      "categoria": "tecnico",
+      "descricao": "O plano aceita explicitamente um blocker angular esperado em `spine_entry→principal` e cita mitigação por override manual via decision-log. Embora não altere `ALLOWED_DEFLECTIONS_INTERNAL`, o critério de aceite não deixa claro que a task pode ser fechada com blocker técnico ativo sem mascarar a pendência construtiva. É necessário explicitar o estado esperado do blocker ao final da task e o gate humano/RT aplicável, sem tratá-lo como sucesso construtivo.",
       "invariante_id": null
     }
   ],
@@ -69,48 +76,48 @@ Plano respeita as 7 invariantes permanentes e é coerente com uma task Classe C 
       "id": "INV-CATALOGO-SEM-HOMOLOGACAO",
       "descricao": "Não alterar catálogo sem SKU homologado.",
       "status": "ok",
-      "justificativa": "O plano declara escopo estritamente documental e proíbe alterações em src/**, incluindo catálogo. Não há inclusão ou alteração de itens de catálogo."
+      "justificativa": "O plano declara que `src/lib/catalog/*` não será alterado e não propõe inclusão ou alteração de itens de catálogo."
     },
     {
       "id": "INV-NAO-INVENTAR-SKU",
       "descricao": "Não inventar SKU.",
       "status": "ok",
-      "justificativa": "O plano não cria, altera ou referencia novos SKUs. A mudança é apenas na documentação de uma premissa hidráulica/operacional."
+      "justificativa": "Não há criação, renomeação ou uso de SKU novo no plano."
     },
     {
       "id": "INV-DN100-LATERAL-5022",
       "descricao": "Não voltar DN100 como lateral 5022.",
       "status": "ok",
-      "justificativa": "Não há alteração de lógica de dimensionamento, catálogo, BOM ou seleção de tubulação. O plano explicitamente preserva src/**."
+      "justificativa": "O plano não altera regras de laterais, dimensionamento DN relacionado à 5022, catálogo ou ADR-013."
     },
     {
       "id": "INV-BLOCKERS-TECNICOS",
       "descricao": "Não relaxar blockers técnicos.",
       "status": "ok",
-      "justificativa": "A promoção de PENDENTE_REVISAO_RT_BRASMAQUINAS para APROVADO_RT é fundamentada na confirmação explícita do RT registrada no plano. O plano não propõe relaxar blockers técnicos nem alterar regras bloqueantes."
+      "justificativa": "O plano preserva `ALLOWED_DEFLECTIONS_INTERNAL = [0°, 90°]`, não altera `network-angle-diagnostics.ts` e afirma que blockers não serão tratados como warnings. Há risco técnico não-terminal sobre aceite com blocker angular esperado, registrado em blocker técnico separado, mas sem relaxamento explícito da regra no código."
     },
     {
       "id": "INV-MASCARAR-PENDENCIA",
       "descricao": "Não mascarar pendência.",
       "status": "ok",
-      "justificativa": "A task tem como objetivo explicitar uma confirmação RT e corrigir contradição documental entre a premissa escrita e o comportamento real do código. Desde que o relatório registre claramente a fonte/data da confirmação, o plano aumenta transparência em vez de mascarar pendência."
+      "justificativa": "As pendências conhecidas são explicitadas: relocation de `section_valve` é deferida, `MIN_HEADLAND_M` é documentado como premissa, e o blocker angular em `spine_entry→principal` é reconhecido. Recomenda-se apenas clarificar o gate de aceite para não converter blocker ativo em sucesso implícito."
     },
     {
       "id": "INV-DOMINIO-FORA-UI",
       "descricao": "Não colocar lógica de domínio na UI.",
       "status": "ok",
-      "justificativa": "Não há alteração em UI nem em src/**. A documentação apenas descreve a regra operacional já implementada em domínio existente."
+      "justificativa": "O escopo fica em `src/lib/layout/hydraulic-connectivity.ts`, testes e documentação; `src/components/` e `src/app/` são declarados fora do escopo."
     },
     {
       "id": "INV-LAYOUT-INSTAVEL-COMERCIAL",
       "descricao": "Não avançar para BOM/comercial se layout/hidráulica/construtibilidade estiverem instáveis.",
       "status": "ok",
-      "justificativa": "O plano não avança BOM, catálogo, orçamento ou decisão comercial. Apenas documenta a homologação da operação rotativa por setor; TASK-053 topológica permanece separada."
+      "justificativa": "O plano não altera `src/lib/bom.ts`, catálogo, ADR comercial ou lógica de BOM; declara explicitamente que BOM/comercial ficam congelados enquanto a topologia ainda está em validação."
     }
   ],
-  "recomendacao": "aprovado_com_ajustes",
+  "recomendacao": "reprovado",
   "override_permitido": true,
-  "justificativa_resumida": "Plano respeita as 7 invariantes permanentes e é coerente com uma task Classe C documental. O único ajuste necessário é metodológico: alinhar ou justificar as contagens de testes/verificações citadas, pois divergem do snapshot fornecido. Não há violação terminal de invariante.",
+  "justificativa_resumida": "Nenhuma invariante permanente foi marcada como violada, portanto não há blocker terminal. Porém o plano deve ser reprovado nesta rodada por inconsistência metodológica entre `current-task.md` v7 e o plano v12, além de risco técnico/metodológico de fechar a task com blocker angular esperado sem critério de aceite suficientemente explícito.",
   "metadata": {
     "tokens_prompt": 0,
     "tokens_completion": 0,

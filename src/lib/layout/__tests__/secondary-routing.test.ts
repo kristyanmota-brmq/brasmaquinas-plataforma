@@ -473,7 +473,11 @@ describe("T11 — diagnóstico usa primeiro/último segmento de coords", () => {
     expect(report.hasBlockers).toBe(false);
   });
 
-  it("checkedElements = 2 (ramal→principal + ramal→lateral)", () => {
-    expect(report.checkedElements).toBe(2);
+  it("checkedElements = 3 (ramal→principal + cotovelo interno L + ramal→lateral) — TASK-053 valida cotovelos internos", () => {
+    // TASK-053: o validador agora itera cotovelos internos da polilinha (entre primeiro e último vértice).
+    // Antes da TASK-053: 2 (junção na principal + junção na lateral).
+    // Após TASK-053: 3 (junção na principal + cotovelo 90° interno do L + junção na lateral).
+    // Mudança correta — aumenta cobertura sem relaxar nenhum blocker.
+    expect(report.checkedElements).toBe(3);
   });
 });

@@ -1,4 +1,5 @@
 import type { IrrigationProjectResult } from "@/lib/layout/irrigation-project";
+import type { SecondaryPipe } from "@/lib/layout/hydraulic-connectivity";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos públicos
@@ -111,7 +112,15 @@ export function buildMapNetworkConsistencyReport(
 
   // ── Mismatch de inlet: lateral_inlet vs secondary.toCoord ───────────────────
 
-  const secondaryByColId = new Map(secondaries.map((s) => [s.physicalColumnId, s]));
+  // TASK-053: mapa de TODAS as colunas servidas (via physicalColumnIds), incluindo sub-coletor multi-coluna.
+  // Para SecondaryPipe legado 1:1: mapeia apenas physicalColumnId (comportamento idêntico ao anterior).
+  const secondaryByColId = new Map<string, SecondaryPipe>();
+  for (const s of secondaries) {
+    const colIds = s.physicalColumnIds ?? [s.physicalColumnId];
+    for (const colId of colIds) {
+      secondaryByColId.set(colId, s);
+    }
+  }
   const centroid = result.input?.centroid;
   const mPerLng = centroid
     ? 111320 * Math.cos((centroid.lat * Math.PI) / 180)
@@ -127,11 +136,22 @@ export function buildMapNetworkConsistencyReport(
     );
     if (!inletCp) continue;
 
-    const dx = (inletCp.coordinate[0] - sec.toCoord[0]) * mPerLng;
-    const dy = (inletCp.coordinate[1] - sec.toCoord[1]) * 111320;
-    const distM = Math.sqrt(dx * dx + dy * dy);
+    // TASK-053: para sub-coletor multi-coluna (physicalColumnIds.length > 1), a polilinha do sec
+    // toca múltiplos inlets em vértices internos — sec.toCoord só é o inlet da ÚLTIMA coluna.
+    // Para a coluna corrente, o vértice "alimentado" pode estar em qualquer ponto da polilinha.
+    // Estratégia: comparar inletCp contra o vértice MAIS PRÓXIMO da polilinha do sec.
+    // Para sub-coletor 1:1 legado (physicalColumnIds.length === 1): polilinha = [from, to] e
+    // o vértice mais próximo é toCoord — comportamento idêntico ao anterior.
+    const polyline = sec.coords ?? [sec.fromCoord, sec.toCoord];
+    let bestDistM = Infinity;
+    for (const v of polyline) {
+      const dx = (inletCp.coordinate[0] - v[0]) * mPerLng;
+      const dy = (inletCp.coordinate[1] - v[1]) * 111320;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bestDistM) bestDistM = d;
+    }
 
-    if (distM > 1.0) {
+    if (bestDistM > 1.0) {
       inletSideMismatchCount++;
     }
   }

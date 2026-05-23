@@ -319,7 +319,16 @@ export function calculateIrrigationProject(
   const principalCoords = mainPipeline.coordinates as [number, number][];
   const adutoraCoords = (mainPipeline.adutora ?? []) as [number, number][];
 
-  const secondaries = generateSecondaries(physicalColumns, principalCoords, centroid);
+  // TASK-053 v6: passa operationalSegments + gridAngleDegrees para ativar espinha de peixe
+  // (3 entidades lineares por setor: 1 spine + 1 spine_entry + N ribs). Sem gridAngleDegrees,
+  // fallback v3 stair-step. Sem operationalSegments, caminho legado 1:1.
+  const secondaries = generateSecondaries(
+    physicalColumns,
+    principalCoords,
+    centroid,
+    0.5,
+    { operationalSegments, gridAngleDegrees: sprinklers.gridAngleDegrees },
+  );
 
   const connectivityReport = validateHydraulicConnectivity(
     physicalColumns,
