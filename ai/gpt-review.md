@@ -1,43 +1,44 @@
-# Revisão GPT — TASK-001
+# Revisão GPT — TASK-004B
 
-> Gerado automaticamente por `scripts/ai/run-gpt-review.mjs` em 2026-05-22T20:13:00-03:00.
+> Gerado automaticamente por `scripts/ai/run-gpt-review.mjs` em 2026-05-22T21:00:00-03:00.
 > Modelo: `gpt-5.5`. Schema: `v1.0`.
 
 ## Resumo executivo
 
-**Veredito:** `aprovado`
-**Recomendação:** `aprovado`
+**Veredito:** `aprovado_com_ajustes`
+**Recomendação:** `aprovado_com_ajustes`
 **Override permitido (declarado pelo GPT):** `true`
 
-Plano estritamente documental, com escopo proibido bem delimitado, sem alteração de produto, catálogo, BOM, UI, regras bloqueantes ou premissas RT. As invariantes permanentes foram respeitadas. Recomenda-se apenas atenção operacional para que contagens de testes/commits/status sejam confirmadas por evidência no momento da implementação antes de marcar critérios como concluídos.
+Não há violação de invariante permanente. O plano é coerente com a task e mantém catálogo, BOM, UI e premissas fora do escopo. Recomenda-se ajustar a detecção de `pressureClassModel` para exigir também `adutoraHfM` e alinhar o escopo caso testes fora de `pressure-class.test.ts` precisem ser alterados.
 
 ## Blockers
 
-_Nenhum blocker identificado._
+- **TEC-004B-001 (tecnico):** A lógica proposta para `pressureClassModel` diz considerar `exact_per_derivation` quando todos os ramais/laterais tiverem `cumPrincipalHfM` definido, mas `annotatePressureClass` só usa o cálculo real quando `cumPrincipalHfM` e `adutoraHfM` estão ambos definidos. Ajuste recomendado: a detecção do modelo deve exigir ambos os campos para os segmentos `secondary`/`lateral`, ou documentar explicitamente que `adutoraHfM` é sempre populado no caminho do solver. Do contrário, o resultado pode declarar modelo exato enquanto alguns segmentos caem no fallback conservador.
+- **MET-004B-001 (metodologico):** O plano lista como mitigação auditar/adaptar expectations em `integration.test.ts`, `bom.test.ts` e `pipeline-diagnostics.test.ts`, mas o escopo permitido de testes menciona apenas `src/lib/layout/__tests__/pressure-class.test.ts`. Se alterações nesses testes forem necessárias, o escopo da task deve ser explicitamente ampliado antes da implementação; caso contrário, devem permanecer intocados.
 
 ## Análise das invariantes permanentes
 
 - **INV-CATALOGO-SEM-HOMOLOGACAO** — _ok_
   - Não alterar catálogo sem SKU homologado.
-  - O plano é documental e declara explicitamente que não alterará `src/**` nem catálogo. A menção a itens sem SKU é tratada como pendência inventariada, não como alteração de catálogo.
+  - O plano declara `src/lib/catalog/aspersores.ts` como read-only e não propõe inclusão, remoção ou alteração de itens de catálogo.
 - **INV-NAO-INVENTAR-SKU** — _ok_
   - Não inventar SKU.
-  - O plano não cria SKU nem propõe códigos novos. Ele apenas registra gaps, como SKU pendente, preservando a pendência para homologação futura.
+  - Não há proposta de criar SKU, mapear novo item comercial ou alterar dados de produto; a tarefa atua no pós-processamento hidráulico de classe de pressão.
 - **INV-DN100-LATERAL-5022** — _ok_
   - Não voltar DN100 como lateral 5022.
-  - Não há alteração de layout, hidráulica, catálogo ou lógica de dimensionamento. O plano apenas inventaria ADRs e decisões existentes.
+  - O plano não toca seleção de lateral, geometria, catálogo ou regras associadas a DN100/5022; também declara `secondary-sizing.ts`, `laterais.ts` e arquivos de geometria como intocados.
 - **INV-BLOCKERS-TECNICOS** — _ok_
   - Não relaxar blockers técnicos.
-  - O plano mantém blockers relevantes, explicita 5 condições para E08 e preserva a homologação RT como bloqueio de TASK-002. A remoção de TASK-001 como bloqueio de TASK-002 está condicionada à própria conclusão documental da TASK-001, sem relaxar blocker técnico/RT remanescente.
+  - A mudança proposta não remove blockers técnicos; ela substitui falsos positivos conservadores por classificação baseada em pressão calculada por derivação e preserva fallback `violation_conservative` quando dados faltarem. Casos reais acima de PN passam a `violation_confirmed`. Há ajuste técnico recomendado para a consistência de `pressureClassModel`, mas não há violação direta da invariante.
 - **INV-MASCARAR-PENDENCIA** — _ok_
   - Não mascarar pendência.
-  - O objetivo do diagnóstico é explicitar pendências, riscos, premissas provisórias, blockers de E08 e limitações de validação. Não há proposta de ocultar ou reclassificar pendência como resolvida sem evidência.
+  - O plano explicita que desnível geodético por segmento e perdas locais proporcionais ficam fora do escopo e devem permanecer documentados como limitações/pendências futuras, sem removê-las das pendências.
 - **INV-DOMINIO-FORA-UI** — _ok_
   - Não colocar lógica de domínio na UI.
-  - O escopo permitido limita-se a documentação, tasks e arquivos de governança. Não há alteração de UI nem implementação de lógica de domínio.
+  - A lógica hidráulica permanece em `src/lib/layout/hydraulic-sizing.ts`; UI, API, PDF e componentes são declarados fora do escopo e intocados.
 - **INV-LAYOUT-INSTAVEL-COMERCIAL** — _ok_
   - Não avançar para BOM/comercial se layout/hidráulica/construtibilidade estiverem instáveis.
-  - O plano não avança implementação comercial/BOM. Pelo contrário, registra E08 como bloqueado por condições explícitas e trata riscos de BOM, RT e validação como pendências.
+  - O plano não avança BOM, PDF comercial, motor comercial ou catálogo; a BOM é explicitamente intocada e há critério de não-regressão para manter o valor do Projeto A.
 
 ## Metadata
 
@@ -51,59 +52,72 @@ _Nenhum blocker identificado._
 
 ```json
 {
-  "task_id": "TASK-001",
+  "task_id": "TASK-004B",
   "schema_version": "1.0",
   "modelo_gpt": "gpt-5.5",
-  "timestamp": "2026-05-22T20:13:00-03:00",
-  "veredito": "aprovado",
-  "blockers": [],
+  "timestamp": "2026-05-22T21:00:00-03:00",
+  "veredito": "aprovado_com_ajustes",
+  "blockers": [
+    {
+      "id": "TEC-004B-001",
+      "categoria": "tecnico",
+      "descricao": "A lógica proposta para `pressureClassModel` diz considerar `exact_per_derivation` quando todos os ramais/laterais tiverem `cumPrincipalHfM` definido, mas `annotatePressureClass` só usa o cálculo real quando `cumPrincipalHfM` e `adutoraHfM` estão ambos definidos. Ajuste recomendado: a detecção do modelo deve exigir ambos os campos para os segmentos `secondary`/`lateral`, ou documentar explicitamente que `adutoraHfM` é sempre populado no caminho do solver. Do contrário, o resultado pode declarar modelo exato enquanto alguns segmentos caem no fallback conservador.",
+      "invariante_id": null
+    },
+    {
+      "id": "MET-004B-001",
+      "categoria": "metodologico",
+      "descricao": "O plano lista como mitigação auditar/adaptar expectations em `integration.test.ts`, `bom.test.ts` e `pipeline-diagnostics.test.ts`, mas o escopo permitido de testes menciona apenas `src/lib/layout/__tests__/pressure-class.test.ts`. Se alterações nesses testes forem necessárias, o escopo da task deve ser explicitamente ampliado antes da implementação; caso contrário, devem permanecer intocados.",
+      "invariante_id": null
+    }
+  ],
   "invariantes": [
     {
       "id": "INV-CATALOGO-SEM-HOMOLOGACAO",
       "descricao": "Não alterar catálogo sem SKU homologado.",
       "status": "ok",
-      "justificativa": "O plano é documental e declara explicitamente que não alterará `src/**` nem catálogo. A menção a itens sem SKU é tratada como pendência inventariada, não como alteração de catálogo."
+      "justificativa": "O plano declara `src/lib/catalog/aspersores.ts` como read-only e não propõe inclusão, remoção ou alteração de itens de catálogo."
     },
     {
       "id": "INV-NAO-INVENTAR-SKU",
       "descricao": "Não inventar SKU.",
       "status": "ok",
-      "justificativa": "O plano não cria SKU nem propõe códigos novos. Ele apenas registra gaps, como SKU pendente, preservando a pendência para homologação futura."
+      "justificativa": "Não há proposta de criar SKU, mapear novo item comercial ou alterar dados de produto; a tarefa atua no pós-processamento hidráulico de classe de pressão."
     },
     {
       "id": "INV-DN100-LATERAL-5022",
       "descricao": "Não voltar DN100 como lateral 5022.",
       "status": "ok",
-      "justificativa": "Não há alteração de layout, hidráulica, catálogo ou lógica de dimensionamento. O plano apenas inventaria ADRs e decisões existentes."
+      "justificativa": "O plano não toca seleção de lateral, geometria, catálogo ou regras associadas a DN100/5022; também declara `secondary-sizing.ts`, `laterais.ts` e arquivos de geometria como intocados."
     },
     {
       "id": "INV-BLOCKERS-TECNICOS",
       "descricao": "Não relaxar blockers técnicos.",
       "status": "ok",
-      "justificativa": "O plano mantém blockers relevantes, explicita 5 condições para E08 e preserva a homologação RT como bloqueio de TASK-002. A remoção de TASK-001 como bloqueio de TASK-002 está condicionada à própria conclusão documental da TASK-001, sem relaxar blocker técnico/RT remanescente."
+      "justificativa": "A mudança proposta não remove blockers técnicos; ela substitui falsos positivos conservadores por classificação baseada em pressão calculada por derivação e preserva fallback `violation_conservative` quando dados faltarem. Casos reais acima de PN passam a `violation_confirmed`. Há ajuste técnico recomendado para a consistência de `pressureClassModel`, mas não há violação direta da invariante."
     },
     {
       "id": "INV-MASCARAR-PENDENCIA",
       "descricao": "Não mascarar pendência.",
       "status": "ok",
-      "justificativa": "O objetivo do diagnóstico é explicitar pendências, riscos, premissas provisórias, blockers de E08 e limitações de validação. Não há proposta de ocultar ou reclassificar pendência como resolvida sem evidência."
+      "justificativa": "O plano explicita que desnível geodético por segmento e perdas locais proporcionais ficam fora do escopo e devem permanecer documentados como limitações/pendências futuras, sem removê-las das pendências."
     },
     {
       "id": "INV-DOMINIO-FORA-UI",
       "descricao": "Não colocar lógica de domínio na UI.",
       "status": "ok",
-      "justificativa": "O escopo permitido limita-se a documentação, tasks e arquivos de governança. Não há alteração de UI nem implementação de lógica de domínio."
+      "justificativa": "A lógica hidráulica permanece em `src/lib/layout/hydraulic-sizing.ts`; UI, API, PDF e componentes são declarados fora do escopo e intocados."
     },
     {
       "id": "INV-LAYOUT-INSTAVEL-COMERCIAL",
       "descricao": "Não avançar para BOM/comercial se layout/hidráulica/construtibilidade estiverem instáveis.",
       "status": "ok",
-      "justificativa": "O plano não avança implementação comercial/BOM. Pelo contrário, registra E08 como bloqueado por condições explícitas e trata riscos de BOM, RT e validação como pendências."
+      "justificativa": "O plano não avança BOM, PDF comercial, motor comercial ou catálogo; a BOM é explicitamente intocada e há critério de não-regressão para manter o valor do Projeto A."
     }
   ],
-  "recomendacao": "aprovado",
+  "recomendacao": "aprovado_com_ajustes",
   "override_permitido": true,
-  "justificativa_resumida": "Plano estritamente documental, com escopo proibido bem delimitado, sem alteração de produto, catálogo, BOM, UI, regras bloqueantes ou premissas RT. As invariantes permanentes foram respeitadas. Recomenda-se apenas atenção operacional para que contagens de testes/commits/status sejam confirmadas por evidência no momento da implementação antes de marcar critérios como concluídos.",
+  "justificativa_resumida": "Não há violação de invariante permanente. O plano é coerente com a task e mantém catálogo, BOM, UI e premissas fora do escopo. Recomenda-se ajustar a detecção de `pressureClassModel` para exigir também `adutoraHfM` e alinhar o escopo caso testes fora de `pressure-class.test.ts` precisem ser alterados.",
   "metadata": {
     "tokens_prompt": 0,
     "tokens_completion": 0,

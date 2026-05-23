@@ -1,136 +1,138 @@
-# claude-report — TASK-001
+# claude-report — TASK-004B
 
-> Gerado por /handoff-claude-report TASK-001 em 2026-05-22T19:56:21-03:00.
-> Plano aprovado com ajustes pelo usuário antes da serialização.
+> Gerado por /handoff-claude-report TASK-004B em 2026-05-22T20:55:25-03:00.
+> Plano aprovado pelo usuário ("APROVADO") antes da serialização.
 
 ---
 
 ## Entendimento
 
-Produzir diagnóstico formal do estado atual do software de aspersão convencional, em forma de relatório único em `docs/relatorios/2026-05-22-TASK-001.md`, reconciliando o arquivo original da TASK-001 (criado 2026-05-19, `pendente`) com o estado real do repositório em 2026-05-22 (826 testes; 0 erros tsc; 27/27 tooling tests; 15 ADRs; 9 épicos do Mapa Mestre TASK-024E; ~14 premissas provisórias; 53 relatórios anteriores; último commit `6debfd4` TOOL-003 em `origin/main`).
+Substituir o cálculo conservador de pressão em ramais e laterais (que hoje usa HMT como teto único) por **pressão real por derivação**, calculando `pressaoOperacionalMaxMca = HMT − (hfAdutora + cumPrincipalHfM até a derivação)` para cada ramal/lateral. Isso transforma `violation_conservative` em `ok` (quando pressão real ≤ PN) ou em `violation_confirmed` (quando pressão real > PN), aumentando precisão do diagnóstico de PN sem alterar catálogo, BOM, PDF, UI/mapa, motor comercial ou premissas RT.
 
-O diagnóstico **substitui conceitualmente** o predecessor `docs/relatorios/2026-05-19-diagnostico-software-atual.md` (commit `23609bc`, 400 testes — desatualizado em 7 dias com +426 testes, 7 ADRs novos e MVP técnico atingido para caso base). Predecessor **preservado fisicamente** como registro histórico.
+**Classe A — motor hidráulico.** Follow-up direto da pendência registrada na TASK-004 mãe (concluída 2026-05-19): *"pressão real por derivação para ramal/lateral (requer `cumPrincipalHfM` no segmento)"*. ADR-008 (Alternativa C) reservou explicitamente esta implementação para tarefa futura — TASK-004B entrega essa Alternativa C.
 
-**Classe A — estritamente documental.** Não modifica código de produto. Não cria ADR novo. Não altera regras bloqueantes nem premissas provisórias (inventaria, não modifica).
+**Achado-chave da leitura prévia:** `cumPrincipalHfM` já existe e está computado em `hydraulic-sizing.ts:474` (campo `EnrichedSeg.cumPrincipalHfM`). Está disponível no escopo do loop que constrói `sSecSegs` (linha 488 destrutura `cumPrincipalHfM`) e `sLatSegs`, mas não é propagado para os objetos `HydraulicSegment` criados. A mudança é cirúrgica.
 
 ## Arquivos criados
 
-- `docs/relatorios/2026-05-22-TASK-001.md` — relatório de diagnóstico ~700-900 linhas. Estrutura de 12 seções obrigatórias:
-  1. Resumo executivo + escopo + método (versão analisada commit `6debfd4`, 826/826, 0 tsc; arquivos lidos integralmente vs leitura seletiva; diferenças vs diagnóstico 2026-05-19).
-  2. Visão geral do software atual (propósito; fluxo end-to-end de uma proposta; estado MVP atingido para caso base por TASK-024 §6).
-  3. Arquitetura funcional (4 motores Técnico/Governança/Comercial/Interface Operacional por `arquitetura-motor-tecnico.md`; orquestrador único ADR-001; camadas; regras de import).
-  4. Matriz dos 9 épicos (tabela única consolidando E01-E09: propósito · capacidade · status real escala 7 níveis · MVP obrigatório? · tasks concluídas · próxima ação; consome literalmente Mapa Mestre TASK-024E).
-  5. Motores existentes (por motor: módulos atuais + decisões ADR-001..015 + débitos conhecidos; diferencia "implementado" de "não iniciado" de "parcial").
-  6. Entradas e saídas (`ProjectLayout` → `IrrigationProjectResult` → PDF + mapa interativo; server actions de persistência).
-  7. Status por bloco de valor (épico × evidências disponíveis; conservadorismo TASK-024D — sempre o nível mais conservador com evidência documentada).
-  8. Evidências disponíveis (53 relatórios; 15 ADRs; suítes de teste por módulo; screenshots TASK-046/048/050; fixtures E06).
-  9. Riscos técnicos (Projeto A é único caso e fictício; RT nunca aprovou metodologia; HMT nunca comparada com projeto histórico; 9 pesos optimizer sem calibração; BOM nunca confrontada; curva_45_adutora sem SKU; pressão real por derivação pendente).
-  10. Premissas pendentes RT/campo (14 entradas + 6 pesos `WEIGHT_*` ativos sem calibração; matriz "premissa × status × responsável × próxima ação"; cita campo Status literal).
-  11. Blockers para E08 — Motor Comercial (5 condições: TASK-001 concluída; RT homologa `09-classificacao-de-projetos.md`; ≥ 9 premissas RT aprovadas; ≥ 1 projeto piloto interno; TASK-002 implementada).
-  12. Roadmap recomendado **separado em 5 categorias** (ajuste editorial aprovado): (a) próxima task recomendada; (b) tasks Classe A; (c) tasks Classe E de validação; (d) pendências RT/campo; (e) tasks de tooling futuras (ex: TOOL-004).
+- `tasks/TASK-004B-pressao-real-derivacao.md` — arquivo da task formal seguindo template; contém objetivo, escopo permitido/proibido, contexto (pendência da TASK-004 mãe), arquivos impactados, critérios de aceite, riscos, log.
+- `docs/relatorios/2026-05-22-TASK-004B.md` — relatório de fechamento ~250-350 linhas: resumo, mudanças aplicadas (tabela diff), testes adicionados, antes/depois de classificação em Projeto A, invariantes verificadas (7/7), riscos materializados, próximos passos.
 
 ## Arquivos modificados
 
-- `tasks/TASK-001-diagnostico-software-atual.md` — atualização do task file:
-  - Linha 3: `Status: pendente` → `Status: aguardando_fechamento` (terminal estável; aguarda commit/push).
-  - Linha 7: atualizar `Atualizado em: 2026-05-19` → `2026-05-22`.
-  - Critérios de aceite (linhas 94-100): marcar cada item `[ ]` → `[x]` com evidência inline; linha 100 atualizar `400/400` → `826/826`.
-  - Plano de implementação (linha 134): substituir `> A ser preenchido...` pelo plano executado.
-  - Log de alterações (linhas 138-142): adicionar entry `| 2026-05-22 | Claude Opus 4.7 | TASK-001 executada: diagnóstico em 2026-05-22-TASK-001.md; reconcilia diagnóstico anterior (2026-05-19) desatualizado em 7 dias; estado base: 826/826 testes, 15 ADRs, 9 épicos. |`.
-  - Adicionar bloco `Relatório:` após linha 7.
-- `tasks/backlog.md` — atualização controlada:
-  - Header (linhas 1-4): atualizar lista de tasks/ADRs incluindo TASK-001 concluída.
-  - Entrada TASK-001 (linhas 40-48): `Status: pendente` → `concluída`; adicionar `Concluída em:` e `Relatório:`; substituir blockquote com 1-2 parágrafos resumindo achados.
-  - Entrada TASK-002 (linhas 51-59): campo `Bloqueada por:` remove "TASK-001" (mantém apenas homologação RT de `09-classificacao-de-projetos.md`).
-- `ai/current-task.md` — ciclo de governança via `/handoff-claude-report` (este comando) e posteriormente `/gpt-review`. Status: `em_planejamento` → `aguardando_revisao_gpt` (transição programática deste comando).
+- `src/lib/layout/hydraulic-sizing.ts` — 5 pontos cirúrgicos:
+  1. Interface `HydraulicSegment` (linhas 101-126): adicionar `cumPrincipalHfM?: number` e `adutoraHfM?: number` (opcionais, para ramal/lateral).
+  2. Interface `HydraulicModelLimitations` (linhas 69-87): `pressureClassModel` muda de literal `"hmt_conservative_inlet"` para união `"hmt_conservative_inlet" | "exact_per_derivation"`.
+  3. Função `annotatePressureClass` (linhas 197-229): para `secondary`/`lateral`, se `cumPrincipalHfM != null && adutoraHfM != null`, calcula `pressaoOperacionalMaxMca = hmtMca - adutoraHfM - cumPrincipalHfM` e classifica como `ok`/`violation_confirmed`. Fallback preservado: sem esses dados, comportamento atual `violation_conservative`.
+  4. Construção de `sSecSegs` (linhas 517-532) e `sLatSegs` (linhas 542-558): popular os 2 novos campos com `cumPrincipalHfM` (destruturado linha 488) e `adutoraHfM` (em escopo linha 423).
+  5. Montagem de `modelLimitations` (linha 822): lógica condicional — se todos os ramais/laterais em `allSegs` têm `cumPrincipalHfM` definido, `pressureClassModel = "exact_per_derivation"`; senão `"hmt_conservative_inlet"`.
+
+- `src/lib/layout/__tests__/pressure-class.test.ts` — adições sem remoção:
+  - Helper `makeSeg` (linha 12-29) ganha parâmetros opcionais `cumPrincipalHfM?: number, adutoraHfM?: number`.
+  - 6 testes novos T04B-1..T04B-6: (a) lateral com pressão real ≤ PN → ok; (b) lateral com pressão real > PN → violation_confirmed; (c) ramal com pressão real ≤ PN → ok; (d) ramal sem `cumPrincipalHfM` → fallback `violation_conservative`; (e) sequência adutora+principal+ramal+lateral com valores numéricos; (f) `pressureClassModel` detectado corretamente.
+  - **15 testes T01..T15 pré-existentes inalterados.**
+
+- `tasks/backlog.md`:
+  - Header (linhas 1-4): atualizar para refletir TASK-004B concluída.
+  - Após linha 119 (entrada TASK-004 mãe concluída): adicionar entrada nova **TASK-004B** com status `aguardando_fechamento`, classe A, relatório, e blockquote.
+  - Linha 118 (pendências da TASK-004 mãe): atualizar para marcar `cumPrincipalHfM` como **resolvido por TASK-004B**; manter pendência irmã `desnível por segmento` como aberta.
+
+- `ai/current-task.md` — ciclo de governança TOOL-003: `em_planejamento` → `aguardando_revisao_gpt` (este comando) → `aprovado_para_implementacao` (decisão humana) → `em_implementacao` → `aguardando_fechamento`.
 
 ## Arquivos não alterados
 
-- `src/**` — todo o produto (motor hidráulico, layout, catálogo, BOM, PDF, UI/mapa). Escopo proibido explícito.
-- `tasks/TASK-024-mapa-mestre-tasks.md` — TASK-024E (2026-05-22) acabou de padronizar os 9 épicos como blocos de valor verificáveis; é **fonte** do diagnóstico, não destino. A única atualização cabível seria adicionar `TASK-001` em "Tasks vinculadas — pendentes/futuras" do E01, mas já está listada (linha 98).
-- `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md` — diagnóstico **inventaria** as 14 premissas; não altera valores nem status (qualquer alteração violaria escopo e tocaria regra de governança RT).
-- `docs/metodologia/01-regras-bloqueantes.md` — não criar `RB-09` nem alterar regras.
-- Demais arquivos `docs/metodologia/` (00, 02-11) — leitura somente.
-- `docs/decisoes/ADR-*.md` — leitura somente; nenhum ADR novo (diagnóstico não decide).
-- `docs/software/*.md` — leitura somente (`arquitetura.md`, `arquitetura-motor-tecnico.md`, `testes-e-homologacao.md`, `testes.md`, `padroes-codigo.md`).
-- `ARQUITETURA_ATUAL.md`, `AGENTS.md`, `CLAUDE.md` — nunca alterar.
-- `scripts/` — sem alteração de scripts (nenhum seed, nenhum tooling novo).
-- `ai/decision-log.md` — append-only humano; nunca tocado por este comando.
-- `ai/gpt-review.md` — será escrito apenas por `scripts/ai/run-gpt-review.mjs` invocado por `/gpt-review`.
-- `.claude/commands/*` — fluxo de comandos preservado.
-- `docs/relatorios/2026-05-19-diagnostico-software-atual.md` — preservado intacto como registro histórico (referenciado pelo novo relatório, não substituído fisicamente).
+- `src/lib/catalog/aspersores.ts` — catálogo read-only (RB-04)
+- `src/lib/bom.ts` — BOM intocada; `generateProposalDiagnostics` já consome `hasPressureClassViolations`/`hasConservativePressureClassWarnings` corretamente
+- `src/lib/pdf/PropostaPDF.tsx`, `src/lib/pdf/secondary-rows.ts` — escopo proibido
+- `src/components/map/ProjectMap.tsx`, `src/components/map/MemorialPanel.tsx` — UI; escopo proibido (RB-06)
+- `src/app/api/projetos/[id]/pdf/route.tsx`, `src/app/projetos/[id]/page.tsx`, `actions.ts` — escopo proibido
+- `src/lib/layout/secondary-sizing.ts` — não cuida de PN no segmento (somente seleção de tubo); intocado
+- `src/lib/layout/laterais.ts`, `sectorization.ts`, `constructability.ts`, `network-angle-diagnostics.ts`, `sprinkler-grid.ts`, `irrigation-project.ts` — geometria; RB-08
+- `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md` — premissas inventariadas, não alteradas
+- `docs/metodologia/01-regras-bloqueantes.md` — não criar `RB-09`
+- `docs/metodologia/03-hidraulica.md` — não atualizar nesta task
+- `docs/decisoes/ADR-008-validacao-pn-classe-pressao-tubos.md` — não criar emenda; sem ADR-016
+- `tasks/TASK-024-mapa-mestre-tasks.md` — Mapa Mestre não alterado (fonte)
+- `ARQUITETURA_ATUAL.md`, `AGENTS.md`, `CLAUDE.md` — nunca alterar
+- `scripts/` — sem alteração
+- `ai/decision-log.md` — apenas pelo humano (append-only)
+- `.claude/commands/*` — fluxo preservado
 
 ## Testes obrigatórios
 
-**TASK-001 é Classe A documental — não modifica código.** Conforme Mapa Mestre §9.3, tasks documentais não exigem testes novos. **Verificações de não-regressão** continuam obrigatórias:
+≥ 6 testes novos em `pressure-class.test.ts` (Classe A exige ≥ 5):
 
-1. `npx tsc --noEmit` → **0 erros** (não tocamos `src/`, deve permanecer).
-2. `npx vitest run` → **826/826 passando** (não tocamos testes, deve permanecer).
-3. `node scripts/ai/__tests__/run-all.mjs` → **27/27 passando** (tooling preservado).
-
-Nenhum teste novo. Nenhum teste alterado. Nenhum teste eliminado.
+1. **T04B-1** — lateral PN40 com `cumPrincipalHfM=10`, `adutoraHfM=5`, `hmtMca=45`: pressão real = 45−5−10 = **30 mca** ≤ 40 ⇒ `ok` (vs antigo `violation_conservative`)
+2. **T04B-2** — lateral PN40 com `cumPrincipalHfM=2`, `adutoraHfM=1`, `hmtMca=45`: pressão real = 45−1−2 = **42 mca** > 40 ⇒ `violation_confirmed` (vs antigo `violation_conservative`)
+3. **T04B-3** — ramal PN80 com `cumPrincipalHfM=5`, `adutoraHfM=3`, `hmtMca=80`: pressão real = 80−3−5 = **72 mca** ≤ 80 ⇒ `ok`
+4. **T04B-4** — ramal sem `cumPrincipalHfM`: fallback ao comportamento atual; `hmtMca=85 > PN=80` ⇒ `violation_conservative` (regressão)
+5. **T04B-5** — sequência adutora(PN80, hf=10) → principal(PN80, hf=5) → ramal(PN80, cum=5, adu=10) → lateral(PN40, cum=5, adu=10): verificar `pressaoOperacionalMaxMca` em cada um; lateral PN40 vira `violation_confirmed` (45>40), ramal PN80 vira `ok`
+6. **T04B-6** — `pressureClassModel` no resultado: ramais com `cumPrincipalHfM` → `"exact_per_derivation"`; sem → `"hmt_conservative_inlet"`
 
 ## Critérios de aceite
 
-- [ ] Relatório criado em `docs/relatorios/2026-05-22-TASK-001.md` com versão analisada (commit `6debfd4`) e data (`2026-05-22`).
-- [ ] Diagnóstico cobre as 12 seções obrigatórias.
-- [ ] Matriz dos 9 épicos (Seção 4) consome literalmente o Mapa Mestre TASK-024E (sem reescrever a fonte).
-- [ ] Cada gap identificado tem: descrição, impacto (bloqueante/importante/melhoria), referência (`arquivo:§seção` ou `ADR-XXX`), sugestão de próximo passo.
-- [ ] Checklist de homologação de `testes-e-homologacao.md` §2 e §3 preenchido contra o estado atual (826 testes, 15 ADRs, MVP obrigatório atingido p/ caso base).
-- [ ] Inventário completo de premissas em `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md` (14 entradas + 6 pesos).
-- [ ] Lista de prioridades (Seção 12) reconcilia com Mapa Mestre Seção 8 e marca alterações pós-TASK-047.
-- [ ] Lista canônica de blockers para E08 (Seção 11) explicita as 5 condições.
-- [ ] Roadmap (Seção 12) separado em 5 categorias: próxima task; Classe A; Classe E validação; pendências RT/campo; tooling futuro.
-- [ ] `tasks/TASK-001-diagnostico-software-atual.md` atualizada: status `aguardando_fechamento`, critérios marcados, plano executado, log.
-- [ ] `tasks/backlog.md` atualizado com entrada TASK-001 `concluída` + ajuste de bloqueio de TASK-002.
-- [ ] **Mapa Mestre não alterado** (justificado).
-- [ ] Premissas vivas **inventariadas mas não alteradas**.
-- [ ] `npx tsc --noEmit` → 0 erros (preservado).
-- [ ] `npx vitest run` → 826/826 passando (preservado).
-- [ ] `node scripts/ai/__tests__/run-all.mjs` → 27/27 passando (preservado).
-- [ ] Nenhum arquivo em `src/**` modificado.
-- [ ] Nenhuma regra bloqueante alterada.
-- [ ] Nenhum ADR novo criado.
-- [ ] Fluxo TOOL-003 (`/handoff-claude-report` + `/gpt-review`) executado **antes** da implementação (não depois).
-- [ ] Sem commit, sem push, sem feature, sem refatoração, sem seed.
+- [ ] Arquivo `tasks/TASK-004B-pressao-real-derivacao.md` criado
+- [ ] `HydraulicSegment` ganha campos opcionais `cumPrincipalHfM?` e `adutoraHfM?`
+- [ ] Construção de `sSecSegs` e `sLatSegs` em `hydraulic-sizing.ts` popula esses campos
+- [ ] `annotatePressureClass` calcula pressão real para ramal/lateral quando dados disponíveis; classifica `ok`/`violation_confirmed`/`unknown`
+- [ ] Fallback preservado: sem `cumPrincipalHfM` → `violation_conservative` (comportamento atual)
+- [ ] `pressureClassModel` aceita 2 valores; detectado automaticamente
+- [ ] ≥ 6 testes novos T04B-1..T04B-6 passando
+- [ ] 15 testes T01..T15 pré-existentes em `pressure-class.test.ts` continuam passando sem alteração
+- [ ] `tasks/backlog.md` atualizado (header + entrada TASK-004B + ajuste pendência TASK-004 mãe)
+- [ ] `docs/relatorios/2026-05-22-TASK-004B.md` criado
+- [ ] **Mapa Mestre NÃO alterado**
+- [ ] **Premissas RT/campo NÃO alteradas**
+- [ ] **ADR-008 NÃO alterada** (sem emenda; sem ADR-016)
+- [ ] **`01-regras-bloqueantes.md` NÃO alterado** (sem RB-09)
+- [ ] **`03-hidraulica.md` NÃO alterado**
+- [ ] **Catálogo NÃO alterado**
+- [ ] **`src/lib/bom.ts` NÃO alterado**
+- [ ] **`src/lib/pdf/*` NÃO alterado**
+- [ ] **`src/components/**` NÃO alterado**
+- [ ] **`src/app/**` NÃO alterado**
+- [ ] **`src/lib/layout/secondary-sizing.ts` NÃO alterado**
+- [ ] `npx tsc --noEmit` → 0 erros
+- [ ] `npx vitest run` → ≥ 832 passando (826 + 6 novos T04B)
+- [ ] `node scripts/ai/__tests__/run-all.mjs` → 27/27 passando
+- [ ] HMT do Projeto A permanece 41,3 mca
+- [ ] BOM do Projeto A permanece R$ 213.740,15
+- [ ] Sem commit, sem push até autorização explícita
 
 ## Riscos
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|---------------|---------|-----------|
-| Diagnóstico reproduzir literalmente o Mapa Mestre (TASK-024E) sem agregar análise transversal | Média | Médio | TASK-024E é fonte; TASK-001 é **análise transversal e priorização**: identifica gaps, conflitos entre épicos, propõe roadmap. Mapa Mestre é insumo, não cópia. |
-| Recomendações conflitarem com Mapa Mestre Seção 8 ("Próximas 5 tasks") sem reconciliar pós-TASK-047 | Média | Médio | Reconciliar explicitamente na Seção 12; quando houver divergência, justificar com mudança de estado pós-TASK-024 (ex.: TASK-047 concluiu "Diâmetros de ramais no PDF" da Seção 8). |
-| Diagnóstico fazer julgamento sobre código sem ter lido o arquivo | Baixa | Alto | Toda afirmação técnica referencia `arquivo:linha` ou `arquivo:§seção`. Leitura de `irrigation-project.ts`, `bom.ts`, `hydraulic-sizing.ts`, `secondary-sizing.ts`, `pipeline-diagnostics.ts`, `constructability.ts`, `aspersores.ts` é obrigatória durante `/implementar`. |
-| Recomendar mudança em premissa RT (escopo proibido) | Baixa | Alto | Diagnóstico **inventaria** premissas — nunca propõe valor novo. Toda recomendação sobre premissa é "aguardar revisão RT" ou "abrir task documental para registro". |
-| Esquecer de marcar diferenças vs diagnóstico 2026-05-19 | Média | Baixo | Seção 1 inclui tabela explícita "Diferenças vs predecessor"; cada seção subsequente marca achados novos com "**Diferença vs 2026-05-19**". |
-| Status real otimista demais (ex.: marcar épico como "Validado em projeto histórico" sem evidência) | Baixa | Alto | Regra conservadora TASK-024D: sempre o nível mais conservador com evidência documentada. Quando apenas o Projeto A (fictício) suportar, marcar "Validado visualmente — caso único". |
-| `/gpt-review` apontar blocker que exige reformular o diagnóstico antes de implementar | Média | Médio | Fluxo TOOL-003 é exatamente o canal certo: humano decide override ou reformulação via `decision-log.md` append-only. Custo humano/manual ≤ US$ 0,50. |
+| # | Risco | Probabilidade | Impacto | Mitigação |
+|---|---|:---:|:---:|---|
+| 1 | Reordenação de blocker/warning quebra integration tests existentes | Média | Alto | Auditar `integration.test.ts`, `bom.test.ts`, `pipeline-diagnostics.test.ts` por uso de `hasConservativePressureClassWarnings`. Adaptar expectations apenas onde a classificação correta mudar (não relaxar). |
+| 2 | Lateral PN40 + HMT 41 que era `violation_conservative` agora vira `ok` — pode ser percebido como "perda de proteção" | Média | Médio | Documentar no relatório que isso é comportamento correto (eliminação de falso positivo). Blocker `violation_confirmed` ativo nos casos genuínos. |
+| 3 | Fórmula sem perdas locais subestima redução de pressão | Baixa | Médio | Fórmula é ligeiramente conservativa (omite redução por perdas locais ~10%), preserva INV-BLOCKERS-TECNICOS. Documentar como limitação para task futura. |
+| 4 | Mudança em `pressureClassModel` quebra leitor externo | Baixíssima | Médio | Apenas 2 ocorrências em todo `src/`, ambas em `hydraulic-sizing.ts`. PDF e UI não consomem. União é compatível. |
+| 5 | GPT Reviewer pode apontar não-inclusão de desnível por segmento | Média | Baixo | Resposta pronta: escopo explicitamente excluído pelo usuário; task futura separada. |
+| 6 | HMT do Projeto A muda inadvertidamente | Baixíssima | Alto | Solver não é tocado. Apenas `annotatePressureClass` (pós-processamento) e propagação de campos opcionais. |
 
 ## O que NÃO será feito
 
-- Não alterar nenhum arquivo em `src/**`.
-- Não alterar motor hidráulico, layout, catálogo, BOM, PDF, UI/mapa.
-- Não alterar `docs/metodologia/01-regras-bloqueantes.md` (nem criar `RB-09`).
-- Não criar ADR novo (diagnóstico inventaria decisões; não decide novas).
-- Não alterar valores de premissas em `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md`.
-- Não alterar o Mapa Mestre `tasks/TASK-024-mapa-mestre-tasks.md` (consumir, não rescrever).
-- Não criar nova feature, não refatorar, não executar seed, não alterar dados.
-- Não automatizar aprovação humana, não editar `ai/decision-log.md` automaticamente.
-- Não criar commit, não fazer push, não apagar branch backup.
-- Não executar `git gc`, `git reflog expire`, `git add .`.
-- Não incluir `.env.local` em nenhuma operação.
-- Não imprimir `OPENAI_API_KEY` nem conteúdo de `.env.local`.
-- Não iniciar TASK-002 (Motor de Governança A/B/C) — esta task remove apenas o bloqueio TASK-001; TASK-002 segue bloqueada por homologação RT.
-- Não substituir fisicamente `docs/relatorios/2026-05-19-diagnostico-software-atual.md` — preservado como registro histórico.
-- Não tocar `scripts/`, `ai/` (exceto governança `current-task.md` via comandos TOOL-001/003), `.claude/commands/`.
-- Não instalar dependências npm novas.
+- Não implementar **desnível geodético por segmento** (escopo explicitamente excluído pelo usuário; pendência irmã da TASK-004 mãe; task futura separada)
+- Não incluir **perdas locais proporcionais** no cálculo de pressão real (fórmula nível médio descartada para V1)
+- Não alterar **`MAX_VELOCITY_RAMAL_MS`**, **`MAX_HEADLOSS_RAMAL_MCA`**, **`DEFAULT_SAFETY_MARGIN_MCA`**, **`DEFAULT_LOCAL_LOSS_FACTOR_PERCENT`**
+- Não alterar o **solver hidráulico em si** (caminho crítico, HMT, validação de bomba); apenas o pós-processamento `annotatePressureClass`
+- Não tocar **`secondary-sizing.ts`**
+- Não criar **ADR novo** nem emenda à ADR-008
+- Não alterar **metodologia hidráulica** em `docs/metodologia/03-hidraulica.md`
+- Não promover o status do épico **E03** no Mapa Mestre (decisão de governança separada)
+- Não alterar **PDF** (Memorial Hidráulico pode opcionalmente exibir `pressureClassModel` em task futura — fora deste escopo)
+- Não alterar **UI/mapa**
+- Não alterar **catálogo** nem **BOM**
+- Não criar commit ou push sem autorização explícita
+- Não automatizar decisão humana ou edição de `ai/decision-log.md`
+- Não instalar dependências npm novas
 
 ## Invariantes verificadas
 
-- **INV-CATALOGO-SEM-HOMOLOGACAO** — ok (catálogo `src/lib/catalog/aspersores.ts` intocado).
-- **INV-NAO-INVENTAR-SKU** — ok (diagnóstico não cria SKU; apenas inventaria gaps como `curva_45_adutora` faltando).
-- **INV-DN100-LATERAL-5022** — ok (regra preservada; ADR-013 inventariado, não modificado).
-- **INV-BLOCKERS-TECNICOS** — ok (diagnóstico não relaxa nenhum blocker; lista gaps que poderiam virar blockers futuros).
-- **INV-MASCARAR-PENDENCIA** — ok (objetivo central do diagnóstico é **explicitar** pendências, não mascarar; 14 premissas + 6 pesos + 5 blockers para E08 + 7 riscos técnicos listados).
-- **INV-DOMINIO-FORA-UI** — ok (apenas `docs/` e `tasks/` afetados; sem `src/`).
-- **INV-LAYOUT-INSTAVEL-COMERCIAL** — ok (não avança para BOM/comercial; diagnóstico identifica que E08 Motor Comercial está bloqueado por 5 condições não atendidas).
+- **INV-CATALOGO-SEM-HOMOLOGACAO** — ok (catálogo intocado)
+- **INV-NAO-INVENTAR-SKU** — ok (sem SKU novo)
+- **INV-DN100-LATERAL-5022** — ok (ADR-013 preservada)
+- **INV-BLOCKERS-TECNICOS** — ok (TASK-004B não relaxa blockers; transforma `violation_conservative` em `ok` quando pressão real ≤ PN (correção de falso positivo) OU em `violation_confirmed` (endurecimento, blocker novo) quando pressão real > PN. Casos sem dados de derivação preservam fallback `violation_conservative`.)
+- **INV-MASCARAR-PENDENCIA** — ok (relatório documenta limitação remanescente: perdas locais e desnível por segmento — task futura)
+- **INV-DOMINIO-FORA-UI** — ok (apenas `src/lib/layout/hydraulic-sizing.ts` e seus testes; sem UI)
+- **INV-LAYOUT-INSTAVEL-COMERCIAL** — ok (não avança comercial; melhora precisão técnica)

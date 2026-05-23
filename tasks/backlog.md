@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-22
-Testes na base: 826/826 · TypeScript: 0 erros · 27/27 testes tooling · Working tree: modificado (TASK-001 — diagnóstico formal pós-TOOL-003) — **TOOL-003 publicada em `origin/main` (commit `6debfd4`) + Diagnóstico formal TASK-001 entregue (relatório de ~900 linhas, 12 seções + 3 apêndices) — primeira task fora de validação interna a usar fluxo TOOL-003 (`/handoff-claude-report` + `/gpt-review`) integralmente; veredito GPT `aprovado` com 0 blockers e 0/7 invariantes violadas; decisão humana registrada em `ai/decision-log.md` append-only**
+Testes na base: 836/836 · TypeScript: 0 erros · 27/27 testes tooling · Working tree: modificado (TASK-004B — pressão real por derivação pós-TASK-001) — **TASK-001 publicada em `origin/main` (commit `427539e`) + Diagnóstico formal entregue + TASK-004B entrega Alternativa C da ADR-008 (pressão real por derivação ramal/lateral via `cumPrincipalHfM` + `adutoraHfM`); resolve pendência aberta da TASK-004 mãe (2026-05-19) e mitiga R8 do diagnóstico TASK-001; veredito GPT `aprovado_com_ajustes` (2 blockers TEC-004B-001 e MET-004B-001 endereçados via Opção A); 0/7 invariantes violadas; 10 testes novos T04B (826 → 836); produto exclusivamente em `src/lib/layout/hydraulic-sizing.ts` (sem catálogo, sem BOM, sem PDF, sem UI/mapa, sem motor comercial)**
 
 ---
 
@@ -115,8 +115,25 @@ Testes na base: 826/826 · TypeScript: 0 erros · 27/27 testes tooling · Workin
 > `hasConservativePressureClassWarnings`. `generateProposalDiagnostics` diferencia
 > blocker confirmado de warning conservador. 15 testes em `pressure-class.test.ts`.
 >
-> **Pendências:** pressão real por derivação para ramal/lateral (requer `cumPrincipalHfM`
-> no segmento); desnível por segmento quando elevações pontuais disponíveis.
+> **Pendências:** ~~pressão real por derivação para ramal/lateral (requer `cumPrincipalHfM`
+> no segmento)~~ — **RESOLVIDO por TASK-004B (2026-05-22)**; desnível por segmento quando
+> elevações pontuais disponíveis — pendente, task futura separada.
+
+---
+
+### TASK-004B — Pressão real por derivação / cumPrincipalHfM
+
+**Status:** `concluída`
+**Prioridade:** P2-importante
+**Classe:** A — motor hidráulico
+**Área:** hidráulica
+**Arquivo:** `tasks/TASK-004B-pressao-real-derivacao.md`
+**Concluída em:** 2026-05-22 · 836/836 testes vitest (+10 novos) · 0 erros tsc · 27/27 testes tooling · produto exclusivamente em `src/lib/layout/hydraulic-sizing.ts`
+**Relatório:** `docs/relatorios/2026-05-22-TASK-004B.md`
+**Veredito GPT:** `aprovado_com_ajustes` · 2 blockers (TEC-004B-001 + MET-004B-001) · 0/7 invariantes violadas
+**Decisão humana:** `aprovado_com_ajustes` (Opção A para ambos) — `ai/decision-log.md` 2026-05-22T21:02:18-03:00
+
+> Follow-up direto da pendência registrada na TASK-004 mãe (2026-05-19). Entrega da **Alternativa C da ADR-008** que foi explicitamente reservada para tarefa futura: substituição do cálculo conservador de pressão em ramais e laterais (HMT como teto único) por **pressão real por derivação** = `HMT − adutoraHfM − cumPrincipalHfM`. Mudança cirúrgica em `src/lib/layout/hydraulic-sizing.ts` (~30 linhas): 2 campos opcionais novos em `HydraulicSegment` (`cumPrincipalHfM`, `adutoraHfM`); novo helper puro exportado `derivePressureClassModel(segments)` que retorna `"exact_per_derivation"` quando ambos os campos estão populados em todos os ramais/laterais (Opção A do ajuste TEC-004B-001); `annotatePressureClass` ganha caminho `exact_per_derivation` quando dados disponíveis com fallback `hmt_conservative_inlet` preservado para compatibilidade; `modelLimitations.pressureClassModel` detectado dinamicamente. 10 testes novos em `pressure-class.test.ts` (T04B-1..T04B-6 + 4 testes do helper). Resultado: vitest 826 → 836 (sem regressão em integration.test.ts/bom.test.ts/pipeline-diagnostics.test.ts — propagação de campos é aditiva); tsc preservado em 0 erros; 27/27 tooling tests preservado. Comportamento prático: warnings espúrios `violation_conservative` em laterais PN40/sistemas planos com HMT 40+ mca são substituídos por classificação correta (`ok` quando pressão real ≤ PN; `violation_confirmed` blocker quando pressão real > PN). Mitiga R8 do diagnóstico TASK-001 e promove precisão técnica do épico E03 (Motor Hidráulico) sem ainda atingir critério "Validado em projeto histórico" (depende de comparação RT). Mapa Mestre, premissas RT/campo, ADR-008, RB-09, catálogo, BOM, PDF, UI/mapa, motor comercial, `secondary-sizing.ts`, `laterais.ts` e demais arquivos de geometria intocados. Desnível geodético por segmento e perdas locais proporcionais ficam fora do escopo desta task (futura).
 
 ---
 

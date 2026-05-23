@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   annotatePressureClass,
+  derivePressureClassModel,
   type HydraulicSegment,
   type HydraulicValidation,
 } from "@/lib/layout/hydraulic-sizing";
@@ -13,6 +14,7 @@ function makeSeg(
   type: HydraulicSegment["type"],
   pressaoNominalMca: number | undefined,
   headLossM: number = 2,
+  derivation?: { cumPrincipalHfM: number; adutoraHfM: number },
 ): HydraulicSegment {
   return {
     id: `seg-${type}-${Math.random()}`,
@@ -25,6 +27,7 @@ function makeSeg(
     velocityMs: 1.0,
     velocityExceeds: false,
     pressaoNominalMca,
+    ...(derivation ?? {}),
   };
 }
 
@@ -112,6 +115,117 @@ describe("annotatePressureClass", () => {
     expect(seg.pressureClassCheck).toBeUndefined();
     expect(seg.pressaoOperacionalMaxMca).toBeUndefined();
     expect(seg.pressaoNominalMca).toBe(original.pressaoNominalMca);
+  });
+});
+
+// ── TASK-004B: pressão real por derivação (cumPrincipalHfM + adutoraHfM) ─────
+
+describe("TASK-004B — annotatePressureClass com pressão real por derivação", () => {
+  it("T04B-1: lateral PN40 com derivação (cum=10, adu=5, hmt=45) → ok (vs antigo violation_conservative)", () => {
+    const lateral = makeSeg("lateral", 40, 2, { cumPrincipalHfM: 10, adutoraHfM: 5 });
+    const result = annotatePressureClass([lateral], 45);
+    // 45 - 5 - 10 = 30 ≤ 40 ⇒ ok
+    expect(result[0].pressaoOperacionalMaxMca).toBe(30);
+    expect(result[0].pressureClassCheck).toBe("ok");
+    expect(result[0].pressureClassCheck).not.toBe("violation_conservative");
+  });
+
+  it("T04B-2: lateral PN40 com derivação rasa (cum=2, adu=1, hmt=45) → violation_confirmed (vs antigo conservative)", () => {
+    const lateral = makeSeg("lateral", 40, 2, { cumPrincipalHfM: 2, adutoraHfM: 1 });
+    const result = annotatePressureClass([lateral], 45);
+    // 45 - 1 - 2 = 42 > 40 ⇒ violation_confirmed (blocker real, não warning conservador)
+    expect(result[0].pressaoOperacionalMaxMca).toBe(42);
+    expect(result[0].pressureClassCheck).toBe("violation_confirmed");
+    expect(result[0].pressureClassCheck).not.toBe("violation_conservative");
+  });
+
+  it("T04B-3: ramal PN80 com derivação (cum=5, adu=3, hmt=80) → ok", () => {
+    const ramal = makeSeg("secondary", 80, 1, { cumPrincipalHfM: 5, adutoraHfM: 3 });
+    const result = annotatePressureClass([ramal], 80);
+    // 80 - 3 - 5 = 72 ≤ 80 ⇒ ok
+    expect(result[0].pressaoOperacionalMaxMca).toBe(72);
+    expect(result[0].pressureClassCheck).toBe("ok");
+  });
+
+  it("T04B-4: ramal sem cumPrincipalHfM (fallback legado) → violation_conservative quando HMT > PN", () => {
+    // Sem o argumento `derivation` no helper, cumPrincipalHfM e adutoraHfM ficam undefined.
+    // Fallback ativa: pressaoOperacionalMaxMca = hmtMca (conservativo).
+    const ramal = makeSeg("secondary", 80, 1);
+    const result = annotatePressureClass([ramal], 85);
+    expect(result[0].pressaoOperacionalMaxMca).toBe(85);
+    expect(result[0].pressureClassCheck).toBe("violation_conservative");
+  });
+
+  it("T04B-5: sequência adutora→principal→ramal→lateral com derivação — valores numéricos exatos", () => {
+    const adutora = makeSeg("adutora", 80, 10);
+    const principal = makeSeg("principal", 80, 5);
+    const ramal = makeSeg("secondary", 80, 1, { cumPrincipalHfM: 5, adutoraHfM: 10 });
+    const lateral = makeSeg("lateral", 40, 2, { cumPrincipalHfM: 5, adutoraHfM: 10 });
+    const result = annotatePressureClass([adutora, principal, ramal, lateral], 60);
+    // adutora: pressão = HMT = 60
+    expect(result[0].pressaoOperacionalMaxMca).toBe(60);
+    expect(result[0].pressureClassCheck).toBe("ok"); // 60 ≤ 80
+    // principal: pressão = 60 - 10 = 50
+    expect(result[1].pressaoOperacionalMaxMca).toBe(50);
+    expect(result[1].pressureClassCheck).toBe("ok"); // 50 ≤ 80
+    // ramal: pressão = 60 - 10 - 5 = 45
+    expect(result[2].pressaoOperacionalMaxMca).toBe(45);
+    expect(result[2].pressureClassCheck).toBe("ok"); // 45 ≤ 80
+    // lateral: pressão = 60 - 10 - 5 = 45
+    expect(result[3].pressaoOperacionalMaxMca).toBe(45);
+    expect(result[3].pressureClassCheck).toBe("violation_confirmed"); // 45 > 40
+  });
+
+  it("T04B-6: lateral com apenas cumPrincipalHfM (sem adutoraHfM) → fallback legado", () => {
+    // Ajuste TEC-004B-001: detecção exige AMBOS os campos. Apenas um → fallback conservador.
+    const lateral: HydraulicSegment = {
+      ...makeSeg("lateral", 40, 2),
+      cumPrincipalHfM: 10,
+      // adutoraHfM omitido propositalmente
+    };
+    const result = annotatePressureClass([lateral], 45);
+    expect(result[0].pressaoOperacionalMaxMca).toBe(45); // fallback HMT
+    expect(result[0].pressureClassCheck).toBe("violation_conservative");
+  });
+});
+
+describe("TASK-004B — derivePressureClassModel", () => {
+  it("retorna 'hmt_conservative_inlet' quando não há ramais/laterais", () => {
+    const segs = [
+      makeSeg("adutora", 80, 5),
+      makeSeg("principal", 80, 3),
+    ];
+    expect(derivePressureClassModel(segs)).toBe("hmt_conservative_inlet");
+  });
+
+  it("retorna 'exact_per_derivation' quando TODOS ramais/laterais têm ambos os campos", () => {
+    const segs: HydraulicSegment[] = [
+      makeSeg("adutora", 80, 5),
+      makeSeg("principal", 80, 3),
+      makeSeg("secondary", 80, 1, { cumPrincipalHfM: 5, adutoraHfM: 5 }),
+      makeSeg("lateral", 40, 2, { cumPrincipalHfM: 5, adutoraHfM: 5 }),
+    ];
+    expect(derivePressureClassModel(segs)).toBe("exact_per_derivation");
+  });
+
+  it("retorna 'hmt_conservative_inlet' quando ALGUM ramal/lateral não tem ambos os campos", () => {
+    const segs: HydraulicSegment[] = [
+      makeSeg("secondary", 80, 1, { cumPrincipalHfM: 5, adutoraHfM: 5 }),
+      // lateral sem derivação — força fallback
+      makeSeg("lateral", 40, 2),
+    ];
+    expect(derivePressureClassModel(segs)).toBe("hmt_conservative_inlet");
+  });
+
+  it("retorna 'hmt_conservative_inlet' quando ramal tem cumPrincipalHfM mas falta adutoraHfM (Opção A do GPT)", () => {
+    const segs: HydraulicSegment[] = [
+      {
+        ...makeSeg("secondary", 80, 1),
+        cumPrincipalHfM: 5,
+        // adutoraHfM omitido
+      },
+    ];
+    expect(derivePressureClassModel(segs)).toBe("hmt_conservative_inlet");
   });
 });
 

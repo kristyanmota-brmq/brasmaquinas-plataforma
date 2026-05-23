@@ -79,11 +79,18 @@ export interface HydraulicModelLimitations {
   /** T8: caminho crítico calculado por varredura exaustiva de todos os setores. */
   criticalPathModel: "exhaustive" | "heuristic";
   /**
-   * TASK-004: adutora/principal têm pressão de entrada calculada diretamente.
-   * Ramais/laterais usam HMT como limite superior conservativo (sem posição de arco
-   * individual). Tarefa futura deve calcular pressão real por derivação.
+   * Modelo de cálculo de pressão por segmento usado na verificação de PN.
+   *
+   * - `"hmt_conservative_inlet"` (legado/fallback): ramais/laterais usam HMT como
+   *   limite superior conservativo. Adutora/principal sempre calculam pressão de
+   *   entrada diretamente. Comportamento original da TASK-004.
+   * - `"exact_per_derivation"` (TASK-004B): ramais/laterais usam pressão real por
+   *   derivação = `HMT − hfAdutora − cumPrincipalHfM(até derivação)`. Ativado quando
+   *   TODOS os segmentos `secondary`/`lateral` carregam `cumPrincipalHfM` E `adutoraHfM`.
+   *
+   * Determinado dinamicamente pela helper {@link derivePressureClassModel}.
    */
-  pressureClassModel: "hmt_conservative_inlet";
+  pressureClassModel: "hmt_conservative_inlet" | "exact_per_derivation";
 }
 
 /** Resultado da verificação de classe de pressão (PN) para um segmento.
@@ -123,6 +130,20 @@ export interface HydraulicSegment {
   pressaoOperacionalMaxMca?: number;
   /** TASK-004: resultado da verificação de PN — ver `PressureClassCheck`. */
   pressureClassCheck?: PressureClassCheck;
+  /**
+   * TASK-004B: perda de carga acumulada na principal até a derivação deste segmento (mca).
+   * Populado apenas para segmentos `secondary` e `lateral` quando o solver propaga `cumPrincipalHfM`
+   * a partir de `EnrichedSeg`. Ausente em adutora/principal e em casos de fallback/teste sem dados
+   * de derivação. Necessário (junto com `adutoraHfM`) para `annotatePressureClass` computar pressão
+   * real por derivação em vez de fallback conservador via HMT.
+   */
+  cumPrincipalHfM?: number;
+  /**
+   * TASK-004B: perda de carga na adutora do setor correspondente a este segmento (mca).
+   * Populado apenas para segmentos `secondary` e `lateral` no caminho real do solver.
+   * Necessário (junto com `cumPrincipalHfM`) para classificação `exact_per_derivation`.
+   */
+  adutoraHfM?: number;
 }
 
 export interface CriticalPath {
@@ -184,13 +205,19 @@ export interface HydraulicSizingReport {
   sizedSecondaries: SizedSecondaryPipe[];
 }
 
-// ── TASK-004: Anotação de classe de pressão ────────────────────────────────────
+// ── TASK-004 / TASK-004B: Anotação de classe de pressão ──────────────────────
 
 /**
  * Anota cada segmento com pressão operacional estimada e resultado da verificação de PN.
  *
- * Adutora e principal têm pressão de entrada calculada diretamente (check "confirmed").
- * Ramais e laterais usam HMT como limite superior conservativo (check "conservative" se violação).
+ * - **Adutora/principal** (sequência linear): pressão de entrada decresce com `cumulativeHfM`
+ *   in-loco. Violação ⇒ `"violation_confirmed"` (blocker).
+ * - **Ramal/lateral**:
+ *   - **TASK-004B (preferencial):** quando `seg.cumPrincipalHfM != null && seg.adutoraHfM != null`,
+ *     usa pressão real por derivação: `pressaoOperacionalMaxMca = hmtMca − adutoraHfM − cumPrincipalHfM`.
+ *     Violação ⇒ `"violation_confirmed"` (blocker real); dentro do PN ⇒ `"ok"`.
+ *   - **Fallback legado (TASK-004):** quando esses campos são ausentes, usa HMT como limite
+ *     superior conservativo. Violação ⇒ `"violation_conservative"` (warning, não blocker).
  *
  * A função é pura — não modifica a array original.
  */
@@ -218,14 +245,45 @@ export function annotatePressureClass(
       pressaoOperacionalMaxMca = hmtMca - cumulativeHfM;
       cumulativeHfM += seg.headLossM;
       pressureClassCheck = pressaoOperacionalMaxMca > pressaoNominalMca ? "violation_confirmed" : "ok";
+    } else if (seg.cumPrincipalHfM != null && seg.adutoraHfM != null) {
+      // TASK-004B: pressão real por derivação — ambos os campos requeridos
+      pressaoOperacionalMaxMca = hmtMca - seg.adutoraHfM - seg.cumPrincipalHfM;
+      pressureClassCheck = pressaoOperacionalMaxMca > pressaoNominalMca ? "violation_confirmed" : "ok";
     } else {
-      // Ramal/lateral: HMT como limite superior conservativo
+      // Fallback legado: HMT como limite superior conservativo
       pressaoOperacionalMaxMca = hmtMca;
       pressureClassCheck = pressaoOperacionalMaxMca > pressaoNominalMca ? "violation_conservative" : "ok";
     }
 
     return { ...seg, pressaoOperacionalMaxMca, pressureClassCheck };
   });
+}
+
+/**
+ * Deriva o `pressureClassModel` a partir do conjunto de segmentos hidráulicos.
+ *
+ * Retorna `"exact_per_derivation"` quando:
+ * - existe pelo menos 1 segmento `secondary` ou `lateral`, E
+ * - TODOS os segmentos `secondary`/`lateral` carregam AMBOS `cumPrincipalHfM` E `adutoraHfM`.
+ *
+ * Caso contrário, retorna `"hmt_conservative_inlet"` (fallback legado da TASK-004).
+ *
+ * Função pura — não modifica a array de entrada.
+ *
+ * Ajuste TEC-004B-001 do GPT Reviewer: detecção exige ambos os campos para evitar
+ * declarar modelo exato enquanto algum segmento usa fallback conservador internamente.
+ */
+export function derivePressureClassModel(
+  allSegments: readonly HydraulicSegment[],
+): "hmt_conservative_inlet" | "exact_per_derivation" {
+  const relevant = allSegments.filter(
+    (s) => s.type === "secondary" || s.type === "lateral",
+  );
+  if (relevant.length === 0) return "hmt_conservative_inlet";
+  const allHaveDerivationData = relevant.every(
+    (s) => s.cumPrincipalHfM != null && s.adutoraHfM != null,
+  );
+  return allHaveDerivationData ? "exact_per_derivation" : "hmt_conservative_inlet";
 }
 
 // ── Geometry helpers ───────────────────────────────────────────────────────────
@@ -529,6 +587,9 @@ export function sizeHydraulics(
           velocityExceeds: velSec > MAX_VEL_SECONDARY_MS,
           secondaryLossExceeds: hfSec > ASPERSOR_PADRAO.pressaoServicoMca * MAX_SECONDARY_LOSS_FRACTION,
           pressaoNominalMca: secPressaoNominalMca,
+          // TASK-004B: dados de derivação para pressão real (ver annotatePressureClass)
+          cumPrincipalHfM,
+          adutoraHfM: adutoraHf,
         });
       }
 
@@ -555,6 +616,9 @@ export function sizeHydraulics(
           velocityExceeds: latVel > MAX_VEL_LATERAL_MS,
           lateralLossExceeds: hfLat > ASPERSOR_PADRAO.pressaoServicoMca * MAX_LATERAL_LOSS_FRACTION,
           pressaoNominalMca: lateral.selecao.tubo.pressaoMca,
+          // TASK-004B: dados de derivação para pressão real (ver annotatePressureClass)
+          cumPrincipalHfM,
+          adutoraHfM: adutoraHf,
         });
       }
 
@@ -819,7 +883,9 @@ export function sizeHydraulics(
     elevationModel: "waterSource_elevation_only",
     diameterAssumption: hasInternalDiams ? "internal" : "nominal_fallback",
     criticalPathModel: "exhaustive",
-    pressureClassModel: "hmt_conservative_inlet",
+    // TASK-004B: detectado dinamicamente — `"exact_per_derivation"` quando todos os
+    // ramais/laterais carregam `cumPrincipalHfM` E `adutoraHfM`.
+    pressureClassModel: derivePressureClassModel(allSegs),
   };
 
   return {
