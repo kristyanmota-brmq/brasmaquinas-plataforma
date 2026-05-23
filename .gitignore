@@ -48,7 +48,7 @@ next-env.d.ts
 # local workspace artifacts
 .vscode/
 memory/
-HANDOFF.md
+/HANDOFF.md
 update_catalog_and_bom.py
 .claude/settings.local.json
 

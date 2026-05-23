@@ -1,6 +1,6 @@
 # claude-report — TASK-XXX (template)
 
-> Esqueleto canônico de `ai/claude-report.md`. Gerado por `/handoff-claude-report TASK-XXX`.
+> Esqueleto canônico de `ai/claude-report.md`. Gerado por `/handoff TASK-XXX` (renomeado de `/handoff-claude-report` em 2026-05-23).
 
 ---
 

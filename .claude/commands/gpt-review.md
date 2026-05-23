@@ -1,6 +1,6 @@
 # Comando /gpt-review
 
-Orquestra o ciclo de revisão GPT pós-handoff: chamada real à Responses API + validação estrutural + resumo executivo no terminal. **Não substitui `/handoff-claude-report`** — assume que ele já foi rodado.
+Orquestra o ciclo de revisão GPT pós-handoff: chamada real à Responses API + validação estrutural + resumo executivo no terminal. **Não substitui `/handoff`** — assume que ele já foi rodado.
 
 Uso: `/gpt-review TASK-XXX`
 
@@ -20,7 +20,7 @@ Uso: `/gpt-review TASK-XXX`
    **Mensagem de abort obrigatória nesses casos:**
    ```
    Handoff não pronto para TASK-XXX.
-   Rode primeiro /handoff-claude-report TASK-XXX e depois /gpt-review TASK-XXX.
+   Rode primeiro /handoff TASK-XXX e depois /gpt-review TASK-XXX.
    ```
 
 4. **Executar `run-gpt-review.mjs`** (chamada real à Responses API):
@@ -82,7 +82,7 @@ Uso: `/gpt-review TASK-XXX`
    ↓
 /planejar TASK-XXX
    ↓
-/handoff-claude-report TASK-XXX     ← grava ai/claude-report.md (com preview + confirmação)
+/handoff TASK-XXX     ← grava ai/claude-report.md (com preview + confirmação)
    ↓
 /gpt-review TASK-XXX                ← este comando: API + validate + resumo
    ↓

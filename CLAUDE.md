@@ -67,7 +67,7 @@ templates/              — Templates de prompt, revisão, checklist de PR
 
 Etapa opcional de revisão por LLM externo entre `/planejar` e a aprovação humana:
 
-1. `/handoff-claude-report TASK-XXX` — serializa o plano para `ai/claude-report.md`.
+1. `/handoff TASK-XXX` — serializa o plano para `ai/claude-report.md`. (Renomeado de `/handoff-claude-report` em 2026-05-23.)
 2. `node scripts/ai/run-gpt-review.mjs --task TASK-XXX` — chama a Responses API e gera `ai/gpt-review.md` (markdown + bloco JSON canônico).
 3. `node scripts/ai/validate-structure.mjs --task TASK-XXX` — validador read-only; deriva `override_permitido` independentemente do GPT.
 4. Humano edita `ai/decision-log.md` (append-only) e usa `/handoff-status TASK-XXX <novo-status>` para transição explícita.

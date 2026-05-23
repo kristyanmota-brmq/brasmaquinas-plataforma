@@ -11,8 +11,8 @@ Este diretório materializa o handoff manual entre o Claude Code (planejador/imp
 | Arquivo | Papel | Quem escreve |
 |---------|-------|--------------|
 | `project-state.md` | Snapshot resumido do projeto (testes, TS, última task, pendências, invariantes) | Humano ou comando manual |
-| `current-task.md` | Ponteiro para a task ativa + frontmatter YAML obrigatório com `task_id`, `status`, etc. | `/handoff-claude-report` ou `/handoff-status` ou humano à mão |
-| `claude-report.md` | Plano canônico da task ativa, no formato do `/planejar` | `/handoff-claude-report` |
+| `current-task.md` | Ponteiro para a task ativa + frontmatter YAML obrigatório com `task_id`, `status`, etc. | `/handoff` ou `/handoff-status` ou humano à mão |
+| `claude-report.md` | Plano canônico da task ativa, no formato do `/planejar` | `/handoff` |
 | `gpt-review.md` | Revisão estruturada do GPT — markdown narrativo **+ bloco JSON canônico** ao final | `scripts/ai/run-gpt-review.mjs` |
 | `decision-log.md` | Append-only. Cada bloco YAML separado por `---` registra a decisão humana | **Humano** (à mão ou via `/handoff-status`) |
 
@@ -29,7 +29,7 @@ Este diretório materializa o handoff manual entre o Claude Code (planejador/imp
 /planejar TOOL-XXX                           (Claude gera plano na conversa)
    │
    ▼
-/handoff-claude-report TOOL-XXX              (Claude serializa para ai/claude-report.md)
+/handoff TOOL-XXX              (Claude serializa para ai/claude-report.md)
    │                                          status: aguardando_revisao_gpt
    ▼
 /gpt-review TOOL-XXX                         (TOOL-003 — orquestra revisão GPT)
@@ -52,14 +52,14 @@ node scripts/ai/validate-structure.mjs --task TOOL-XXX  (confirma estado coerent
 
 ### `/gpt-review TASK-XXX` (TOOL-003)
 
-Comando único que orquestra o ciclo de revisão GPT pós-handoff sem copy/paste entre VS Code e ChatGPT. Não substitui `/handoff-claude-report` — assume que ele já foi rodado.
+Comando único que orquestra o ciclo de revisão GPT pós-handoff sem copy/paste entre VS Code e ChatGPT. Não substitui `/handoff` — assume que ele já foi rodado.
 
 O comando:
 
 1. Valida `ai/current-task.md` (task_id + status compatível).
 2. Valida `ai/claude-report.md` (existe e cita TASK-XXX no cabeçalho).
 3. Aborta se o handoff não estiver pronto, com mensagem fixa:
-   > "Rode primeiro `/handoff-claude-report TASK-XXX` e depois `/gpt-review TASK-XXX`."
+   > "Rode primeiro `/handoff TASK-XXX` e depois `/gpt-review TASK-XXX`."
 4. Executa `node scripts/ai/run-gpt-review.mjs --task TASK-XXX` (chamada real à Responses API).
 5. Executa `node scripts/ai/validate-structure.mjs --task TASK-XXX` (read-only).
 6. Executa `node scripts/ai/print-review-summary.mjs --task TASK-XXX` (resumo executivo).

@@ -1,8 +1,10 @@
-# Comando /handoff-claude-report
+# Comando /handoff
 
 Serializa o plano gerado por `/planejar` para `ai/claude-report.md` e atualiza `ai/current-task.md.status` para `aguardando_revisao_gpt`.
 
-Uso: `/handoff-claude-report TASK-XXX`
+Uso: `/handoff TASK-XXX`
+
+> **Nota histórica**: este comando era chamado `/handoff-claude-report` até 2026-05-23. Foi renomeado para `/handoff` (mais curto). Tasks fechadas, relatórios e entries antigas do decision-log preservam o nome original como registro histórico.
 
 ## O que fazer
 
@@ -33,7 +35,7 @@ Uso: `/handoff-claude-report TASK-XXX`
 6. **Atualizar `ai/current-task.md`:**
    - `status: aguardando_revisao_gpt`
    - `ultima_atualizacao: <timestamp ISO 8601 com offset>`
-   - `atualizado_por: comando:/handoff-claude-report`
+   - `atualizado_por: comando:/handoff`
 
 7. **Lembrar o usuário** do próximo passo:
    ```
