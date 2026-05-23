@@ -1,138 +1,119 @@
-# claude-report — TASK-004B
+# claude-report — TASK-052
 
-> Gerado por /handoff-claude-report TASK-004B em 2026-05-22T20:55:25-03:00.
-> Plano aprovado pelo usuário ("APROVADO") antes da serialização.
+> Gerado por /handoff-claude-report TASK-052 em 2026-05-22T21:41:18-03:00.
+> Plano Classe C inline aprovado pelo usuário antes da serialização.
 
 ---
 
 ## Entendimento
 
-Substituir o cálculo conservador de pressão em ramais e laterais (que hoje usa HMT como teto único) por **pressão real por derivação**, calculando `pressaoOperacionalMaxMca = HMT − (hfAdutora + cumPrincipalHfM até a derivação)` para cada ramal/lateral. Isso transforma `violation_conservative` em `ok` (quando pressão real ≤ PN) ou em `violation_confirmed` (quando pressão real > PN), aumentando precisão do diagnóstico de PN sem alterar catálogo, BOM, PDF, UI/mapa, motor comercial ou premissas RT.
+Corrigir descrição contraditória da premissa "Critério de vazão de projeto do ramal" em `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md` e promover seu status de `PENDENTE_REVISAO_RT_BRASMAQUINAS` para `APROVADO_RT`. O RT (Kristyan Mota) confirmou em 2026-05-22 que a operação Brasmáquinas é **rotativa por setor (1 setor ativo por vez)**. O código em [`src/lib/layout/secondary-sizing.ts:180-183`](../src/lib/layout/secondary-sizing.ts#L180-L183) já implementava o critério correto (`max(lat.vazaoM3h)`) desde sua origem — TASK-052 é **estritamente documental**: nenhuma linha de código é alterada.
 
-**Classe A — motor hidráulico.** Follow-up direto da pendência registrada na TASK-004 mãe (concluída 2026-05-19): *"pressão real por derivação para ramal/lateral (requer `cumPrincipalHfM` no segmento)"*. ADR-008 (Alternativa C) reservou explicitamente esta implementação para tarefa futura — TASK-004B entrega essa Alternativa C.
+**Classe C — documental.** Não modifica `src/**`. Per Mapa Mestre §9.3, Classe C dispensa `/planejar` formal; plano vive inline em `ai/current-task.md` e neste claude-report.
 
-**Achado-chave da leitura prévia:** `cumPrincipalHfM` já existe e está computado em `hydraulic-sizing.ts:474` (campo `EnrichedSeg.cumPrincipalHfM`). Está disponível no escopo do loop que constrói `sSecSegs` (linha 488 destrutura `cumPrincipalHfM`) e `sLatSegs`, mas não é propagado para os objetos `HydraulicSegment` criados. A mudança é cirúrgica.
+A inconsistência descoberta durante análise técnica pós-TASK-004B (sessão 2026-05-22): a descrição literal da premissa afirma "todos os aspersores da coluna ativos simultaneamente" (que seria `sum(...)`) mas o código fazia `max(...)` — comportamento exato de operação rotativa. Esta task corrige a lacuna documental sem tocar código.
 
 ## Arquivos criados
 
-- `tasks/TASK-004B-pressao-real-derivacao.md` — arquivo da task formal seguindo template; contém objetivo, escopo permitido/proibido, contexto (pendência da TASK-004 mãe), arquivos impactados, critérios de aceite, riscos, log.
-- `docs/relatorios/2026-05-22-TASK-004B.md` — relatório de fechamento ~250-350 linhas: resumo, mudanças aplicadas (tabela diff), testes adicionados, antes/depois de classificação em Projeto A, invariantes verificadas (7/7), riscos materializados, próximos passos.
+- `tasks/TASK-052-homologar-rotativa-por-setor.md` — task file formal seguindo `tasks/TASK_TEMPLATE.md` com status, classe, escopo permitido/proibido, critérios de aceite e log de alterações.
+- `docs/relatorios/2026-05-22-TASK-052.md` — relatório de fechamento ~150-200 linhas: resumo executivo + diff documental aplicado + evidência de leitura do código (`secondary-sizing.ts:180-183`) + auditoria de invariantes (7/7) + sem testes novos (Classe C).
 
 ## Arquivos modificados
 
-- `src/lib/layout/hydraulic-sizing.ts` — 5 pontos cirúrgicos:
-  1. Interface `HydraulicSegment` (linhas 101-126): adicionar `cumPrincipalHfM?: number` e `adutoraHfM?: number` (opcionais, para ramal/lateral).
-  2. Interface `HydraulicModelLimitations` (linhas 69-87): `pressureClassModel` muda de literal `"hmt_conservative_inlet"` para união `"hmt_conservative_inlet" | "exact_per_derivation"`.
-  3. Função `annotatePressureClass` (linhas 197-229): para `secondary`/`lateral`, se `cumPrincipalHfM != null && adutoraHfM != null`, calcula `pressaoOperacionalMaxMca = hmtMca - adutoraHfM - cumPrincipalHfM` e classifica como `ok`/`violation_confirmed`. Fallback preservado: sem esses dados, comportamento atual `violation_conservative`.
-  4. Construção de `sSecSegs` (linhas 517-532) e `sLatSegs` (linhas 542-558): popular os 2 novos campos com `cumPrincipalHfM` (destruturado linha 488) e `adutoraHfM` (em escopo linha 423).
-  5. Montagem de `modelLimitations` (linha 822): lógica condicional — se todos os ramais/laterais em `allSegs` têm `cumPrincipalHfM` definido, `pressureClassModel = "exact_per_derivation"`; senão `"hmt_conservative_inlet"`.
-
-- `src/lib/layout/__tests__/pressure-class.test.ts` — adições sem remoção:
-  - Helper `makeSeg` (linha 12-29) ganha parâmetros opcionais `cumPrincipalHfM?: number, adutoraHfM?: number`.
-  - 6 testes novos T04B-1..T04B-6: (a) lateral com pressão real ≤ PN → ok; (b) lateral com pressão real > PN → violation_confirmed; (c) ramal com pressão real ≤ PN → ok; (d) ramal sem `cumPrincipalHfM` → fallback `violation_conservative`; (e) sequência adutora+principal+ramal+lateral com valores numéricos; (f) `pressureClassModel` detectado corretamente.
-  - **15 testes T01..T15 pré-existentes inalterados.**
+- `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md` — seção "Critério de vazão de projeto do ramal":
+  - Linha "Valor usado": remover "todos os aspersores da coluna ativos simultaneamente" (descrição incorreta); substituir por descrição que reflete o código real (`max(lat.vazaoM3h)` — vazão do pior setor isolado) com link para `secondary-sizing.ts:180-183`.
+  - Linha "Regra": atualizar para citar explicitamente "operação rotativa por setor (1 setor ativo por vez)".
+  - Linha "Origem": atualizar de "Decisão de engenharia (provisória)" para "Decisão operacional Brasmáquinas confirmada pelo RT em 2026-05-22 (Kristyan Mota)".
+  - Linha "Status": `PENDENTE_REVISAO_RT_BRASMAQUINAS` → **`APROVADO_RT`**.
+  - Remover linhas "Alternativa pós-RT", "Risco — manter conservador (atual)", "Risco — relaxar para `max(setor_simultâneo)` sem RT" — todas tratavam de incerteza operacional agora resolvida.
+  - Histórico de revisões (final do arquivo): adicionar 1 linha datada 2026-05-22 citando responsável, motivo e referência ao código.
 
 - `tasks/backlog.md`:
-  - Header (linhas 1-4): atualizar para refletir TASK-004B concluída.
-  - Após linha 119 (entrada TASK-004 mãe concluída): adicionar entrada nova **TASK-004B** com status `aguardando_fechamento`, classe A, relatório, e blockquote.
-  - Linha 118 (pendências da TASK-004 mãe): atualizar para marcar `cumPrincipalHfM` como **resolvido por TASK-004B**; manter pendência irmã `desnível por segmento` como aberta.
+  - Header (linhas 1-4): atualizar para refletir TASK-052 concluída.
+  - Adicionar entrada nova **TASK-052 — Homologar premissa de operação rotativa por setor** com status `aguardando_fechamento`, classe C, relatório, e blockquote sucinta.
 
 - `ai/current-task.md` — ciclo de governança TOOL-003: `em_planejamento` → `aguardando_revisao_gpt` (este comando) → `aprovado_para_implementacao` (decisão humana) → `em_implementacao` → `aguardando_fechamento`.
 
 ## Arquivos não alterados
 
-- `src/lib/catalog/aspersores.ts` — catálogo read-only (RB-04)
-- `src/lib/bom.ts` — BOM intocada; `generateProposalDiagnostics` já consome `hasPressureClassViolations`/`hasConservativePressureClassWarnings` corretamente
-- `src/lib/pdf/PropostaPDF.tsx`, `src/lib/pdf/secondary-rows.ts` — escopo proibido
-- `src/components/map/ProjectMap.tsx`, `src/components/map/MemorialPanel.tsx` — UI; escopo proibido (RB-06)
-- `src/app/api/projetos/[id]/pdf/route.tsx`, `src/app/projetos/[id]/page.tsx`, `actions.ts` — escopo proibido
-- `src/lib/layout/secondary-sizing.ts` — não cuida de PN no segmento (somente seleção de tubo); intocado
-- `src/lib/layout/laterais.ts`, `sectorization.ts`, `constructability.ts`, `network-angle-diagnostics.ts`, `sprinkler-grid.ts`, `irrigation-project.ts` — geometria; RB-08
-- `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md` — premissas inventariadas, não alteradas
-- `docs/metodologia/01-regras-bloqueantes.md` — não criar `RB-09`
-- `docs/metodologia/03-hidraulica.md` — não atualizar nesta task
-- `docs/decisoes/ADR-008-validacao-pn-classe-pressao-tubos.md` — não criar emenda; sem ADR-016
-- `tasks/TASK-024-mapa-mestre-tasks.md` — Mapa Mestre não alterado (fonte)
-- `ARQUITETURA_ATUAL.md`, `AGENTS.md`, `CLAUDE.md` — nunca alterar
-- `scripts/` — sem alteração
-- `ai/decision-log.md` — apenas pelo humano (append-only)
-- `.claude/commands/*` — fluxo preservado
+- **`src/**`** — todo o produto (motor hidráulico, layout, catálogo, BOM, PDF, UI/mapa). TASK-052 é estritamente documental.
+- `src/lib/layout/secondary-sizing.ts` — código confirmado tecnicamente correto; **nenhuma linha alterada** (apenas referenciado na nova descrição da premissa).
+- `docs/metodologia/01-regras-bloqueantes.md` — sem `RB-09` nova.
+- `docs/metodologia/00-09, 11` (demais arquivos de metodologia) — leitura somente.
+- `docs/decisoes/ADR-*.md` — leitura somente; sem ADR novo; sem emenda à ADR-008.
+- `docs/software/*.md` — leitura somente.
+- `tasks/TASK-024-mapa-mestre-tasks.md` — Mapa Mestre não alterado.
+- Outras premissas em `docs/metodologia/12-premissas-...md` — apenas a "Critério de vazão de projeto do ramal" é tocada; demais 13 premissas + 6 pesos preservados.
+- `ARQUITETURA_ATUAL.md`, `AGENTS.md`, `CLAUDE.md` — nunca alterar.
+- `scripts/`, `.claude/commands/*` — sem alteração.
+- `ai/decision-log.md` — apenas pelo humano (append-only).
 
 ## Testes obrigatórios
 
-≥ 6 testes novos em `pressure-class.test.ts` (Classe A exige ≥ 5):
+**TASK-052 é Classe C documental — não modifica código.** Per Mapa Mestre §9.3, Classe C não exige testes novos. Verificações de não-regressão obrigatórias (cumpridas por inação):
 
-1. **T04B-1** — lateral PN40 com `cumPrincipalHfM=10`, `adutoraHfM=5`, `hmtMca=45`: pressão real = 45−5−10 = **30 mca** ≤ 40 ⇒ `ok` (vs antigo `violation_conservative`)
-2. **T04B-2** — lateral PN40 com `cumPrincipalHfM=2`, `adutoraHfM=1`, `hmtMca=45`: pressão real = 45−1−2 = **42 mca** > 40 ⇒ `violation_confirmed` (vs antigo `violation_conservative`)
-3. **T04B-3** — ramal PN80 com `cumPrincipalHfM=5`, `adutoraHfM=3`, `hmtMca=80`: pressão real = 80−3−5 = **72 mca** ≤ 80 ⇒ `ok`
-4. **T04B-4** — ramal sem `cumPrincipalHfM`: fallback ao comportamento atual; `hmtMca=85 > PN=80` ⇒ `violation_conservative` (regressão)
-5. **T04B-5** — sequência adutora(PN80, hf=10) → principal(PN80, hf=5) → ramal(PN80, cum=5, adu=10) → lateral(PN40, cum=5, adu=10): verificar `pressaoOperacionalMaxMca` em cada um; lateral PN40 vira `violation_confirmed` (45>40), ramal PN80 vira `ok`
-6. **T04B-6** — `pressureClassModel` no resultado: ramais com `cumPrincipalHfM` → `"exact_per_derivation"`; sem → `"hmt_conservative_inlet"`
+1. `npx tsc --noEmit` → **0 erros** (não tocamos `src/`)
+2. `npx vitest run` → **836/836 passando** (não tocamos testes)
+3. `node scripts/ai/__tests__/run-all.mjs` → **27/27 passando** (tooling preservado)
+
+Nenhum teste novo. Nenhum teste alterado. Nenhum teste eliminado.
 
 ## Critérios de aceite
 
-- [ ] Arquivo `tasks/TASK-004B-pressao-real-derivacao.md` criado
-- [ ] `HydraulicSegment` ganha campos opcionais `cumPrincipalHfM?` e `adutoraHfM?`
-- [ ] Construção de `sSecSegs` e `sLatSegs` em `hydraulic-sizing.ts` popula esses campos
-- [ ] `annotatePressureClass` calcula pressão real para ramal/lateral quando dados disponíveis; classifica `ok`/`violation_confirmed`/`unknown`
-- [ ] Fallback preservado: sem `cumPrincipalHfM` → `violation_conservative` (comportamento atual)
-- [ ] `pressureClassModel` aceita 2 valores; detectado automaticamente
-- [ ] ≥ 6 testes novos T04B-1..T04B-6 passando
-- [ ] 15 testes T01..T15 pré-existentes em `pressure-class.test.ts` continuam passando sem alteração
-- [ ] `tasks/backlog.md` atualizado (header + entrada TASK-004B + ajuste pendência TASK-004 mãe)
-- [ ] `docs/relatorios/2026-05-22-TASK-004B.md` criado
-- [ ] **Mapa Mestre NÃO alterado**
-- [ ] **Premissas RT/campo NÃO alteradas**
-- [ ] **ADR-008 NÃO alterada** (sem emenda; sem ADR-016)
-- [ ] **`01-regras-bloqueantes.md` NÃO alterado** (sem RB-09)
-- [ ] **`03-hidraulica.md` NÃO alterado**
-- [ ] **Catálogo NÃO alterado**
-- [ ] **`src/lib/bom.ts` NÃO alterado**
-- [ ] **`src/lib/pdf/*` NÃO alterado**
-- [ ] **`src/components/**` NÃO alterado**
-- [ ] **`src/app/**` NÃO alterado**
-- [ ] **`src/lib/layout/secondary-sizing.ts` NÃO alterado**
-- [ ] `npx tsc --noEmit` → 0 erros
-- [ ] `npx vitest run` → ≥ 832 passando (826 + 6 novos T04B)
-- [ ] `node scripts/ai/__tests__/run-all.mjs` → 27/27 passando
-- [ ] HMT do Projeto A permanece 41,3 mca
-- [ ] BOM do Projeto A permanece R$ 213.740,15
-- [ ] Sem commit, sem push até autorização explícita
+- [ ] Descrição da premissa "Critério de vazão de projeto do ramal" corrigida em `12-premissas-...md` — sem contradição interna (não mais menciona "todos os aspersores ativos simultaneamente")
+- [ ] Linha "Valor usado" cita o código real (`max(lat.vazaoM3h)` em `secondary-sizing.ts:180-183`)
+- [ ] Linha "Regra" cita explicitamente "operação rotativa por setor"
+- [ ] Linha "Status" promovida para `APROVADO_RT`
+- [ ] Linhas "Alternativa pós-RT" e os 2 "Risco" obsoletos removidas
+- [ ] Histórico de revisões registra: 2026-05-22, autor (Claude Opus 4.7 + RT Kristyan Mota), causa (confirmação RT da operação rotativa), referência ao código (secondary-sizing.ts:180-183)
+- [ ] Arquivo `tasks/TASK-052-homologar-rotativa-por-setor.md` criado
+- [ ] `tasks/backlog.md` atualizado (header + entrada TASK-052)
+- [ ] `docs/relatorios/2026-05-22-TASK-052.md` criado
+- [ ] **Nenhum arquivo em `src/**` modificado**
+- [ ] **Nenhuma outra premissa em `12-premissas-...md` alterada**
+- [ ] **Sem ADR novo; sem emenda à ADR-008**
+- [ ] **Sem `RB-09` em `01-regras-bloqueantes.md`**
+- [ ] **Mapa Mestre não alterado**
+- [ ] `npx tsc --noEmit` → 0 erros (preservado)
+- [ ] `npx vitest run` → 836/836 (preservado)
+- [ ] `node scripts/ai/__tests__/run-all.mjs` → 27/27 (preservado)
+- [ ] Fluxo TOOL-003 (`/handoff-claude-report` + `/gpt-review` + decision-log) executado antes da implementação
+- [ ] Sem commit, sem push (aguarda autorização explícita)
 
 ## Riscos
 
 | # | Risco | Probabilidade | Impacto | Mitigação |
 |---|---|:---:|:---:|---|
-| 1 | Reordenação de blocker/warning quebra integration tests existentes | Média | Alto | Auditar `integration.test.ts`, `bom.test.ts`, `pipeline-diagnostics.test.ts` por uso de `hasConservativePressureClassWarnings`. Adaptar expectations apenas onde a classificação correta mudar (não relaxar). |
-| 2 | Lateral PN40 + HMT 41 que era `violation_conservative` agora vira `ok` — pode ser percebido como "perda de proteção" | Média | Médio | Documentar no relatório que isso é comportamento correto (eliminação de falso positivo). Blocker `violation_confirmed` ativo nos casos genuínos. |
-| 3 | Fórmula sem perdas locais subestima redução de pressão | Baixa | Médio | Fórmula é ligeiramente conservativa (omite redução por perdas locais ~10%), preserva INV-BLOCKERS-TECNICOS. Documentar como limitação para task futura. |
-| 4 | Mudança em `pressureClassModel` quebra leitor externo | Baixíssima | Médio | Apenas 2 ocorrências em todo `src/`, ambas em `hydraulic-sizing.ts`. PDF e UI não consomem. União é compatível. |
-| 5 | GPT Reviewer pode apontar não-inclusão de desnível por segmento | Média | Baixo | Resposta pronta: escopo explicitamente excluído pelo usuário; task futura separada. |
-| 6 | HMT do Projeto A muda inadvertidamente | Baixíssima | Alto | Solver não é tocado. Apenas `annotatePressureClass` (pós-processamento) e propagação de campos opcionais. |
+| 1 | Erro de transcrição na nova descrição da premissa (introduzir inconsistência diferente) | Baixa | Médio | Mostrar diff completo no relatório; GPT Reviewer audita |
+| 2 | Contradizer outras tasks/ADRs que mencionem a premissa antiga | Baixa | Médio | Antes de implementar: grep por "todos os setores", "todos os aspersores", "simultâneo" em `docs/` e `tasks/`. Se houver outras citações da redação antiga, atualizar coerentemente OU justificar manter (referência histórica) |
+| 3 | TASK-043 ou TASK-042R citarem a premissa antiga em blockquotes do backlog | Baixa | Baixo | Backlog é registro histórico de tasks já fechadas; blockquotes não precisam ser alteradas. Apenas a premissa em `12-premissas-...md` é fonte autoritativa |
+| 4 | GPT Reviewer apontar outra inconsistência além da que estou corrigindo | Média | Baixo | Aceitar ajustes via decision-log conforme padrão TASK-004B (Opção A/B explícita do usuário) |
+| 5 | INV-MASCARAR-PENDENCIA potencialmente violada se a nova descrição esconder algo | Baixíssima | Alto | **Pelo contrário:** TASK-052 **corrige** uma inconsistência documental que mascarava o estado real do código. A nova descrição é mais transparente que a antiga |
 
 ## O que NÃO será feito
 
-- Não implementar **desnível geodético por segmento** (escopo explicitamente excluído pelo usuário; pendência irmã da TASK-004 mãe; task futura separada)
-- Não incluir **perdas locais proporcionais** no cálculo de pressão real (fórmula nível médio descartada para V1)
-- Não alterar **`MAX_VELOCITY_RAMAL_MS`**, **`MAX_HEADLOSS_RAMAL_MCA`**, **`DEFAULT_SAFETY_MARGIN_MCA`**, **`DEFAULT_LOCAL_LOSS_FACTOR_PERCENT`**
-- Não alterar o **solver hidráulico em si** (caminho crítico, HMT, validação de bomba); apenas o pós-processamento `annotatePressureClass`
-- Não tocar **`secondary-sizing.ts`**
-- Não criar **ADR novo** nem emenda à ADR-008
-- Não alterar **metodologia hidráulica** em `docs/metodologia/03-hidraulica.md`
-- Não promover o status do épico **E03** no Mapa Mestre (decisão de governança separada)
-- Não alterar **PDF** (Memorial Hidráulico pode opcionalmente exibir `pressureClassModel` em task futura — fora deste escopo)
-- Não alterar **UI/mapa**
-- Não alterar **catálogo** nem **BOM**
-- Não criar commit ou push sem autorização explícita
+- Não alterar `src/lib/layout/secondary-sizing.ts` — código está tecnicamente correto desde origem
+- Não alterar nenhum outro arquivo em `src/**` (RB-04, RB-05, RB-06, RB-08 preservadas por inação)
+- Não criar ADR (decisão é confirmação operacional, não decisão arquitetural)
+- Não criar emenda à ADR-008
+- Não criar `RB-09` em `01-regras-bloqueantes.md`
+- Não alterar valores ou status de outras premissas em `12-premissas-...md` (somente "Critério de vazão de projeto do ramal" é tocada)
+- Não alterar Mapa Mestre `tasks/TASK-024-mapa-mestre-tasks.md`
+- Não promover status do épico E03 no Mapa Mestre (decisão de governança separada)
+- Não atualizar blockquotes de tasks históricas no `backlog.md` que mencionem a premissa antiga (preservação histórica)
+- Não tocar `secondary-sizing.test.ts` (sem mudança de comportamento)
+- Não criar testes novos (Classe C documental)
 - Não automatizar decisão humana ou edição de `ai/decision-log.md`
+- Não criar commit, não fazer push até autorização explícita
 - Não instalar dependências npm novas
+- Não iniciar TASK-053 (topológica) — sucessor recomendado, mas independente
 
 ## Invariantes verificadas
 
-- **INV-CATALOGO-SEM-HOMOLOGACAO** — ok (catálogo intocado)
+- **INV-CATALOGO-SEM-HOMOLOGACAO** — ok (catálogo `src/lib/catalog/aspersores.ts` intocado)
 - **INV-NAO-INVENTAR-SKU** — ok (sem SKU novo)
 - **INV-DN100-LATERAL-5022** — ok (ADR-013 preservada)
-- **INV-BLOCKERS-TECNICOS** — ok (TASK-004B não relaxa blockers; transforma `violation_conservative` em `ok` quando pressão real ≤ PN (correção de falso positivo) OU em `violation_confirmed` (endurecimento, blocker novo) quando pressão real > PN. Casos sem dados de derivação preservam fallback `violation_conservative`.)
-- **INV-MASCARAR-PENDENCIA** — ok (relatório documenta limitação remanescente: perdas locais e desnível por segmento — task futura)
-- **INV-DOMINIO-FORA-UI** — ok (apenas `src/lib/layout/hydraulic-sizing.ts` e seus testes; sem UI)
-- **INV-LAYOUT-INSTAVEL-COMERCIAL** — ok (não avança comercial; melhora precisão técnica)
+- **INV-BLOCKERS-TECNICOS** — ok (TASK-052 não relaxa nenhum blocker; apenas formaliza estado correto que já existia em código)
+- **INV-MASCARAR-PENDENCIA** — **ok com nota positiva** — TASK-052 explicitamente **CORRIGE** uma inconsistência documental (descrição contraditória da premissa que afirmava "todos simultâneos" enquanto código fazia `max`). A correção AUMENTA transparência; o oposto de mascarar
+- **INV-DOMINIO-FORA-UI** — ok (apenas `docs/metodologia/`, `tasks/`, `docs/relatorios/` e `ai/`; sem UI, sem `src/lib/`)
+- **INV-LAYOUT-INSTAVEL-COMERCIAL** — ok (não avança comercial; apenas documenta confirmação operacional)

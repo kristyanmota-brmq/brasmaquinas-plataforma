@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-05-22
-Testes na base: 836/836 · TypeScript: 0 erros · 27/27 testes tooling · Working tree: modificado (TASK-004B — pressão real por derivação pós-TASK-001) — **TASK-001 publicada em `origin/main` (commit `427539e`) + Diagnóstico formal entregue + TASK-004B entrega Alternativa C da ADR-008 (pressão real por derivação ramal/lateral via `cumPrincipalHfM` + `adutoraHfM`); resolve pendência aberta da TASK-004 mãe (2026-05-19) e mitiga R8 do diagnóstico TASK-001; veredito GPT `aprovado_com_ajustes` (2 blockers TEC-004B-001 e MET-004B-001 endereçados via Opção A); 0/7 invariantes violadas; 10 testes novos T04B (826 → 836); produto exclusivamente em `src/lib/layout/hydraulic-sizing.ts` (sem catálogo, sem BOM, sem PDF, sem UI/mapa, sem motor comercial)**
+Testes na base: 836/836 · TypeScript: 0 erros · 27/27 testes tooling · Working tree: modificado (TASK-052 — homologação documental da premissa de operação rotativa por setor) — **TASK-004B publicada em `origin/main` (commit `b1bc2e0`) + TASK-052 homologa premissa "Critério de vazão de projeto do ramal" como `APROVADO_RT` após RT (Kristyan Mota) confirmar em 2026-05-22 que a operação Brasmáquinas é rotativa por setor; corrige inconsistência documental (descrição afirmava "todos ativos simultaneamente" enquanto código faz `max(...)` — implementação tecnicamente correta desde origem); produto estritamente documental (`docs/metodologia/12-premissas-...md`); veredito GPT `aprovado_com_ajustes` (BLK-MET-001 sobre snapshot interno desatualizado do prompt do GPT — justificado no decision-log como pendência tooling futura TOOL-XXX); 0/7 invariantes violadas; nenhum `src/**` alterado**
 
 ---
 
@@ -134,6 +134,22 @@ Testes na base: 836/836 · TypeScript: 0 erros · 27/27 testes tooling · Workin
 **Decisão humana:** `aprovado_com_ajustes` (Opção A para ambos) — `ai/decision-log.md` 2026-05-22T21:02:18-03:00
 
 > Follow-up direto da pendência registrada na TASK-004 mãe (2026-05-19). Entrega da **Alternativa C da ADR-008** que foi explicitamente reservada para tarefa futura: substituição do cálculo conservador de pressão em ramais e laterais (HMT como teto único) por **pressão real por derivação** = `HMT − adutoraHfM − cumPrincipalHfM`. Mudança cirúrgica em `src/lib/layout/hydraulic-sizing.ts` (~30 linhas): 2 campos opcionais novos em `HydraulicSegment` (`cumPrincipalHfM`, `adutoraHfM`); novo helper puro exportado `derivePressureClassModel(segments)` que retorna `"exact_per_derivation"` quando ambos os campos estão populados em todos os ramais/laterais (Opção A do ajuste TEC-004B-001); `annotatePressureClass` ganha caminho `exact_per_derivation` quando dados disponíveis com fallback `hmt_conservative_inlet` preservado para compatibilidade; `modelLimitations.pressureClassModel` detectado dinamicamente. 10 testes novos em `pressure-class.test.ts` (T04B-1..T04B-6 + 4 testes do helper). Resultado: vitest 826 → 836 (sem regressão em integration.test.ts/bom.test.ts/pipeline-diagnostics.test.ts — propagação de campos é aditiva); tsc preservado em 0 erros; 27/27 tooling tests preservado. Comportamento prático: warnings espúrios `violation_conservative` em laterais PN40/sistemas planos com HMT 40+ mca são substituídos por classificação correta (`ok` quando pressão real ≤ PN; `violation_confirmed` blocker quando pressão real > PN). Mitiga R8 do diagnóstico TASK-001 e promove precisão técnica do épico E03 (Motor Hidráulico) sem ainda atingir critério "Validado em projeto histórico" (depende de comparação RT). Mapa Mestre, premissas RT/campo, ADR-008, RB-09, catálogo, BOM, PDF, UI/mapa, motor comercial, `secondary-sizing.ts`, `laterais.ts` e demais arquivos de geometria intocados. Desnível geodético por segmento e perdas locais proporcionais ficam fora do escopo desta task (futura).
+
+---
+
+### TASK-052 — Homologar premissa de operação rotativa por setor
+
+**Status:** `concluída`
+**Prioridade:** P3-melhoria
+**Classe:** C — documental / governança
+**Área:** governança / metodologia
+**Arquivo:** `tasks/TASK-052-homologar-rotativa-por-setor.md`
+**Concluída em:** 2026-05-22 · 836/836 testes vitest · 0 erros tsc · 27/27 testes tooling · `src/**` intocado
+**Relatório:** `docs/relatorios/2026-05-22-TASK-052.md`
+**Veredito GPT:** `aprovado_com_ajustes` · 1 blocker (BLK-MET-001 sobre snapshot interno desatualizado do prompt do GPT — não responsabilidade desta task) · 0/7 invariantes violadas
+**Decisão humana:** `aprovado_com_ajustes` (sem override) — `ai/decision-log.md` 2026-05-22T21:52:58-03:00
+
+> Homologação documental da premissa "Critério de vazão de projeto do ramal" em `docs/metodologia/12-premissas-provisorias-e-revisao-rt.md`. O RT (Kristyan Mota) confirmou em 2026-05-22 que a operação Brasmáquinas é **rotativa por setor (1 setor ativo por vez)** — informação fornecida durante análise técnica pós-TASK-004B dos ramais. A premissa estava com descrição **contraditória** (afirmava "todos os aspersores da coluna ativos simultaneamente" — que seria `sum(...)`) enquanto o código em [`src/lib/layout/secondary-sizing.ts:180-183`](../src/lib/layout/secondary-sizing.ts#L180-L183) sempre usou `max(lat.vazaoM3h)` — comportamento exato de operação rotativa. **O código estava tecnicamente correto desde sua origem; apenas a documentação descreveu mal.** TASK-052 corrigiu a descrição (linhas obsoletas "Alternativa pós-RT" + 2 "Risco" removidas; "Valor usado", "Regra" e "Origem" reescritas; referência ao código adicionada) e promoveu o status `PENDENTE_REVISAO_RT_BRASMAQUINAS → APROVADO_RT`. Histórico de revisões atualizado com entrada datada citando RT, motivo e referência ao código. Classe C — `src/**` intocado; nenhum teste novo; nenhum ADR; sem `RB-09`; Mapa Mestre preservado. GPT identificou 1 blocker (BLK-MET-001) sobre snapshot interno do prompt do `run-gpt-review.mjs` desatualizado (cita `vitest 817/817` + `tooling 20/20` — provavelmente baseline TOOL-001) vs valores reais atuais 836/27 — justificado no decision-log como pendência de tooling futura (TOOL-XXX, atualizar snapshot do prompt) e não responsabilidade desta task documental. Sucessor identificado para investigação técnica dos ramais ("ramais estão horríveis"): TASK-053 Classe A futura sobre topologia (Problemas 1, 2, 3, 5, 6 da análise pós-TASK-004B — atualmente 1 ramal independente por coluna sem agrupamento).
 
 ---
 
