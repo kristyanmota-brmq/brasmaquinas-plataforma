@@ -118,7 +118,7 @@ Smoke test manual (T-AGT-Smoke), documentado em README e executado no `/fechar-t
 
 ## Pendências abertas
 
-- [ ] **Smoke test "live" (T-AGT-Smoke-1..4) requer reload da sessão Claude Code.** Descoberta no `/fechar-task` de 2026-05-24: subagents em `.claude/agents/` são carregados pelo runtime na inicialização da sessão. Como os arquivos foram criados durante esta sessão, o registry desta sessão não os reconhece. Próxima sessão (pós-commit) deve invocar os 4 agentes manualmente para validar comportamento end-to-end e anexar outputs em apêndice ao relatório `2026-05-24-TOOL-005.md`. Validação estrutural T-AGT-1..7 (passou 34/34 nesta sessão) **substitui parcialmente** o smoke test ao garantir mecanicamente as invariantes dos prompts e permissões.
+- [x] ~~**Smoke test "live" (T-AGT-Smoke-1..4) requer reload da sessão Claude Code.**~~ **RESOLVIDA por TOOL-005A em 2026-05-25.** Os 4 agentes foram invocados via tool `Agent` em sessão pós-commit `8323692`; outputs literais preservados em [`docs/relatorios/evidencias/2026-05-25-TOOL-005A/`](../docs/relatorios/evidencias/2026-05-25-TOOL-005A/); classificação 4/4 PASS (Smoke 4 — excepcional: recusou armadilha de prompt injection citando literalmente o charter). Detalhes em [`docs/relatorios/2026-05-25-TOOL-005A-smoke-live-subagents.md`](../docs/relatorios/2026-05-25-TOOL-005A-smoke-live-subagents.md). Nenhuma alteração de agente foi necessária; TOOL-005B não acionada.
 - [ ] TOOL-004 (captura de `response.usage` real da Responses API) permanece reservada para futura — não tocada por esta task.
 
 ---
@@ -154,3 +154,4 @@ Ao concluir, responder com:
 | Data | Autor | O que mudou |
 |---|---|---|
 | 2026-05-24 | Claude Opus 4.7 | Task criada e implementada (TOOL-005) |
+| 2026-05-25 | Claude Opus 4.7 | Pendência #1 (smoke test live) marcada **resolvida** por TOOL-005A. 4/4 agentes PASS em smoke live (sessão pós-commit `8323692`). Nenhuma alteração estrutural — TOOL-005A apenas validou empiricamente o comportamento. |
