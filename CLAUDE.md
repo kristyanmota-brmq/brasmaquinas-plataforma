@@ -73,3 +73,14 @@ Etapa opcional de revisão por LLM externo entre `/planejar` e a aprovação hum
 4. Humano edita `ai/decision-log.md` (append-only) e usa `/handoff-status TASK-XXX <novo-status>` para transição explícita.
 
 **Fluxo obrigatório existente não muda** — handoff é camada adicional, opcional, manual. Detalhes em [`ai/README.md`](ai/README.md). Plano original em [`tasks/TOOL-001-handoff-claude-gpt-reviewer.md`](tasks/TOOL-001-handoff-claude-gpt-reviewer.md).
+
+## Subagents de governança (TOOL-005)
+
+Camada **opcional e aditiva** de subagents Claude Code em [`.claude/agents/`](.claude/agents/) — auxiliares dos slash commands, **não substituem** `/iniciar-task`, `/planejar`, `/implementar`, `/fechar-task` nem a aprovação humana. Quatro agentes disponíveis:
+
+- `context-gate-agent` — audita estado do repo (read-only)
+- `task-planner-agent` — produz rascunho de plano
+- `test-qa-agent` — executa `tsc`/`vitest`/tooling tests
+- `close-commit-agent` — propõe staging + mensagem de commit (não tem `Bash` — não executa git)
+
+Política permanente (limites, restrição de permissões via `tools`, proibição de auto-commit, proibição de decisão crítica) em [ADR-016](docs/decisoes/ADR-016-subagents-claude-code-camada-aditiva-governanca.md). Uso, matriz command×subagent, smoke tests e FAQ em [`.claude/agents/README.md`](.claude/agents/README.md).
