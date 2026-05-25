@@ -153,3 +153,38 @@ npx vitest run src/lib/layout/__tests__/secondary-sizing.test.ts
 # Com cobertura (não obrigatório mas útil para novas features)
 npx vitest run --coverage
 ```
+
+---
+
+## 10. Scripts de diagnóstico (banco local — não fazem parte da bateria)
+
+Scripts em `scripts/diagnose/` que **dependem de banco local** (Prisma + fixture
+`fixture-e06-9setores`) e são executados manualmente para inspecionar o estado
+do Projeto A real. Não rodam em `vitest run`, `tsc --noEmit` nem em
+`scripts/ai/__tests__/run-all.mjs`.
+
+```bash
+# (1) Tabela A0 / A2-min / A2-max / A3 com BOM, P1-P4, scoreFinal, vencedor.
+node scripts/diagnose/diagnose-architecture-projeto-a.mjs
+
+# (2) Verificação v12 (TASK-053): direção do spine, rib[0], lateral,
+#     e deflexão da junção rib→lateral em cada setor do Projeto A.
+node scripts/diagnose/verify-v12-projeto-a.mjs
+
+# (3) Diagnóstico de espinha (v9 inline) — preservado para auditoria.
+node scripts/diagnose/diagnose-espinha-projeto-a.mjs
+```
+
+Pré-requisitos comuns:
+
+- `POSTGRES_PRISMA_URL` definido (ou arquivo `.env` local com `DATABASE_URL`)
+- Banco populado com `fixture-e06-9setores`
+- `node` 20+ (suporte a `import.meta` e top-level await)
+
+Cobertura equivalente em vitest (não substitui o diagnóstico em banco real, mas
+fica como artefato persistente do P1-P4):
+
+- `src/lib/layout/__tests__/architecture-selector.test.ts` → cenário "Projeto
+  A-like" (`buildProjetoALikeScenario`) com snapshot em `T56-DIAG-W02`.
+- `src/lib/layout/__tests__/network-angle-diagnostics.test.ts` → cobertura de
+  dobras de adutora (T-ADUTORA-1..7) e regra `[0°, 90°]` da rede interna.
