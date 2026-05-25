@@ -1339,6 +1339,28 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
               paint={{ "line-color": "#7C3AED", "line-width": 2.5 }}
               layout={{ "line-cap": "round", "line-join": "round" }}
             />
+            {/* W-UX (diagnóstico 2026-05-24): label 'Adutora' no meio da linha,
+                acompanhando a inclinação geográfica. minzoom para evitar poluir
+                a overview. */}
+            <Layer
+              id="adutora-label"
+              type="symbol"
+              minzoom={13}
+              layout={{
+                "symbol-placement": "line-center",
+                "text-field": "Adutora",
+                "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+                "text-size": 11,
+                "text-letter-spacing": 0.05,
+                "text-allow-overlap": false,
+                "text-ignore-placement": false,
+              }}
+              paint={{
+                "text-color": "#7C3AED",
+                "text-halo-color": "#FFFFFF",
+                "text-halo-width": 1.8,
+              }}
+            />
           </Source>
 
           {/* Camada de ramais (principal → lateral_inlet) — teal, apenas quando existem */}
@@ -1883,7 +1905,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
             label="Captação (fonte hídrica)"
             value={
               layout.waterSource
-                ? `${layout.waterSource.lng.toFixed(4)}, ${layout.waterSource.lat.toFixed(4)}`
+                ? `Lat ${layout.waterSource.lat.toFixed(4)} · Lng ${layout.waterSource.lng.toFixed(4)}`
                 : "Não marcada"
             }
             mono={!!layout.waterSource}
