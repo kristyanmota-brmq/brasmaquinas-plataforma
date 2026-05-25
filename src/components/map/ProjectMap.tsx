@@ -62,6 +62,7 @@ import {
   buildSectorizationForJornada,
 } from "@/lib/layout/layout-use-cases";
 import { MemorialPanel } from "@/components/map/MemorialPanel";
+import { partitionBlockers } from "@/components/map/blocker-classification";
 
 interface Props {
   projectId: string;
@@ -1727,58 +1728,100 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
           )}
         </div>
 
-        {/* ── Blockers (derivados de projectResult.diagnostics — sempre reativos) ── */}
-        {(projectResult.diagnostics?.blockers.length ?? 0) > 0 && (
-          <div className="mb-5 bg-red-50 border border-red-200 rounded-md p-3">
-            <p className="text-[11px] font-semibold text-red-700 uppercase tracking-[0.08em] mb-2">
-              Bloqueios ativos
-            </p>
-            <ul className="space-y-1 max-h-32 overflow-y-auto">
-              {projectResult.diagnostics!.blockers.map((b, i) => (
-                <li key={i} className="text-xs text-red-700 flex items-start gap-1.5">
-                  <span className="flex-shrink-0 mt-0.5">·</span>
-                  <span>{b}</span>
-                </li>
-              ))}
-            </ul>
-            {/* Detalhes de segmentos inválidos do último attempt de PDF */}
-            {pdfError?.kind === "blocked" && pdfError.invalidHydraulicSegments.length > 0 && (
-              <div className="mt-2 border-t border-red-200 pt-2">
-                <p className="text-[11px] font-semibold text-red-700 mb-1.5">
-                  Segmentos inválidos ({pdfError.invalidHydraulicSegments.length}
-                  {pdfError.invalidHydraulicSegments.length > 3 ? " — exibindo 3 primeiros" : ""}):
-                </p>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                  {pdfError.invalidHydraulicSegments.slice(0, 3).map((seg) => (
-                    <div key={seg.id} className="bg-red-100 rounded p-1.5 font-mono text-[10px] leading-snug">
-                      <div className="font-sans font-semibold text-[10px] mb-0.5 text-red-800">
-                        {seg.type} · {REJECTION_REASON_LABEL[seg.rejectionReason] ?? seg.rejectionReason}
+        {/* ── Blockers (B-05 + W-08: separados por categoria) ─────────────────
+            Particiona blockers em (a) rt-pending — aguarda decisão técnica
+            (RT/engenheiro) e (b) data-block — erro corrigível pelo projetista.
+            O conteúdo de projectResult.diagnostics.blockers continua intocado;
+            a separação é puramente visual. Sempre que ambos os grupos têm
+            itens, mostramos primeiro o data-block (mais acionável agora) e
+            depois o rt-pending. ────────────────────────────────────────────── */}
+        {(() => {
+          const allBlockers = projectResult.diagnostics?.blockers ?? [];
+          if (allBlockers.length === 0) return null;
+          const { rtPending, dataBlock } = partitionBlockers(allBlockers);
+          return (
+            <>
+              {dataBlock.length > 0 && (
+                <div className="mb-5 bg-red-50 border border-red-200 rounded-md p-3">
+                  <p className="text-[11px] font-semibold text-red-700 uppercase tracking-[0.08em] mb-1">
+                    Bloqueio do projeto
+                  </p>
+                  <p className="text-[10px] text-red-600/80 mb-2 leading-snug">
+                    Corrigir os dados abaixo antes de gerar a proposta.
+                  </p>
+                  <ul className="space-y-1 max-h-32 overflow-y-auto">
+                    {dataBlock.map((b, i) => (
+                      <li key={`db-${i}`} className="text-xs text-red-700 flex items-start gap-1.5">
+                        <span className="flex-shrink-0 mt-0.5">·</span>
+                        <span>{b.message}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {/* Detalhes de segmentos inválidos do último attempt de PDF */}
+                  {pdfError?.kind === "blocked" && pdfError.invalidHydraulicSegments.length > 0 && (
+                    <div className="mt-2 border-t border-red-200 pt-2">
+                      <p className="text-[11px] font-semibold text-red-700 mb-1.5">
+                        Segmentos inválidos ({pdfError.invalidHydraulicSegments.length}
+                        {pdfError.invalidHydraulicSegments.length > 3 ? " — exibindo 3 primeiros" : ""}):
+                      </p>
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                        {pdfError.invalidHydraulicSegments.slice(0, 3).map((seg) => (
+                          <div key={seg.id} className="bg-red-100 rounded p-1.5 font-mono text-[10px] leading-snug">
+                            <div className="font-sans font-semibold text-[10px] mb-0.5 text-red-800">
+                              {seg.type} · {REJECTION_REASON_LABEL[seg.rejectionReason] ?? seg.rejectionReason}
+                            </div>
+                            <div>
+                              DN {seg.diameterNominalMm}mm
+                              {seg.internalDiameterMm != null && ` (Øint ${seg.internalDiameterMm}mm)`}
+                              {" · "}Q {seg.flowM3h.toFixed(1)} m³/h
+                            </div>
+                            <div>
+                              v {seg.velocityMs.toFixed(2)} m/s{" > lim "}{seg.maxVelocityMs.toFixed(1)} m/s
+                            </div>
+                            <div>
+                              hf {seg.headLossMca.toFixed(2)} mca
+                              {seg.maxHeadLossMca != null && ` > lim ${seg.maxHeadLossMca.toFixed(1)} mca`}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div>
-                        DN {seg.diameterNominalMm}mm
-                        {seg.internalDiameterMm != null && ` (Øint ${seg.internalDiameterMm}mm)`}
-                        {" · "}Q {seg.flowM3h.toFixed(1)} m³/h
-                      </div>
-                      <div>
-                        v {seg.velocityMs.toFixed(2)} m/s{" > lim "}{seg.maxVelocityMs.toFixed(1)} m/s
-                      </div>
-                      <div>
-                        hf {seg.headLossMca.toFixed(2)} mca
-                        {seg.maxHeadLossMca != null && ` > lim ${seg.maxHeadLossMca.toFixed(1)} mca`}
-                      </div>
+                      <button
+                        onClick={() => setPdfError(null)}
+                        className="mt-2 text-[10px] text-red-400 hover:text-red-600"
+                      >
+                        Dispensar detalhes
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
-                <button
-                  onClick={() => setPdfError(null)}
-                  className="mt-2 text-[10px] text-red-400 hover:text-red-600"
-                >
-                  Dispensar detalhes
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+              {rtPending.length > 0 && (
+                <div className="mb-5 bg-sky-50 border border-sky-200 rounded-md p-3">
+                  <p className="text-[11px] font-semibold text-sky-800 uppercase tracking-[0.08em] mb-1">
+                    Aguarda decisão técnica (RT)
+                  </p>
+                  <p className="text-[10px] text-sky-700/80 mb-2 leading-snug">
+                    Não é erro de projeto — itens que dependem de revisão do RT, engenheiro
+                    ou homologação de catálogo antes de gerar a proposta comercial.
+                  </p>
+                  <ul className="space-y-2 max-h-40 overflow-y-auto">
+                    {rtPending.map((b, i) => (
+                      <li key={`rt-${i}`} className="text-xs text-sky-800 flex items-start gap-1.5">
+                        <span className="flex-shrink-0 mt-0.5">·</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-medium">{b.audienceHint}</span>
+                          <span className="text-sky-700/80 text-[11px] leading-snug">
+                            {b.message}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* ── Erro técnico inesperado do PDF ───────────────────── */}
         {pdfError?.kind === "technical" && (
