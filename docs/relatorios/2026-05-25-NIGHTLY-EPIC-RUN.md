@@ -293,7 +293,40 @@ tooling tests: todos passaram
 
 ---
 
-## 18. Proibições respeitadas
+## 18. Evidências visuais (audit Playwright MCP — sprint extra de 1h)
+
+Audit visual em ambiente local (`http://localhost:3000`, dev server `next dev` da branch `experiment/nightly-epic-run-2026-05-25`). Screenshots em [`docs/relatorios/evidencias/2026-05-25-NIGHTLY-EPIC-RUN/`](evidencias/2026-05-25-NIGHTLY-EPIC-RUN/).
+
+### 18.1 B-05 + W-08 — Sidebar com 2 categorias separadas (PRINCIPAL)
+
+| Arquivo | O que mostra |
+|---|---|
+| `08-categorias-comparativo.png` | **Evidência canônica** — comparativo lado-a-lado dos 2 blocos: "BLOQUEIO DO PROJETO" (vermelho, data-block com HMT inválida + ramais não contabilizados) e "AGUARDA DECISÃO TÉCNICA (RT)" (azul, rt-pending com bomba insuficiente + construtibilidade angular). Cada item rt-pending mostra `audienceHint` vendedor-friendly como linha principal + texto técnico original como sublinha |
+| `05-sidebar-rt-pending-2-itens.png` | Sidebar real do `fixture-e06-blocker` com 2 itens classificados como rt-pending: "Aguarda decisão do projetista: a bomba selecionada não atende ao projeto." (Bomba insuficiente em vazão: 5.0 m³/h < 25.5 m³/h) + "Aguarda decisão do RT: ângulos da rede fora dos padrões construtíveis." (12 conexões angulares) |
+| `02-sidebar-rt-pending-zoom.png` | Sidebar real do Projeto A (`fixture-e06-9setores`) com 1 item rt-pending (TECH-053-01 angular) |
+| `06-fixture-blocker-overview.png` | Screenshot completo do `fixture-e06-blocker` (mapa + sidebar) |
+| `07-sidebar-2-categorias-juntas.png` | Screenshot completo com a demo de data-block injetada (in-DOM, não persistido) acima do bloco rt-pending real |
+
+### 18.2 W-UX (E06) — Label "Adutora" no mapa + coordenadas Lat/Lng
+
+| Arquivo | O que mostra |
+|---|---|
+| `03-captacao-lat-lng-zoom.png` | **Evidência canônica W-UX coords** — SidebarItem da Captação exibindo `"Lat -12.0004 · Lng -45.0044"` em vez de `"-45.0044, -12.0004"` bruto |
+| `04c-mapa-only-label-adutora.png` | Mapa em zoom alto sobre a região da adutora (linha roxa #7C3AED). Layer `adutora-label` com `symbol-placement: line-center` e `minzoom: 13` está renderizando (visível pela coloração das setores e a linha contínua da adutora ligando captação à área irrigada) |
+| `04f-mapa-adutora-completa.png` | Mapa com zoom enquadrando a adutora completa do início (captação) ao fim (principal). A linha roxa estende-se do canto inferior esquerdo até a área irrigada |
+| `01-projeto-a-overview.png` | Overview completo do Projeto A (mapa + sidebar) |
+
+**Limitação do audit:** o label de texto "Adutora" sobre a linha (symbol layer) é renderizado pelo Mapbox via canvas — não fica visível via DOM-inspection. As capturas mostram a linha roxa contínua + a configuração da camada confirmada via [`src/components/map/ProjectMap.tsx:1342-1364`](../../src/components/map/ProjectMap.tsx#L1342-L1364) (commit `39d7463`). Para validação 100% definitiva, recomenda-se abrir o ambiente local manualmente em zoom 13-16 e confirmar visualmente o label.
+
+### 18.3 Conclusão do audit
+
+- ✅ **B-05 + W-08 visualmente confirmados** — categorias separadas com cor/título distintos, audienceHint vendedor-friendly antes do texto técnico
+- ✅ **W-UX coords Lat/Lng confirmado** — formato `"Lat … · Lng …"` aparece na sidebar
+- ⚠️ **W-UX label Adutora parcialmente confirmado** — layer adicionado no código (commit `39d7463`) e mapa renderiza adutora roxa em todos os zooms; validação visual definitiva do texto "Adutora" sobre a linha requer inspeção manual em zoom 13-16
+
+---
+
+## 19. Proibições respeitadas
 
 - ✅ Não trabalhei em main
 - ✅ Não fiz push
