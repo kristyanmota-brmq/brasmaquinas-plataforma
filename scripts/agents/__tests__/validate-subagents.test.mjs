@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 /**
- * Testes estruturais dos subagents Claude Code (TOOL-005).
+ * Testes estruturais dos subagents Claude Code (TOOL-005 + TOOL-006).
  *
- * Valida o esqueleto e as invariantes mecânicas dos arquivos em `.claude/agents/`:
- * - existência dos 4 agentes
- * - frontmatter YAML válido com campos obrigatórios
- * - permissões restritas via `tools` (read-only agents sem Write/Edit/NotebookEdit)
- * - `task-planner-agent` sem Bash
- * - `close-commit-agent` SEM Bash (invariante crítica isolada)
- * - frase de proteção `"NÃO substitui"` em cada system prompt
- * - README cobre os 4 agentes pelo nome
+ * TOOL-005 introduziu os 4 agentes base de governança:
+ *   - context-gate-agent (haiku; Read, Bash, Grep, Glob)
+ *   - task-planner-agent (sonnet; Read, Grep, Glob)
+ *   - test-qa-agent (haiku; Read, Bash, Grep, Glob)
+ *   - close-commit-agent (haiku; Read, Grep, Glob — SEM Bash)
+ *
+ * TOOL-006 adicionou 11 agentes read-only (tools: Read, Grep, Glob):
+ *   - 8 especialistas por épico (E02..E09)
+ *   - 3 transversais (irrigation-methodology, ux-dx, software-project-manager)
+ *
+ * Total: 15 agentes.
  *
  * Política em `docs/decisoes/ADR-016-subagents-claude-code-camada-aditiva-governanca.md`.
  * Uso: invocado por `scripts/ai/__tests__/run-all.mjs`.
@@ -25,14 +28,47 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
 const AGENTS_DIR = resolve(REPO_ROOT, ".claude/agents");
 
-const AGENTS = [
+// 4 agentes de governança (TOOL-005)
+const GOVERNANCE_AGENTS = [
   "context-gate-agent",
   "task-planner-agent",
   "test-qa-agent",
   "close-commit-agent",
 ];
 
-const READ_ONLY_AGENTS = ["context-gate-agent", "test-qa-agent", "close-commit-agent"];
+// 8 agentes especialistas por épico (TOOL-006)
+const SPECIALIST_AGENTS = [
+  "architecture-layout-agent",
+  "hydraulics-agent",
+  "constructability-agent",
+  "bom-catalog-agent",
+  "map-workspace-agent",
+  "proposal-pdf-agent",
+  "commercial-engine-agent",
+  "field-validation-agent",
+];
+
+// 3 agentes transversais (TOOL-006)
+const CROSS_FUNCTIONAL_AGENTS = [
+  "irrigation-methodology-agent",
+  "ux-dx-agent",
+  "software-project-manager-agent",
+];
+
+// 11 agentes novos da TOOL-006 (especialistas + transversais) — todos read-only com tools exatos
+const TOOL_006_AGENTS = [...SPECIALIST_AGENTS, ...CROSS_FUNCTIONAL_AGENTS];
+
+// Total: 15 agentes
+const AGENTS = [...GOVERNANCE_AGENTS, ...TOOL_006_AGENTS];
+
+// Read-only no sentido de NÃO ter Write/Edit/NotebookEdit
+// (task-planner-agent é coberto por T-AGT-4 separadamente; close-commit-agent + context-gate-agent + test-qa-agent + os 11 da TOOL-006 entram aqui)
+const READ_ONLY_AGENTS = [
+  "context-gate-agent",
+  "test-qa-agent",
+  "close-commit-agent",
+  ...TOOL_006_AGENTS,
+];
 
 function parseFrontmatter(content) {
   const match = content.match(/^---\n([\s\S]+?)\n---/);
@@ -58,8 +94,8 @@ function toolsList(fm) {
   return fm.tools.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-describe("TOOL-005 — subagents Claude Code (validação estrutural)", () => {
-  test("T-AGT-1: os 4 arquivos de agent existem em .claude/agents/", () => {
+describe("TOOL-005 + TOOL-006 — subagents Claude Code (validação estrutural)", () => {
+  test("T-AGT-1: os 15 arquivos de agent existem em .claude/agents/", () => {
     for (const name of AGENTS) {
       const path = resolve(AGENTS_DIR, `${name}.md`);
       assert.ok(existsSync(path), `agent ausente: ${path}`);
@@ -121,7 +157,7 @@ describe("TOOL-005 — subagents Claude Code (validação estrutural)", () => {
     }
   });
 
-  test("T-AGT-6: .claude/agents/README.md existe e referencia os 4 agentes pelo nome", () => {
+  test("T-AGT-6: .claude/agents/README.md existe e referencia os 15 agentes pelo nome", () => {
     const readmePath = resolve(AGENTS_DIR, "README.md");
     assert.ok(existsSync(readmePath), "README.md ausente em .claude/agents/");
     const readme = readFileSync(readmePath, "utf8");
@@ -142,5 +178,20 @@ describe("TOOL-005 — subagents Claude Code (validação estrutural)", () => {
       !tools.includes("Bash"),
       "close-commit-agent NÃO PODE ter Bash em tools — risco crítico de auto-commit (ADR-016 §6)"
     );
+  });
+
+  test("T-AGT-8: agents da TOOL-006 (11) têm tools exatamente Read, Grep, Glob", () => {
+    const EXPECTED_TOOLS = ["Read", "Grep", "Glob"];
+    for (const name of TOOL_006_AGENTS) {
+      const { content } = readAgent(name);
+      const fm = parseFrontmatter(content);
+      assert.ok(fm.tools, `${name} precisa de tools explícito`);
+      const tools = toolsList(fm);
+      assert.deepEqual(
+        [...tools].sort(),
+        [...EXPECTED_TOOLS].sort(),
+        `${name} tools deve ser exatamente Read, Grep, Glob (sem Bash, sem extras). Atual: ${tools.join(", ")}`
+      );
+    }
   });
 });
