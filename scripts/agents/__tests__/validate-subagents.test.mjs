@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Testes estruturais dos subagents Claude Code (TOOL-005 + TOOL-006).
+ * Testes estruturais dos subagents Claude Code (TOOL-005 + TOOL-006 + TOOL-006B).
  *
  * TOOL-005 introduziu os 4 agentes base de governança:
  *   - context-gate-agent (haiku; Read, Bash, Grep, Glob)
@@ -13,6 +13,11 @@
  *   - 3 transversais (irrigation-methodology, ux-dx, software-project-manager)
  *
  * Total: 15 agentes.
+ *
+ * TOOL-006B calibrou exclusivamente o map-workspace-agent contra hardcode de
+ * contagens globais — adicionou T-AGT-9 (regra) e T-AGT-10 (fallback literal).
+ * Origem: Smoke 05 da TOOL-006A foi PARCIAL (hardcode vitest 826/826).
+ * Total de testes estruturais: 10 (era 8 — +2 da TOOL-006B).
  *
  * Política em `docs/decisoes/ADR-016-subagents-claude-code-camada-aditiva-governanca.md`.
  * Uso: invocado por `scripts/ai/__tests__/run-all.mjs`.
@@ -193,5 +198,27 @@ describe("TOOL-005 + TOOL-006 — subagents Claude Code (validação estrutural)
         `${name} tools deve ser exatamente Read, Grep, Glob (sem Bash, sem extras). Atual: ${tools.join(", ")}`
       );
     }
+  });
+
+  // TOOL-006B: calibração do map-workspace-agent contra hardcode de contagens globais.
+  // Origem: Smoke 05 da TOOL-006A classificado PARCIAL — agente hardcodeou
+  // "vitest 826/826" em closing statement quando o baseline real era 887/887.
+  // Não houve mudança de tools (continua read-only com Read, Grep, Glob).
+  // Validação estrutural: regra + fallback devem estar literalmente documentados no charter.
+
+  test("T-AGT-9: map-workspace-agent documenta regra contra hardcode de contagens GLOBAIS (TOOL-006B)", () => {
+    const { content } = readAgent("map-workspace-agent");
+    assert.ok(
+      /contagens globais|status global/i.test(content),
+      "map-workspace-agent precisa documentar regra contra hardcode de contagens GLOBAIS (vitest, TypeScript, tooling, branch, git status, baseline) — TOOL-006B calibração"
+    );
+  });
+
+  test("T-AGT-10: map-workspace-agent contém fallback literal 'Não verificado nesta análise' (TOOL-006B)", () => {
+    const { content } = readAgent("map-workspace-agent");
+    assert.ok(
+      content.includes("Não verificado nesta análise"),
+      "map-workspace-agent precisa documentar o fallback literal 'Não verificado nesta análise.' para citação de contagens globais sem fonte — TOOL-006B calibração"
+    );
   });
 });

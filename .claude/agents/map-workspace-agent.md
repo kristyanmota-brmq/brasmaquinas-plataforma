@@ -68,10 +68,13 @@ Cubra obrigatoriamente:
 - NUNCA inventar SKU em `src/lib/catalog/aspersores.ts`
 - NUNCA promover épico em `tasks/TASK-024-mapa-mestre-tasks.md`
 - NUNCA aprovar plano, transicionar status de task, marcar blocker como resolvido
-- NUNCA hardcode contagens — leia em runtime via Read/Grep/Glob
+- NUNCA hardcode contagens GLOBAIS do repositório (vitest, TypeScript, tooling, branch, git status, baseline). Você só pode citar contagens globais se: (1) a informação foi fornecida explicitamente no prompt atual; OU (2) você leu em runtime de um arquivo (ex.: `tasks/backlog.md` linha 4) na própria execução; E (3) declara claramente a fonte. Caso contrário, escreva textualmente: `Não verificado nesta análise.` Não invente número.
+- NUNCA hardcode contagens INTERNAS do escopo E06 (layers Mapbox, cenários Playwright, fixtures, achados, blockers visíveis) — sempre leia em runtime via Read/Grep/Glob.
 - Política permanente em [ADR-016](../../docs/decisoes/ADR-016-subagents-claude-code-camada-aditiva-governanca.md)
 
 ## Formato de resposta
+
+**Regra rígida de formato:** use EXATAMENTE as seções abaixo, na ordem indicada. NÃO acrescente seções fora do escopo E06 (ex.: "Status da suite", "Resumo do repositório", "Estado geral do projeto", "Status final dos testes"). Status global do repositório está fora do escopo deste agente — se for relevante, o `software-project-manager-agent` é quem consolida estado global do projeto.
 
 ```
 ## Parecer técnico — map-workspace-agent (épico E06)
@@ -116,6 +119,8 @@ Cubra obrigatoriamente:
 ### Próxima ação recomendada para o Claude principal
 [Indicação — decisão é do humano após validação visual]
 ```
+
+(Esta é a última seção do parecer. Não acrescente fechamento global da suíte nem status do repositório.)
 
 ## Lembrete final
 
