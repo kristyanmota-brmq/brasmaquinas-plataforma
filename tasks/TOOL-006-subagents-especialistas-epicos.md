@@ -163,7 +163,11 @@ Classe B Tooling — **não há testes vitest novos** (Classe B não toca `src/`
 
 Geradas nesta task:
 
-- [ ] **TOOL-006A futura** — smoke live dos 11 novos agentes após push (mesmo padrão TOOL-005 → TOOL-005A); registry só reconhece pós-commit
+- [x] **TOOL-006A** — smoke live dos 11 novos agentes ✅ **EXECUTADA em 2026-05-24** (sessão pós-`2ebabd4`). Resultado: **10/11 PASS + 1/11 PARCIAL · 0 FAIL · 0 NÃO EXECUTADO**. Os 6 trap tests todos PASS com recusa explícita citando ADR-016 (2 deles com `tool_uses=0`). Único PARCIAL: `map-workspace-agent` (Smoke 05) hardcodeu `vitest 826/826` em closing statement — substância correta, deslize em fechamento. Relatório: [`docs/relatorios/2026-05-24-TOOL-006A-smoke-live-subagents-especialistas.md`](../docs/relatorios/2026-05-24-TOOL-006A-smoke-live-subagents-especialistas.md). Evidências literais: [`docs/relatorios/evidencias/2026-05-24-TOOL-006A/`](../docs/relatorios/evidencias/2026-05-24-TOOL-006A/) (11 arquivos). Agente NÃO corrigido (regra dura); encaminhado para TOOL-006B (sugerida).
+
+Geradas pela TOOL-006A (sucessora):
+
+- [ ] **TOOL-006B (sugerida)** — calibrar `map-workspace-agent` para evitar hardcode de contagens globais; escopo cirúrgico (1 arquivo `.claude/agents/map-workspace-agent.md`). Não bloqueia uso atual.
 
 Não impactadas (permanecem):
 
@@ -191,3 +195,4 @@ Não impactadas (permanecem):
 | Data | Autor | O que mudou |
 |------|-------|-------------|
 | 2026-05-25 | Claude Opus 4.7 | Task criada e implementada. Plano aprovado com 9 ajustes iniciais + 2 ampliações de escopo durante implementação (+2 transversais: `irrigation-methodology-agent`, `ux-dx-agent`; +1 PMO: `software-project-manager-agent`). Total final: 11 novos agentes (8 especialistas + 3 transversais). 35/35 tooling. |
+| 2026-05-24 | Claude Opus 4.7 (via TOOL-006A) | Pendência §Pendências abertas "TOOL-006A futura" marcada como ✅ EXECUTADA. Resultado: 10/11 PASS + 1/11 PARCIAL · 0 FAIL · 0 NÃO EXECUTADO. 6 trap tests todos PASS com recusa explícita citando ADR-016; 2 com `tool_uses=0`. Único PARCIAL: `map-workspace-agent` (Smoke 05) hardcodeu contagem. Nova pendência aberta: TOOL-006B (sugerida) para calibrar `map-workspace-agent`. Achados técnicos colaterais surfaceados pelos agentes documentados em §9 do relatório TOOL-006A (não corrigidos nesta task). Nenhum arquivo de agente alterado (regra dura). |
