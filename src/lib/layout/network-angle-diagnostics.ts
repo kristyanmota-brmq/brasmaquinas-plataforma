@@ -8,6 +8,7 @@
  *
  * O que é verificado:
  *   - Dobras internas da principal (segmentos consecutivos)
+ *   - Dobras internas da adutora (segmentos consecutivos — endereça W-05 do diagnóstico 2026-05-24)
  *   - Junção ramal/secundária → principal
  *   - Junção ramal/secundária → lateral física
  *
@@ -48,7 +49,7 @@ import type { SecondaryPipe } from "@/lib/layout/hydraulic-connectivity";
  *   45  = curva 45° (deflexão 45°)
  */
 export interface NetworkAngleIssue {
-  elementType: "lateral" | "secondary" | "principal";
+  elementType: "lateral" | "secondary" | "principal" | "adutora";
   elementId: string;
   connectionType: "bend" | "junction";
   angleDeg: number;
@@ -124,6 +125,19 @@ export const ALLOWED_DEFLECTIONS_ADUTORA = [0, 45, 90] as const;
  */
 export function isAllowedDeflection(deflectionDeg: number, toleranceDeg = 5): boolean {
   return ALLOWED_DEFLECTIONS_INTERNAL.some((d) => Math.abs(deflectionDeg - d) <= toleranceDeg);
+}
+
+/**
+ * Retorna true se a deflexão está dentro da tolerância de um ângulo permitido na adutora.
+ * Adutora: 0°, 45° e 90° (ADR-010).
+ * toleranceDeg = 5° — mesma PREMISSA_PROVISORIA_ENGENHARIA da rede interna.
+ *
+ * W-05 (diagnóstico 2026-05-24): antes do nightly 2026-05-25 esta função não existia
+ * e dobras internas da adutora não eram validadas em runtime — `ALLOWED_DEFLECTIONS_ADUTORA`
+ * estava declarada mas era cosmética.
+ */
+export function isAllowedDeflectionAdutora(deflectionDeg: number, toleranceDeg = 5): boolean {
+  return ALLOWED_DEFLECTIONS_ADUTORA.some((d) => Math.abs(deflectionDeg - d) <= toleranceDeg);
 }
 
 /**
@@ -261,6 +275,43 @@ export function detectNetworkAngleIssues(params: {
         reason:
           `Dobra na principal no ponto ${i}: deflexão ${deflection.toFixed(1)}° fora dos padrões ` +
           `construtíveis (0°/45°/90°). Nenhuma conexão padrão disponível.`,
+      });
+    }
+  }
+
+  // ── 1.5. Dobras internas da adutora (W-05 diagnóstico 2026-05-24) ─────────
+  // Mesma lógica de §1 (principal) mas com tolerância ALLOWED_DEFLECTIONS_ADUTORA = [0°, 45°, 90°].
+  // A junção adutora→principal continua não verificada (ver docstring topo do arquivo).
+  // Aqui só validamos dobras internas da polilinha da adutora.
+  for (let i = 1; i < adutoraCoords.length - 1; i++) {
+    const A = adutoraCoords[i - 1];
+    const B = adutoraCoords[i];
+    const C = adutoraCoords[i + 1];
+
+    const vIn = metricVec(A, B, mLng);
+    const vOut = metricVec(B, C, mLng);
+
+    const lenIn = Math.sqrt(vIn[0] ** 2 + vIn[1] ** 2);
+    const lenOut = Math.sqrt(vOut[0] ** 2 + vOut[1] ** 2);
+    if (lenIn < 1e-3 || lenOut < 1e-3) continue;
+
+    const deflection = angleBetweenDeg(vIn, vOut);
+    checkedElements++;
+
+    if (!isAllowedDeflectionAdutora(deflection, toleranceDeg)) {
+      const angle = 180 - deflection;
+      issues.push({
+        elementType: "adutora",
+        elementId: `adutora-bend-${i}`,
+        connectionType: "bend",
+        angleDeg: Math.round(angle * 10) / 10,
+        deflectionDeg: Math.round(deflection * 10) / 10,
+        nearestAllowedAngleDeg: nearestAllowedFitting(deflection),
+        requiredFitting: fittingName(deflection, "bend", toleranceDeg),
+        severity: "blocker",
+        reason:
+          `Dobra na adutora no ponto ${i}: deflexão ${deflection.toFixed(1)}° fora dos padrões ` +
+          `construtíveis da adutora (0°/45°/90°). Nenhuma conexão padrão disponível.`,
       });
     }
   }

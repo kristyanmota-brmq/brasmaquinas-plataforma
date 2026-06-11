@@ -706,3 +706,162 @@ describe("Vazão kind-aware em sizeAllSecondaries (preservado v6 + v12 espinha)"
     expect(spineEntry.flowM3h).toBe(9 + 10 + 11);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T53-B03 (diagnóstico 2026-05-24, anomalia setor 1 do Projeto A) —
+// Grid 59° + colunas físicas ALINHADAS ao grid: rib→lateral deve ficar em 0°
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// O diagnóstico de 2026-05-24 (§4.4) sinalizou no Projeto A real um rib do setor
+// 1 com deflexão -37,5° na junção rib→lateral. As hipóteses do diagnóstico
+// foram: agrupamento incorreto de coluna, inlet fora do headland esperado ou
+// erro em `fieldSideSign`. Os testes T53-* anteriores não cobriam o caso
+// "lateral física alinhada com o frame rotacionado" — usavam `makeCol`/`colAtGap`
+// que produzem colunas verticais (Y global) independente do `gridAngleDegrees`.
+//
+// Este bloco fornece o helper `colInLocalFrame` que constrói laterais cuja
+// `startLngLat/endLngLat` está realmente alinhada ao eixo Y local rotacionado
+// por `gridAngleDegrees` — o cenário REAL do Projeto A. Sob essa fixture, a
+// rib (perpendicular ao spine no frame local) e a lateral (paralela ao eixo Y
+// local) devem ter deflexão na junção = 0° (luva) por construção geométrica.
+//
+// Se algum dia a deflexão dessa junção sair de [0°, 90°] sob essa fixture,
+// é o B-03 reproduzido em ambiente sintético — não é hipótese visual no Projeto
+// A real. Hoje (TASK-053 v12), todos os ribs ficam em 0° conforme esperado.
+describe("T53-B03 — Grid 59° + lateral alinhada ao grid: rib→lateral em 0° (luva)", () => {
+  const M_PER_DEG_LAT = 111320;
+  const GRID = 59; // mesmo ângulo do Projeto A
+  const CENTROID_B03 = { lng: -46.0, lat: -12.0 };
+  const cosA = Math.cos((GRID * Math.PI) / 180);
+  const sinA = Math.sin((GRID * Math.PI) / 180);
+  const mPerLng = M_PER_DEG_LAT * Math.cos((CENTROID_B03.lat * Math.PI) / 180);
+
+  /**
+   * Constrói uma coluna física cuja polilinha REAL é paralela ao eixo Y local
+   * (= perpendicular ao spine no frame rotacionado por gridAngleDegrees).
+   * xLocal: posição da coluna ao longo do eixo X local (m, a partir do centroid).
+   * yStart, yEnd: extremos da coluna no eixo Y local (m).
+   */
+  function colInLocalFrame(
+    id: string,
+    xLocal: number,
+    yStart: number,
+    yEnd: number,
+    idx: number,
+  ): PhysicalColumn {
+    function localToLngLat(x: number, y: number): [number, number] {
+      const dx = x * cosA - y * sinA;
+      const dy = x * sinA + y * cosA;
+      return [CENTROID_B03.lng + dx / mPerLng, CENTROID_B03.lat + dy / M_PER_DEG_LAT];
+    }
+    const start = localToLngLat(xLocal, yStart);
+    const end = localToLngLat(xLocal, yEnd);
+    return makeCol(id, start, end, idx);
+  }
+
+  // Principal: paralela ao eixo X local (= perpendicular aos laterais), na borda
+  // sul do campo (yLocal = -200m). Em LngLat global, vai do xLocal=-100 ao
+  // xLocal=+100 com yLocal=-200.
+  function principalAtLocalY(yLocal: number, xLeft: number, xRight: number): [number, number][] {
+    function localToLngLat(x: number, y: number): [number, number] {
+      const dx = x * cosA - y * sinA;
+      const dy = x * sinA + y * cosA;
+      return [CENTROID_B03.lng + dx / mPerLng, CENTROID_B03.lat + dy / M_PER_DEG_LAT];
+    }
+    return [localToLngLat(xLeft, yLocal), localToLngLat(xRight, yLocal)];
+  }
+
+  // Setor 1 do Projeto A simplificado: 3 colunas a xLocal = 0, 12, 24 m;
+  // laterais de yLocal = -180m (inlet) a yLocal = -100m (extremo).
+  // Centroid acima da principal (yLocal=0 > yLocal=-200), então fieldSideSign = +1.
+  const PRINCIPAL_LOCAL = principalAtLocalY(-200, -50, 100);
+  const c1 = colInLocalFrame("c1", 0, -180, -100, 0);
+  const c2 = colInLocalFrame("c2", 12, -180, -100, 1);
+  const c3 = colInLocalFrame("c3", 24, -180, -100, 2);
+  const opSegs: OperationalSegment[] = [
+    makeOpSeg("c1", 1), makeOpSeg("c2", 1), makeOpSeg("c3", 1),
+  ];
+
+  const secs = generateSecondaries(
+    [c1, c2, c3],
+    PRINCIPAL_LOCAL,
+    CENTROID_B03,
+    0.5,
+    { operationalSegments: opSegs, gridAngleDegrees: GRID },
+  );
+
+  it("topologia v12 gerada (1 spine + 1 spine_entry + 3 ribs)", () => {
+    expect(secs).toHaveLength(5);
+    expect(secs.filter((s) => s.kind === "spine")).toHaveLength(1);
+    expect(secs.filter((s) => s.kind === "spine_entry")).toHaveLength(1);
+    expect(secs.filter((s) => s.kind === "rib")).toHaveLength(3);
+  });
+
+  it("rib direction = eixo Y local (paralela à lateral)", () => {
+    const ribs = secs.filter((s) => s.kind === "rib");
+    // Eixo Y local em coords globais: (-sin(GRID), cos(GRID))
+    const yLocalGlobal: [number, number] = [-Math.sin((GRID * Math.PI) / 180), Math.cos((GRID * Math.PI) / 180)];
+    for (const rib of ribs) {
+      const ribDir = unitVecLngLat(rib.fromCoord, rib.toCoord, CENTROID_B03.lat);
+      // dot(ribDir, yLocalGlobal) ≈ ±1 (paralelo ou antiparalelo)
+      const cosTheta = dotVec(ribDir, yLocalGlobal);
+      expect(Math.abs(Math.abs(cosTheta) - 1)).toBeLessThan(1e-3);
+    }
+  });
+
+  it("rib→lateral: deflexão 0° (luva) para TODAS as 3 colunas (B-03 não reproduzível em sintético)", () => {
+    const report = detectNetworkAngleIssues({
+      physicalColumns: [c1, c2, c3],
+      secondaries: secs,
+      principalCoords: PRINCIPAL_LOCAL,
+      adutoraCoords: [],
+      centroid: CENTROID_B03,
+    });
+    const ribIds = secs.filter((s) => s.kind === "rib").map((s) => s.id);
+    const ribLateralIssues = report.issues.filter((iss) =>
+      iss.elementType === "lateral" && ribIds.some((id) => iss.elementId.includes(id))
+    );
+    // Sob fixture sintética com lateral alinhada ao grid, NENHUM blocker rib→lateral.
+    // B-03 (Projeto A real) deve ter origem em (a) lateral REAL não alinhada
+    // exatamente ao gridAngleDegrees (ruído numérico nos aspersores), (b)
+    // routeCoords da lateral divergindo de start/end, ou (c) inlet derivado
+    // fora do extremo da coluna. Caso este teste passe a falhar futuramente,
+    // o cenário real foi reproduzido em sintético e o bug está em
+    // routeEspinhaDePeixe ou na derivação de inlet em hydraulic-connectivity.ts.
+    expect(ribLateralIssues).toHaveLength(0);
+  });
+
+  it("spine_entry→principal: junção em 0° ou 90° (principal alinhada ao eixo X local)", () => {
+    const report = detectNetworkAngleIssues({
+      physicalColumns: [c1, c2, c3],
+      secondaries: secs,
+      principalCoords: PRINCIPAL_LOCAL,
+      adutoraCoords: [],
+      centroid: CENTROID_B03,
+    });
+    const spineEntryId = secs.find((s) => s.kind === "spine_entry")!.id;
+    const seIssues = report.issues.filter((iss) => iss.elementId.includes(spineEntryId));
+    // Principal paralela ao eixo X local; spine_entry perpendicular ao spine
+    // (paralelo ao eixo Y local). Junção = 90° → SEM blocker.
+    expect(seIssues).toHaveLength(0);
+  });
+
+  it("anti-regressão: fieldSideSign não inverte (spine ABAIXO do centroid e ACIMA da principal)", () => {
+    // Em frame local, centroid está em yLocal=0 e principal em yLocal=-200. Inlets em yLocal≈-180.
+    // fieldSideSign deve ser +1 (centroid > principal). Spine deve estar entre principal e inlets:
+    // spineYLocal = (principalYLocal + farthestInletYLocal) / 2 ≈ (-200 + -180) / 2 = -190.
+    // Em global, isso significa que o spine NÃO está do lado oposto do centroid relativo à principal.
+    const spine = secs.find((s) => s.kind === "spine")!;
+    // Projeta o ponto médio do spine no frame local e verifica que yLocal < 0 (mesmo lado da principal)
+    const spineMidLngLat: [number, number] = [
+      (spine.coords![0][0] + spine.coords![1][0]) / 2,
+      (spine.coords![0][1] + spine.coords![1][1]) / 2,
+    ];
+    const dx = (spineMidLngLat[0] - CENTROID_B03.lng) * mPerLng;
+    const dy = (spineMidLngLat[1] - CENTROID_B03.lat) * M_PER_DEG_LAT;
+    const spineYLocal = -dx * sinA + dy * cosA;
+    // Spine entre -200 e -100 (faixa de inlets); NÃO acima de 0 (lado oposto).
+    expect(spineYLocal).toBeLessThan(0);
+    expect(spineYLocal).toBeGreaterThan(-200);
+  });
+});

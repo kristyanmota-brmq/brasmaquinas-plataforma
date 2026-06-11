@@ -13,6 +13,7 @@ import { describe, it, expect } from "vitest";
 import {
   detectNetworkAngleIssues,
   isAllowedDeflection,
+  isAllowedDeflectionAdutora,
   type NetworkAngleIssue,
 } from "@/lib/layout/network-angle-diagnostics";
 import type { PhysicalColumn } from "@/lib/layout/laterais";
@@ -601,5 +602,225 @@ describe("T10 — dobra 45° na principal → blocker (nova regra rede interna)"
 
   it("issue com elementType = 'principal'", () => {
     expect(report.issues.some((i) => i.elementType === "principal")).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W-05 (diagnóstico 2026-05-24) — validação angular runtime da adutora
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("isAllowedDeflectionAdutora", () => {
+  it("0° → allowed (trecho reto / luva)", () => {
+    expect(isAllowedDeflectionAdutora(0)).toBe(true);
+  });
+  it("45° → allowed (curva 45° permitida na adutora — ADR-010)", () => {
+    expect(isAllowedDeflectionAdutora(45)).toBe(true);
+  });
+  it("90° → allowed (curva/tê 90°)", () => {
+    expect(isAllowedDeflectionAdutora(90)).toBe(true);
+  });
+  it("30° → NOT allowed", () => {
+    expect(isAllowedDeflectionAdutora(30)).toBe(false);
+  });
+  it("60° → NOT allowed", () => {
+    expect(isAllowedDeflectionAdutora(60)).toBe(false);
+  });
+  it("dentro da tolerância ±5°: 42° → allowed (≈45°)", () => {
+    expect(isAllowedDeflectionAdutora(42)).toBe(true);
+  });
+  it("fora da tolerância: 38° → NOT allowed", () => {
+    expect(isAllowedDeflectionAdutora(38)).toBe(false);
+  });
+});
+
+describe("T-ADUTORA-1 — adutora reta (3 pontos colíneos) → sem issues", () => {
+  const adutoraCoords: [number, number][] = [[0, -12.005], [0, -12.003], [0, -12.001]];
+  const principalCoords: [number, number][] = [[0, -12.001], [0.001, -12.001]];
+
+  const report = detectNetworkAngleIssues({
+    physicalColumns: [],
+    secondaries: [],
+    principalCoords,
+    adutoraCoords,
+    centroid: CENTROID,
+  });
+
+  it("hasBlockers = false para adutora reta", () => {
+    expect(report.hasBlockers).toBe(false);
+  });
+
+  it("0 issues de elementType='adutora'", () => {
+    expect(report.issues.filter((i) => i.elementType === "adutora")).toHaveLength(0);
+  });
+});
+
+describe("T-ADUTORA-2 — adutora com dobra 90° → sem issues", () => {
+  // A → B vai para E. B → C vai para N. Deflexão em B = 90° → permitido na adutora.
+  const mPerLng = 111320 * Math.cos((-12 * Math.PI) / 180);
+  const d = 0.001;
+  const adutoraCoords: [number, number][] = [
+    [0, -12.005],
+    [d, -12.005],
+    [d, -12.005 + d * (mPerLng / 111320)],
+  ];
+  const principalCoords: [number, number][] = [[d, -12.005], [d, -12.004]];
+
+  const report = detectNetworkAngleIssues({
+    physicalColumns: [],
+    secondaries: [],
+    principalCoords,
+    adutoraCoords,
+    centroid: CENTROID,
+  });
+
+  it("hasBlockers = false para dobra 90° na adutora", () => {
+    expect(report.hasBlockers).toBe(false);
+  });
+});
+
+describe("T-ADUTORA-3 — adutora com dobra 45° → sem issues (45° é VÁLIDO em adutora)", () => {
+  // Adutora com dobra 45°. ADR-010: rede interna proíbe 45°, mas adutora permite.
+  // Este teste verifica que a validação adutora é distinta da rede interna.
+  const mPerLng = 111320 * Math.cos((-12 * Math.PI) / 180);
+  const d = 0.001;
+  const adutoraCoords: [number, number][] = [
+    [0, -12.005],
+    [d, -12.005],
+    // 45° a partir do leste: cos(45°)=sin(45°)≈0.707
+    [d + 0.707 * d, -12.005 + 0.707 * d * (mPerLng / 111320)],
+  ];
+  const principalCoords: [number, number][] = [
+    [d + 0.707 * d, -12.005 + 0.707 * d],
+    [d + 0.707 * d + 0.001, -12.005 + 0.707 * d],
+  ];
+
+  const report = detectNetworkAngleIssues({
+    physicalColumns: [],
+    secondaries: [],
+    principalCoords,
+    adutoraCoords,
+    centroid: CENTROID,
+  });
+
+  it("hasBlockers = false para dobra 45° na adutora (mesma dobra na principal seria blocker)", () => {
+    const adutoraIssues = report.issues.filter((i) => i.elementType === "adutora");
+    expect(adutoraIssues).toHaveLength(0);
+  });
+});
+
+describe("T-ADUTORA-4 — adutora com dobra 60° → blocker (W-05 fix)", () => {
+  // Dobra 60° na adutora — fora de [0°, 45°, 90°] → blocker.
+  // Antes do W-05 fix: dobra interna da adutora NÃO era verificada → falso negativo.
+  const mPerLng = 111320 * Math.cos((-12 * Math.PI) / 180);
+  const d = 0.001;
+  const adutoraCoords: [number, number][] = [
+    [0, -12.005],
+    [d, -12.005],
+    // 60° a partir do leste: cos(60°)=0.5, sin(60°)≈0.866
+    [d + 0.5 * d, -12.005 + 0.866 * d * (mPerLng / 111320)],
+  ];
+  const principalCoords: [number, number][] = [
+    [d + 0.5 * d, -12.005 + 0.866 * d],
+    [d + 0.5 * d + 0.001, -12.005 + 0.866 * d],
+  ];
+
+  const report = detectNetworkAngleIssues({
+    physicalColumns: [],
+    secondaries: [],
+    principalCoords,
+    adutoraCoords,
+    centroid: CENTROID,
+  });
+
+  it("hasBlockers = true para dobra 60° na adutora", () => {
+    expect(report.hasBlockers).toBe(true);
+  });
+
+  it("1 issue com elementType = 'adutora'", () => {
+    const adutoraIssues = report.issues.filter((i) => i.elementType === "adutora");
+    expect(adutoraIssues).toHaveLength(1);
+  });
+
+  it("severity = 'blocker' e elementId começa com 'adutora-bend-'", () => {
+    const issue = report.issues.find((i) => i.elementType === "adutora")!;
+    expect(issue.severity).toBe("blocker");
+    expect(issue.elementId).toMatch(/^adutora-bend-/);
+    expect(issue.connectionType).toBe("bend");
+    expect(issue.reason).toMatch(/adutora/i);
+  });
+
+  it("deflexão reportada está entre 50° e 70° (cerca de 60° com distorção geodésica)", () => {
+    const issue = report.issues.find((i) => i.elementType === "adutora")!;
+    expect(issue.deflectionDeg).toBeGreaterThan(50);
+    expect(issue.deflectionDeg).toBeLessThan(70);
+  });
+});
+
+describe("T-ADUTORA-5 — adutora com dobra 30° → blocker (próximo de 0° e 45° mas fora da tolerância)", () => {
+  const mPerLng = 111320 * Math.cos((-12 * Math.PI) / 180);
+  const d = 0.001;
+  // 30° a partir do leste: cos(30°)≈0.866, sin(30°)=0.5
+  const adutoraCoords: [number, number][] = [
+    [0, -12.005],
+    [d, -12.005],
+    [d + 0.866 * d, -12.005 + 0.5 * d * (mPerLng / 111320)],
+  ];
+  const principalCoords: [number, number][] = [
+    [d + 0.866 * d, -12.005 + 0.5 * d],
+    [d + 0.866 * d + 0.001, -12.005 + 0.5 * d],
+  ];
+
+  const report = detectNetworkAngleIssues({
+    physicalColumns: [],
+    secondaries: [],
+    principalCoords,
+    adutoraCoords,
+    centroid: CENTROID,
+  });
+
+  it("hasBlockers = true para dobra 30° na adutora", () => {
+    expect(report.hasBlockers).toBe(true);
+  });
+
+  it("issue com elementType = 'adutora'", () => {
+    expect(report.issues.some((i) => i.elementType === "adutora")).toBe(true);
+  });
+});
+
+describe("T-ADUTORA-6 — adutora 2 pontos (sem dobras internas) → sem issues nem checks", () => {
+  const adutoraCoords: [number, number][] = [[0, -12.005], [0, -12.001]];
+  // Principal com 3 pontos (1 dobra interna a 0° = colíneos) para gerar 1 checkedElement.
+  const principalCoords: [number, number][] = [[0, -12.001], [0.001, -12.001], [0.002, -12.001]];
+
+  const report = detectNetworkAngleIssues({
+    physicalColumns: [],
+    secondaries: [],
+    principalCoords,
+    adutoraCoords,
+    centroid: CENTROID,
+  });
+
+  it("hasBlockers = false (adutora sem dobras internas; principal reta)", () => {
+    expect(report.hasBlockers).toBe(false);
+  });
+
+  it("checkedElements = 1 (apenas a dobra da principal; adutora 2-pontos não soma)", () => {
+    expect(report.checkedElements).toBe(1);
+  });
+});
+
+describe("T-ADUTORA-7 — adutora vazia ([]) → não quebra", () => {
+  const principalCoords: [number, number][] = [[0, -12.001], [0.001, -12.001]];
+
+  const report = detectNetworkAngleIssues({
+    physicalColumns: [],
+    secondaries: [],
+    principalCoords,
+    adutoraCoords: [],
+    centroid: CENTROID,
+  });
+
+  it("hasBlockers = false (sem adutora)", () => {
+    expect(report.hasBlockers).toBe(false);
   });
 });

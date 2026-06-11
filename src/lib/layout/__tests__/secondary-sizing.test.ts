@@ -267,3 +267,110 @@ describe("modelLimitations — T10: secondarySizingModel atualizado para P4", ()
     );
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W-03 (diagnóstico 2026-05-24) — Spine longo com vazão somada dispara o gate
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// O diagnóstico apontou que MAX_HEADLOSS_RAMAL_MCA = 3,0 mca (premissa RT
+// PENDENTE_REVISAO_BRASMAQUINAS) "pode não capturar adequadamente a perda no
+// trecho spine" em casos com spine longo + vazão somada alta. Verificamos aqui
+// que o gate JÁ É APLICADO ao spine/spine_entry (não é caso silencioso) — a
+// pendência do W-03 é de calibração do valor (3.0 vs ?), não de cobertura
+// estrutural ausente.
+describe("W-03 — sizeAllSecondaries aplica o gate MAX_HF a spine/spine_entry (não só ribs)", () => {
+  it("spine longo + vazão somada alta → status reflete violação (gate aplicado)", () => {
+    // 4 ribs com 25 m³/h cada → spine recebe 100 m³/h.
+    // Spine de 400 m: Q=100, L=400. Mesmo no maior tubo (DN150, interno 133mm),
+    // velocidade ≈ 2.0 m/s > 1.5, hf ≈ 10 mca >> 3 mca. Status NÃO pode ser "ok".
+    const ribs: SecondaryPipe[] = [
+      { id: "rib-1", physicalColumnId: "c1", physicalColumnIds: ["c1"], sectorId: 0, kind: "rib",
+        fromCoord: [0, 0], toCoord: [0, 0], lengthM: 5, source: "auto" },
+      { id: "rib-2", physicalColumnId: "c2", physicalColumnIds: ["c2"], sectorId: 0, kind: "rib",
+        fromCoord: [0, 0], toCoord: [0, 0], lengthM: 5, source: "auto" },
+      { id: "rib-3", physicalColumnId: "c3", physicalColumnIds: ["c3"], sectorId: 0, kind: "rib",
+        fromCoord: [0, 0], toCoord: [0, 0], lengthM: 5, source: "auto" },
+      { id: "rib-4", physicalColumnId: "c4", physicalColumnIds: ["c4"], sectorId: 0, kind: "rib",
+        fromCoord: [0, 0], toCoord: [0, 0], lengthM: 5, source: "auto" },
+    ];
+    const spine: SecondaryPipe = {
+      id: "spine-s0", physicalColumnId: "", physicalColumnIds: [], sectorId: 0, kind: "spine",
+      fromCoord: [0, 0], toCoord: [0, 0], lengthM: 400, source: "auto",
+    };
+    const spineEntry: SecondaryPipe = {
+      id: "spine-entry-s0", physicalColumnId: "", physicalColumnIds: [], sectorId: 0, kind: "spine_entry",
+      fromCoord: [0, 0], toCoord: [0, 0], lengthM: 30, source: "auto",
+    };
+    const secondaries = [...ribs, spine, spineEntry];
+
+    const laterais: Lateral[] = [
+      makeLateral("c1", 0, 25),
+      makeLateral("c2", 0, 25),
+      makeLateral("c3", 0, 25),
+      makeLateral("c4", 0, 25),
+    ];
+
+    const sized = sizeAllSecondaries(secondaries, laterais);
+
+    // Spine recebe a soma das vazões dos ribs do sectorId=0.
+    const sizedSpine = sized.find((s) => s.kind === "spine")!;
+    expect(sizedSpine.flowM3h).toBe(100);
+
+    // Mesmo no maior tubo do catálogo (DN150), Q=100 + L=400 viola gate.
+    // Status NÃO pode ser "ok" — alguma forma de violação tem que aparecer.
+    expect(sizedSpine.status).not.toBe("ok");
+    expect(sizedSpine.velocityExceeds || sizedSpine.headLossExceeds).toBe(true);
+  });
+
+  it("spine curto + vazão moderada → headLossExceeds = false (gate respeitado sem disparar)", () => {
+    const ribs: SecondaryPipe[] = [
+      { id: "rib-1", physicalColumnId: "c1", physicalColumnIds: ["c1"], sectorId: 0, kind: "rib",
+        fromCoord: [0, 0], toCoord: [0, 0], lengthM: 3, source: "auto" },
+      { id: "rib-2", physicalColumnId: "c2", physicalColumnIds: ["c2"], sectorId: 0, kind: "rib",
+        fromCoord: [0, 0], toCoord: [0, 0], lengthM: 3, source: "auto" },
+    ];
+    const spine: SecondaryPipe = {
+      id: "spine-s0", physicalColumnId: "", physicalColumnIds: [], sectorId: 0, kind: "spine",
+      fromCoord: [0, 0], toCoord: [0, 0], lengthM: 15, source: "auto",
+    };
+    const spineEntry: SecondaryPipe = {
+      id: "spine-entry-s0", physicalColumnId: "", physicalColumnIds: [], sectorId: 0, kind: "spine_entry",
+      fromCoord: [0, 0], toCoord: [0, 0], lengthM: 5, source: "auto",
+    };
+    const secondaries = [...ribs, spine, spineEntry];
+    const laterais: Lateral[] = [
+      makeLateral("c1", 0, 5),
+      makeLateral("c2", 0, 5),
+    ];
+
+    const sized = sizeAllSecondaries(secondaries, laterais);
+    const sizedSpine = sized.find((s) => s.kind === "spine")!;
+    expect(sizedSpine.flowM3h).toBe(10);
+    expect(sizedSpine.headLossExceeds).toBe(false);
+    expect(sizedSpine.velocityExceeds).toBe(false);
+    expect(sizedSpine.status).toBe("ok");
+  });
+
+  it("spine_entry recebe SUM ribs e status próprio (não herda do spine)", () => {
+    const ribs: SecondaryPipe[] = [
+      { id: "rib-1", physicalColumnId: "c1", physicalColumnIds: ["c1"], sectorId: 0, kind: "rib",
+        fromCoord: [0, 0], toCoord: [0, 0], lengthM: 3, source: "auto" },
+    ];
+    const spine: SecondaryPipe = {
+      id: "spine-s0", physicalColumnId: "", physicalColumnIds: [], sectorId: 0, kind: "spine",
+      fromCoord: [0, 0], toCoord: [0, 0], lengthM: 8, source: "auto",
+    };
+    const spineEntry: SecondaryPipe = {
+      id: "spine-entry-s0", physicalColumnId: "", physicalColumnIds: [], sectorId: 0, kind: "spine_entry",
+      fromCoord: [0, 0], toCoord: [0, 0], lengthM: 4, source: "auto",
+    };
+    const secondaries = [...ribs, spine, spineEntry];
+    const laterais: Lateral[] = [makeLateral("c1", 0, 6)];
+
+    const sized = sizeAllSecondaries(secondaries, laterais);
+    const sizedSpineEntry = sized.find((s) => s.kind === "spine_entry")!;
+    expect(sizedSpineEntry.flowM3h).toBe(6); // SUM dos ribs do sector 0
+    // status individual computado para a geometria do spine_entry
+    expect(sizedSpineEntry.diametroMm).toBeGreaterThan(0);
+  });
+});

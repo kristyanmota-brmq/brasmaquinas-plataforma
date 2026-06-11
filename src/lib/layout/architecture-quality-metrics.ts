@@ -186,6 +186,12 @@ export function computeRouteBreaksCount(
  * Por enquanto, o helper existe para testabilidade e diagnóstico, mas a
  * penalidade no score é 0.
  *
+ * **W-02 (diagnóstico 2026-05-24):** o motor não recebe `controlPoints`
+ * (`computeValveDispersionM([], ...)` em `architecture-selector.ts:450`), então
+ * `CandidateEvaluation.p4_valveDispersionM` é estruturalmente `0` para A0/A2/A3
+ * — não é "ruído". Teste de regressão observacional:
+ * `architecture-selector.test.ts:T56-DIAG-W02`.
+ *
  * Convenção: se não há section_valves (`controlPoints` vazio ou ausente) OU não
  * há spine_entries (topologia legado), retorna 0.
  */

@@ -354,3 +354,52 @@ describe("generateProposalDiagnostics — verificação de PN", () => {
     expect(diag.blockers.some((b) => b.toLowerCase().includes("pn"))).toBe(false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W-04 (diagnóstico 2026-05-24) — PN da adutora cobre o cenário Projeto A
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// O diagnóstico questionou: "adutora 227 m com pressão mais alta do sistema —
+// verificar PN da adutora no catálogo". O catálogo PVC rígido tem só PN80
+// (TIGRE_R_*_PN80). Estes testes documentam a margem de uso típica e o ponto
+// onde o gate começa a alertar.
+describe("W-04 — PN da adutora cobre Projeto A (HMT 42 mca em PN80)", () => {
+  it("Projeto A: HMT 42 mca em adutora PN80 → ok (margem ~47%)", () => {
+    const adutora = makeSeg("adutora", 80, 4);
+    const result = annotatePressureClass([adutora], 42);
+    expect(result[0].pressureClassCheck).toBe("ok");
+    expect(result[0].pressaoOperacionalMaxMca).toBe(42);
+    // Margem: 80 - 42 = 38 mca de folga (47% do PN livre)
+    const margin = 80 - result[0].pressaoOperacionalMaxMca!;
+    expect(margin).toBeGreaterThanOrEqual(38);
+  });
+
+  it("HMT 70 mca em adutora PN80 → ok (margem apertada ~12%)", () => {
+    const adutora = makeSeg("adutora", 80, 5);
+    const result = annotatePressureClass([adutora], 70);
+    expect(result[0].pressureClassCheck).toBe("ok");
+    expect(result[0].pressaoOperacionalMaxMca).toBe(70);
+  });
+
+  it("HMT 80 mca em adutora PN80 → limite exato — ainda ok", () => {
+    // Critério "≤" inclui igualdade: HMT == PN é ok (não violação).
+    const adutora = makeSeg("adutora", 80, 5);
+    const result = annotatePressureClass([adutora], 80);
+    expect(result[0].pressureClassCheck).toBe("ok");
+  });
+
+  it("HMT 81 mca em adutora PN80 → violation_confirmed (acima do PN do catálogo)", () => {
+    const adutora = makeSeg("adutora", 80, 5);
+    const result = annotatePressureClass([adutora], 81);
+    expect(result[0].pressureClassCheck).toBe("violation_confirmed");
+  });
+
+  it("HMT 120 mca em adutora PN80 → violation_confirmed (faltaria PN160+ no catálogo)", () => {
+    // Documenta limite estrutural do catálogo atual: não há PN160 nem PN200
+    // (somente PN40 LF e PN80 R). Projetos com HMT > 80 mca exigem aprovação
+    // explícita de novo SKU homologado pelo RT.
+    const adutora = makeSeg("adutora", 80, 8);
+    const result = annotatePressureClass([adutora], 120);
+    expect(result[0].pressureClassCheck).toBe("violation_confirmed");
+  });
+});

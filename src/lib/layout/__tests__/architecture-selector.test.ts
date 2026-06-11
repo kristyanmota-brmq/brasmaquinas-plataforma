@@ -554,4 +554,62 @@ describe("TASK-056 — selectArchitectureByBom com penalidades operacionais", ()
       expect(s.kind).toBeUndefined();
     }
   });
+
+  it("T56-DIAG-W02 — snapshot diagnóstico P1-P4 cenário Projeto A-like (W-02 artefato persistente)", () => {
+    // W-02 (diagnóstico 2026-05-24): saída real P1-P4 do Projeto A não estava
+    // em artefato persistente. Este teste registra a estrutura observada no
+    // cenário Projeto A-like (16 colunas × 300m × 24 m³/h) como contrato de
+    // regressão estrutural — NÃO valida valores numéricos exatos para não
+    // amarrar implementações futuras de P1-P3.
+    const { waterSource, physicalColumns, laterais } = buildProjetoALikeScenario();
+    const result = selectArchitectureByBom({
+      waterSource,
+      physicalColumns,
+      centroid: CENTROID_0,
+      gridAngleDegrees: 0,
+      laterais,
+    });
+
+    // Estrutura obrigatória: 3 candidatos (A0/A2/A3), todos com P1-P4 + scoreFinal
+    expect(result.evaluations).toHaveLength(3);
+
+    for (const e of result.evaluations) {
+      // P1 é razão (0..1) — proxy do princípio "principal aproveita borda"
+      expect(e.p1_principalSplitsColumnsRatio).toBeGreaterThanOrEqual(0);
+      expect(e.p1_principalSplitsColumnsRatio).toBeLessThanOrEqual(1);
+
+      // P2 é metros — desconexão de sub-coletor (sempre não-negativo)
+      expect(e.p2_subCollectorDisconnectM).toBeGreaterThanOrEqual(0);
+
+      // P3 é contagem inteira não-negativa de bends extra
+      expect(e.p3_routeBreaksCount).toBeGreaterThanOrEqual(0);
+      expect(Number.isInteger(e.p3_routeBreaksCount)).toBe(true);
+
+      // P4 ESTRUTURALMENTE = 0 no MVP (W-02): controlPoints não passado ao motor
+      // por design (evitar circularidade — ver architecture-quality-metrics.ts:171-190).
+      // Quando TASK-053-valves entregar, P4 fica meaningful e este expect muda.
+      expect(e.p4_valveDispersionM).toBe(0);
+
+      // Penalidade total é não-negativa (proxies operacionais ≥ 0).
+      expect(e.operationalPenaltyR$).toBeGreaterThanOrEqual(0);
+
+      // scoreFinal = bomEstimadaPreliminar + operationalPenaltyR$ por construção
+      expect(Math.abs(e.scoreFinal - (e.bomEstimadaPreliminar + e.operationalPenaltyR$))).toBeLessThan(0.01);
+    }
+
+    // Diagnóstico semântico: A3 (central) deve ter P1 > 0 (atravessa colunas)
+    // e A0/A2-borda devem ter P1 = 0 (ficam na borda).
+    const evalA0 = result.evaluations.find((e) => e.candidate.id === "A0")!;
+    const evalA3 = result.evaluations.find((e) => e.candidate.id === "A3")!;
+    expect(evalA0.p1_principalSplitsColumnsRatio).toBe(0);
+    expect(evalA3.p1_principalSplitsColumnsRatio).toBeGreaterThan(0);
+
+    // Winner deve ter scoreFinal mínimo entre candidatos válidos.
+    const winner = result.evaluations.find((e) => e.candidate.id === result.winner)!;
+    const validEvals = result.evaluations.filter((e) => e.isValid);
+    if (validEvals.length > 0 && winner.isValid) {
+      const minScore = Math.min(...validEvals.map((e) => e.scoreFinal));
+      expect(winner.scoreFinal).toBeLessThanOrEqual(minScore + EPS_BOM);
+    }
+  });
 });
