@@ -2645,7 +2645,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                 <input
                   type="range"
                   min="0"
-                  max="89"
+                  max="179"
                   step="1"
                   value={layout.sprinklers.gridAngleDegrees}
                   onChange={(e) =>
@@ -2656,7 +2656,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                 <div className="flex justify-between text-[10px] font-mono text-ink-4 mt-1">
                   <span>0°</span>
                   <span>45°</span>
-                  <span>89°</span>
+                  <span>179°</span>
                 </div>
               </div>
 

@@ -199,14 +199,102 @@ export function generateRotatedSprinklerGridWithOffset(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// dominantBoundaryAzimuth (TASK-079 — planimetria: a divisa manda na orientação)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Azimute DOMINANTE da divisa do talhão (planimetria).
+ *
+ * Em irrigação convencional, as laterais seguem as linhas de plantio, e as
+ * linhas de plantio seguem a divisa dominante do talhão. A orientação da
+ * grade deve, portanto, alinhar com a divisa — não com critérios geométricos
+ * abstratos (TASK-079; argumento do fundador em sessão de 2026-06-12).
+ *
+ * Algoritmo: cada aresta do anel externo vota com peso = seu comprimento;
+ * direções são tratadas mod 180° (uma reta não tem sentido). Arestas são
+ * agrupadas em clusters de ±CLUSTER_TOL_DEG e o cluster de maior peso define
+ * o azimute (média ponderada circular). `dominance` = peso do cluster
+ * vencedor / perímetro total — campos sem direção clara (pivôs, polígonos
+ * orgânicos) têm dominância baixa e o caller usa o fallback geométrico.
+ *
+ * Retorna null para polígonos degenerados.
+ */
+export function dominantBoundaryAzimuth(
+  polygon: GeoJSON.Polygon,
+): { angleDeg: number; dominance: number } | null {
+  const ring = polygon.coordinates?.[0];
+  if (!ring || ring.length < 4) return null;
+
+  const centroid = getCentroid(polygon);
+  const latRad = (centroid.lat * Math.PI) / 180;
+  const mPerLng = metersPerDegLng(latRad);
+
+  const CLUSTER_TOL_DEG = 3;
+  interface Edge { dirDeg: number; lengthM: number }
+  const edges: Edge[] = [];
+  let perimeter = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const dx = (ring[i + 1][0] - ring[i][0]) * mPerLng;
+    const dy = (ring[i + 1][1] - ring[i][1]) * M_PER_DEG_LAT;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.5) continue; // vértice duplicado / ruído
+    let dir = (Math.atan2(dy, dx) * 180) / Math.PI; // -180..180, 0 = leste
+    dir = ((dir % 180) + 180) % 180; // direção de reta: 0..180
+    edges.push({ dirDeg: dir, lengthM: len });
+    perimeter += len;
+  }
+  if (edges.length === 0 || perimeter === 0) return null;
+
+  // Distância angular mod 180 (171° e 3° distam 12°).
+  const angDist = (a: number, b: number) => {
+    const d = Math.abs(a - b) % 180;
+    return Math.min(d, 180 - d);
+  };
+
+  // Cluster guloso: cada aresta como semente; soma pesos das arestas a ±tol.
+  let bestWeight = 0;
+  let bestSeed = 0;
+  for (const seed of edges) {
+    let w = 0;
+    for (const e of edges) {
+      if (angDist(e.dirDeg, seed.dirDeg) <= CLUSTER_TOL_DEG) w += e.lengthM;
+    }
+    if (w > bestWeight) {
+      bestWeight = w;
+      bestSeed = seed.dirDeg;
+    }
+  }
+
+  // Média ponderada circular (dobra o ângulo: mod 180 vira mod 360).
+  let sx = 0;
+  let sy = 0;
+  for (const e of edges) {
+    if (angDist(e.dirDeg, bestSeed) > CLUSTER_TOL_DEG) continue;
+    const rad2 = (e.dirDeg * 2 * Math.PI) / 180;
+    sx += Math.cos(rad2) * e.lengthM;
+    sy += Math.sin(rad2) * e.lengthM;
+  }
+  let mean = (Math.atan2(sy, sx) * 180) / Math.PI / 2;
+  mean = ((mean % 180) + 180) % 180;
+
+  return { angleDeg: mean, dominance: bestWeight / perimeter };
+}
+
+/** Dominância mínima da divisa para a planimetria comandar a orientação (TASK-079). */
+export const PLANIMETRIA_MIN_DOMINANCE = 0.3;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // findOptimalGridAngle (TASK-046 — gate de desvio aspersor-eixo)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Encontra o ângulo (0–89°, inteiro) ótimo para a grade.
+ * Encontra o ângulo (0–179°, inteiro) ótimo para a grade.
  *
- * Algoritmo (TASK-046):
- *   1. Avaliar todos os ângulos 0–89°.
+ * Algoritmo (TASK-079 — planimetria primeiro; TASK-046 como fallback):
+ *   0. Se a divisa tem direção dominante (≥30% do perímetro num cluster ±3°),
+ *      avaliar APENAS os 2 ângulos alinhados à divisa (colunas ⊥ e ∥) e
+ *      escolher o de colunas mais curtas (laterais construtíveis).
+ *   1. Sem divisa dominante: avaliar todos os ângulos 0–179°.
  *   2. Para cada ângulo, gerar a malha (frame métrico local — TASK-046) e
  *      calcular o desvio máximo aspersor → eixo (mediana de X) por coluna.
  *   3. **Gate dura**: candidato válido só se `maxDeviation ≤ 0,10 m` (ADR-011).
@@ -228,22 +316,15 @@ export function findOptimalGridAngle(
   spacingMeters: number = 12,
 ): number {
   const centroid = getCentroid(polygon);
+  const latRad = (centroid.lat * Math.PI) / 180;
+  const mPerLng = metersPerDegLng(latRad);
 
-  let bestValidAngle: number | null = null;
-  let bestValidBboxArea = Infinity;
-  let bestFallbackAngle = 0;
-  let bestFallbackDev = Infinity;
-
-  for (let angle = 0; angle < 90; angle++) {
+  /** Avalia um ângulo: gate de desvio + bbox + comprimento das colunas (laterais). */
+  const evaluateAngle = (angle: number) => {
     const positions = generateRotatedSprinklerGrid(polygon, spacingMeters, angle);
-    if (positions.length === 0) continue;
+    if (positions.length === 0) return null;
 
-    // Reaplicar rotação inversa para medir desvio no frame local rotacionado
-    // (mesma lógica de generatePhysicalColumns + buildLateralRoute via mediana).
-    const latRad = (centroid.lat * Math.PI) / 180;
-    const mPerLng = metersPerDegLng(latRad);
     const angleRad = (angle * Math.PI) / 180;
-
     const local = positions.map(([lng, lat]) => {
       const dx = (lng - centroid.lng) * mPerLng;
       const dy = (lat - centroid.lat) * M_PER_DEG_LAT;
@@ -276,7 +357,6 @@ export function findOptimalGridAngle(
       if (colMax > maxDev) maxDev = colMax;
     }
 
-    // Bbox area no frame local (já calculado implicitamente — ringLocal).
     const ringLocal = polygonToLocalFrame(polygon, centroid.lng, centroid.lat, angle);
     let rxMin = Infinity, rxMax = -Infinity, ryMin = Infinity, ryMax = -Infinity;
     for (const p of ringLocal) {
@@ -286,24 +366,68 @@ export function findOptimalGridAngle(
       if (p.y > ryMax) ryMax = p.y;
     }
     const bboxArea = (rxMax - rxMin) * (ryMax - ryMin);
+    // Extensão Y do frame = comprimento potencial das colunas (laterais).
+    const colSpanY = ryMax - ryMin;
 
-    const isValid = maxDev <= TOLERANCIA_ASPERSOR_EIXO_LATERAL;
-    if (isValid) {
-      if (bestValidAngle === null || bboxArea < bestValidBboxArea) {
+    return {
+      valid: maxDev <= TOLERANCIA_ASPERSOR_EIXO_LATERAL,
+      maxDev,
+      bboxArea,
+      colSpanY,
+    };
+  };
+
+  // ── TASK-079 — PLANIMETRIA PRIMEIRO: a divisa dominante comanda a orientação ──
+  // Laterais seguem linhas de plantio; linhas de plantio seguem a divisa.
+  // Dois candidatos alinhados: colunas PERPENDICULARES à divisa (θ = d) e
+  // colunas PARALELAS à divisa (θ = d − 90), com d = azimute-de-leste mod 180.
+  // Entre os válidos, vence o de colunas mais CURTAS (laterais construtíveis);
+  // empate → menor bbox → menor ângulo. Sem divisa dominante → fallback
+  // geométrico (varredura completa por menor bbox, comportamento TASK-046).
+  const boundary = dominantBoundaryAzimuth(polygon);
+  if (boundary && boundary.dominance >= PLANIMETRIA_MIN_DOMINANCE) {
+    const d = boundary.angleDeg;
+    const cand1 = ((Math.round(d) % 180) + 180) % 180;
+    const cand2 = ((Math.round(d - 90) % 180) + 180) % 180;
+    const planimetric = [...new Set([cand1, cand2])]
+      .map((angle) => ({ angle, ev: evaluateAngle(angle) }))
+      .filter((c): c is { angle: number; ev: NonNullable<ReturnType<typeof evaluateAngle>> } =>
+        c.ev !== null && c.ev.valid,
+      )
+      .sort(
+        (a, b) =>
+          a.ev.colSpanY - b.ev.colSpanY ||
+          a.ev.bboxArea - b.ev.bboxArea ||
+          a.angle - b.angle,
+      );
+    if (planimetric.length > 0) return planimetric[0].angle;
+  }
+
+  // ── Fallback geométrico (sem divisa dominante): menor bbox em 0–179° ──
+  let bestValidAngle: number | null = null;
+  let bestValidBboxArea = Infinity;
+  let bestFallbackAngle = 0;
+  let bestFallbackDev = Infinity;
+
+  for (let angle = 0; angle < 180; angle++) {
+    const ev = evaluateAngle(angle);
+    if (!ev) continue;
+    if (ev.valid) {
+      if (bestValidAngle === null || ev.bboxArea < bestValidBboxArea) {
         bestValidAngle = angle;
-        bestValidBboxArea = bboxArea;
+        bestValidBboxArea = ev.bboxArea;
       }
-    } else if (maxDev < bestFallbackDev) {
+    } else if (ev.maxDev < bestFallbackDev) {
       bestFallbackAngle = angle;
-      bestFallbackDev = maxDev;
+      bestFallbackDev = ev.maxDev;
     }
   }
 
   if (bestValidAngle !== null) return bestValidAngle;
 
-  // Fallback: nenhum ângulo atinge o gate. Blocker dispara como defesa final.
+  // Fallback final: nenhum ângulo atinge o gate. Blocker dispara como defesa.
   console.warn(
-    `[findOptimalGridAngle] Nenhum ângulo 0-89° produz aspersores dentro de ${TOLERANCIA_ASPERSOR_EIXO_LATERAL} m do eixo. ` +
+    `[findOptimalGridAngle] Nenhum ângulo 0-179° produz aspersores dentro de ${TOLERANCIA_ASPERSOR_EIXO_LATERAL} m do eixo. ` +
       `Retornando ${bestFallbackAngle}° (menor desvio: ${bestFallbackDev.toFixed(2)} m). ` +
       `Blocker de eixo (detectAxisDeviations) dispara como gate final — corrigir polígono ou tolerância.`,
   );

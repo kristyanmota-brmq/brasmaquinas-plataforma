@@ -614,7 +614,7 @@ function generateCandidateConfigs(
   const angles: number[] = [];
   for (let i = -N_ANGLE_NEIGHBORS; i <= N_ANGLE_NEIGHBORS; i++) {
     const a = optimalAngle + i * ANGLE_STEP_DEG;
-    if (a >= 0 && a <= 89) angles.push(a);
+    if (a >= 0 && a <= 179) angles.push(a); // TASK-079: eixo de colunas é mod 180
   }
   if (angles.length === 0) angles.push(optimalAngle);
 
