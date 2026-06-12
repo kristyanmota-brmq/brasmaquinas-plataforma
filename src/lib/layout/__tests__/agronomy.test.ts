@@ -295,3 +295,42 @@ describe("T66 — catálogo sem custo zero nas famílias core", () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-067/069 — Setorização agronômica derivada, validada contra caso histórico
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T67 — buildSectorizationAgronomica (validação histórica 12,7 ha)", () => {
+  it("T67-1: 5035@18×18, lâmina 10, jornada 14 h → 9 setores derivados (caso real: 8 em 13 h, mesma equação)", async () => {
+    const { buildSectorizationAgronomica } = await import("@/lib/layout/layout-use-cases");
+    const { generatePhysicalColumns } = await import("@/lib/layout/laterais");
+    const { ASPERSOR_5035_SD_50X25, TUBOS_PVC_LF } = await import("@/lib/catalog/aspersores");
+    const layout = makeLayoutL();
+    const cols = generatePhysicalColumns(
+      layout.sprinklers!.positions, 0, layout.centroid!, 18,
+      { vazao: ASPERSOR_5035_SD_50X25.vazaoM3PorHora, pressaoServico: 30 },
+      TUBOS_PVC_LF,
+    );
+    const sec = buildSectorizationAgronomica(
+      cols, 14, layout.sprinklers!.positions.length,
+      ASPERSOR_5035_SD_50X25.vazaoM3PorHora, 18, 10, "capim",
+    );
+    expect(sec.setoresCount).toBe(9); // floor(14 / 1,5355)
+    expect(sec.setoresMode).toBe("agronomico");
+    expect(sec.tempoPorSetorMinutos).toBe(92); // 1,533 h
+  });
+
+  it("T67-2: legado intocado — buildSectorizationForJornada mantém setores = jornada e marca o modo", async () => {
+    const { buildSectorizationForJornada } = await import("@/lib/layout/layout-use-cases");
+    const { generatePhysicalColumns } = await import("@/lib/layout/laterais");
+    const { ASPERSOR_PADRAO, TUBOS_PVC_LF } = await import("@/lib/catalog/aspersores");
+    const layout = makeLayoutL();
+    const cols = generatePhysicalColumns(
+      layout.sprinklers!.positions, 0, layout.centroid!, 12,
+      { vazao: 1.5, pressaoServico: 30 }, TUBOS_PVC_LF,
+    );
+    const sec = buildSectorizationForJornada(cols, 9, layout.sprinklers!.positions.length, 1.5, 60);
+    expect(sec.setoresCount).toBe(9);
+    expect(sec.setoresMode).toBe("jornada");
+  });
+});

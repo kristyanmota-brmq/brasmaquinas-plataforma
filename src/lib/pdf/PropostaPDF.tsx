@@ -267,6 +267,8 @@ const hmtStatusLabel: Record<string, string> = {
 };
 
 export function PropostaPDF({ projectName, client, city, state, result, geradoEm, mapImage }: Props) {
+  // TASK-068: referência comercial estável (id curto do conteúdo + ano)
+  const proposalRef = `${(projectName ?? "PRJ").replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase() || "PROJ"}-${String(result.layout?.sprinklers?.count ?? 0).padStart(3, "0")}/${new Date().getFullYear()}`;
   const { layout, bom } = result;
   if (!bom) return null;
   const { sprinklers, sectorization, mainPipeline, areaHectares, geodetic } = layout;
@@ -320,6 +322,13 @@ export function PropostaPDF({ projectName, client, city, state, result, geradoEm
           )}
         </View>
 
+        {/* TASK-068: identificação comercial — padrão das propostas reais */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10, paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: C.border }}>
+          <Text style={{ fontSize: 8, color: C.ink2 }}>Orçamento Nº {proposalRef}</Text>
+          <Text style={{ fontSize: 8, color: C.ink2 }}>Validade: 30 dias</Text>
+          <Text style={{ fontSize: 8, color: C.ink2 }}>Consultor: ____________</Text>
+          <Text style={{ fontSize: 8, color: C.ink2 }}>Resp. Técnico (RT): ____________</Text>
+        </View>
         <Text style={s.sectionTitle}>Resumo Técnico</Text>
         <View style={s.summaryGrid}>
           {areaHectares && (
@@ -580,6 +589,20 @@ export function PropostaPDF({ projectName, client, city, state, result, geradoEm
         <View style={s.totalRow}>
           <Text style={s.totalLabel}>TOTAL GERAL</Text>
           <Text style={s.totalValue}>R$ {fmt(bom.totalGeral)}</Text>
+        </View>
+
+        {/* TASK-068: escopo complementar — seções presentes nas propostas reais */}
+        <Text style={s.sectionTitle}>Conjunto Moto-Bomba e Escopo Complementar</Text>
+        <View style={{ marginBottom: 6 }}>
+          <Text style={{ fontSize: 8.5, color: C.ink, marginBottom: 2 }}>
+            {result.layout?.pump?.modelo
+              ? `Conjunto moto-bomba: ${result.layout.pump.modelo} — ${result.layout.pump.vazaoMaxM3h} m³/h @ ${result.layout.pump.hmtMca} mca (validado contra a HMT do projeto). Preço sob consulta.`
+              : "Conjunto moto-bomba: a especificar — selecionar no projeto e validar contra a curva Q-H."}
+          </Text>
+          <Text style={{ fontSize: 8, color: C.ink2, marginBottom: 1 }}>• Sucção (válvula de pé, tubos e curvas em aço FL, redução excêntrica): dimensionada no projeto executivo.</Text>
+          <Text style={{ fontSize: 8, color: C.ink2, marginBottom: 1 }}>• Materiais elétricos (painel/soft-starter por CV, cabos pela distância da casa de bomba): dimensionados no projeto executivo.</Text>
+          <Text style={{ fontSize: 8, color: C.ink2, marginBottom: 1 }}>• Barrilete / ligação de pressão (manômetro, registro, válvula de retenção e de alívio, ventosa): dimensionado no projeto executivo.</Text>
+          <Text style={{ fontSize: 8, color: C.ink2 }}>• Frete e instalação: condições a combinar.</Text>
         </View>
 
         {/* TASK-063: disclaimer comercial — mesma nota exibida na plataforma */}

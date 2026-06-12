@@ -60,6 +60,7 @@ import {
   buildSelectedPipelineCoords,
   buildMainPipelineUpdate,
   buildSectorizationForJornada,
+  buildSectorizationAgronomica,
 } from "@/lib/layout/layout-use-cases";
 import type { ArchitectureSelectionResult } from "@/lib/layout/architecture-selector";
 import { MemorialPanel } from "@/components/map/MemorialPanel";
@@ -938,21 +939,35 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
   // ─────────────────────────────────────────────────────────────────────────
 
   const applyJornada = useCallback(
-    (jornada: Jornada) => {
+    (jornada: Jornada, modeOverride?: "jornada" | "agronomico") => {
       if (!layout.sprinklers || !layout.centroid) return;
-      const sectorization = buildSectorizationForJornada(
-        physicalColumns,
-        jornada,
-        layout.sprinklers.positions.length,
-        aspersorAtivo.vazaoM3PorHora,
-        tempoPorSetorMinutos,
-        // TASK-060: preserva lâmina/cultura informadas ao trocar de jornada
-        layout.sectorization?.laminaMm ?? 10,
-        layout.sectorization?.cultura,
-      );
+      const lamina = layout.sectorization?.laminaMm ?? 10;
+      const cultura = layout.sectorization?.cultura;
+      const mode = modeOverride ?? layout.sectorization?.setoresMode ?? "jornada";
+      // TASK-067: critério agronômico derivado (corpus) ou legado (setores = jornada)
+      const sectorization =
+        mode === "agronomico"
+          ? buildSectorizationAgronomica(
+              physicalColumns,
+              jornada,
+              layout.sprinklers.positions.length,
+              aspersorAtivo.vazaoM3PorHora,
+              layout.sprinklers.espacamentoM,
+              lamina,
+              cultura,
+            )
+          : buildSectorizationForJornada(
+              physicalColumns,
+              jornada,
+              layout.sprinklers.positions.length,
+              aspersorAtivo.vazaoM3PorHora,
+              tempoPorSetorMinutos,
+              lamina,
+              cultura,
+            );
       setLayout((l) => ({ ...l, sectorization }));
     },
-    [layout.sprinklers, layout.centroid, layout.sectorization, physicalColumns, tempoPorSetorMinutos]
+    [layout.sprinklers, layout.centroid, layout.sectorization, physicalColumns, tempoPorSetorMinutos, aspersorAtivo]
   );
 
   // TASK-060: lâmina/cultura são inputs do projetista — atualizam a sectorization
@@ -2756,6 +2771,32 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                 })}
               </div>
             </div>
+
+            {/* TASK-067: critério de setorização — agronômico (derivado) vs jornada (legado) */}
+            {layout.sectorization && (
+              <div className="mb-3 grid grid-cols-2 gap-1.5">
+                {(["jornada", "agronomico"] as const).map((m) => {
+                  const active = (layout.sectorization?.setoresMode ?? "jornada") === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => applyJornada(layout.sectorization!.jornadaHoras, m)}
+                      className={clsx(
+                        "px-2 py-1.5 rounded-sm text-[11px] font-medium border transition-colors",
+                        active
+                          ? "bg-ink text-white border-ink"
+                          : "bg-background text-ink-2 border-border hover:border-border-strong",
+                      )}
+                      title={m === "agronomico"
+                        ? "Setores derivados de lâmina ÷ intensidade do emissor (padrão das propostas reais)"
+                        : "Critério legado: nº de setores = horas de jornada"}
+                    >
+                      {m === "agronomico" ? "Agronômico (derivado)" : "Por jornada (legado)"}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* TASK-060: lâmina desejada e cultura como inputs do projetista */}
             {layout.sectorization && (

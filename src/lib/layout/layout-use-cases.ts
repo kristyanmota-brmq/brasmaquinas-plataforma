@@ -13,6 +13,11 @@ import {
   selectArchitectureByBom,
   type ArchitectureSelectionResult,
 } from "./architecture-selector";
+import {
+  computeApplicationIntensityMmH,
+  computeSectorTimeH,
+  deriveRecommendedSectorCount,
+} from "./agronomy";
 import type { PhysicalColumn, Lateral } from "./laterais";
 import type { ProjectLayout } from "@/app/projetos/[id]/layout-schema";
 
@@ -137,6 +142,51 @@ export function buildMainPipelineUpdate(
  * Returns the sectorization object for the given jornada.
  * Does not mutate layout — caller uses setLayout.
  */
+/**
+ * TASK-067 — Setorização AGRONÔMICA derivada (corpus de propostas reais, TASK-059):
+ * nº de setores = floor(jornada ÷ (lâmina ÷ intensidade do emissor)).
+ * Validado contra proposta real de 12,7 ha (8 setores em 13 h com 5035@18×18).
+ * Critério legado (setores = jornada) permanece disponível em buildSectorizationForJornada.
+ */
+export function buildSectorizationAgronomica(
+  physicalColumns: PhysicalColumn[],
+  jornada: 9 | 14 | 21,
+  totalSprinklerCount: number,
+  vazaoM3PorHoraPerSprinkler: number,
+  espacamentoM: number,
+  laminaMm: number = LAMINA_MM,
+  cultura?: string,
+): NonNullable<ProjectLayout["sectorization"]> {
+  const intensidade = computeApplicationIntensityMmH(
+    vazaoM3PorHoraPerSprinkler,
+    espacamentoM,
+    espacamentoM,
+  );
+  const tempoPorSetorH = computeSectorTimeH(laminaMm, intensidade);
+  const derivado = deriveRecommendedSectorCount(jornada, tempoPorSetorH);
+  // Guard: ao menos 1 setor; nunca mais setores que aspersores.
+  const nSetores = Math.max(1, Math.min(derivado, totalSprinklerCount));
+
+  const { sectorIndices } = buildSectorsByFlowWithColumnSplitting(
+    physicalColumns,
+    nSetores,
+    vazaoM3PorHoraPerSprinkler,
+    totalSprinklerCount,
+  );
+  const aspersoresPorSetor = Math.round(totalSprinklerCount / nSetores);
+  return {
+    jornadaHoras: jornada,
+    laminaMm,
+    cultura,
+    setoresCount: nSetores,
+    setoresMode: "agronomico",
+    tempoPorSetorMinutos: Math.round(tempoPorSetorH * 60),
+    aspersoresPorSetor,
+    vazaoPorSetorM3PorHora: aspersoresPorSetor * vazaoM3PorHoraPerSprinkler,
+    sectorIndices,
+  };
+}
+
 export function buildSectorizationForJornada(
   physicalColumns: PhysicalColumn[],
   jornada: 9 | 14 | 21,
@@ -161,6 +211,7 @@ export function buildSectorizationForJornada(
     laminaMm,
     cultura,
     setoresCount: jornada,
+    setoresMode: "jornada",
     tempoPorSetorMinutos,
     aspersoresPorSetor,
     vazaoPorSetorM3PorHora,

@@ -92,6 +92,8 @@ export interface ProjectLayout {
     /** TASK-060: cultura informada pelo projetista (opcional; ex.: pastagem, capim). */
     cultura?: string;
     setoresCount: number;
+    /** TASK-067: critério usado — "jornada" (legado) ou "agronomico" (derivado). */
+    setoresMode?: "jornada" | "agronomico";
     tempoPorSetorMinutos: number;
     aspersoresPorSetor: number;
     vazaoPorSetorM3PorHora: number;
