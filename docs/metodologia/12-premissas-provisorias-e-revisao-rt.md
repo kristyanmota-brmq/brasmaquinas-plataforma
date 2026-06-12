@@ -358,6 +358,23 @@ arquitetural**.
 
 ---
 
+## Motor agronômico mínimo (TASK-059)
+
+### Equação agronômica de setorização — diagnóstico-only
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `computeAgronomyReport()` — intensidade (mm/h) = vazão emissor (L/h) / (esp. linhas × esp. emissores); tempo/setor (h) = lâmina (mm/dia) / intensidade; setores recomendados = floor(tempo disponível / tempo por setor) |
+| **Valor usado** | Relatório comparativo + warnings em `generateProposalDiagnostics`. **NÃO altera a setorização vigente** (`setoresCount = jornadaHoras` em `layout-use-cases.ts` preservado byte-a-byte). |
+| **Onde é usado** | `src/lib/layout/agronomy.ts`; wiring em `irrigation-project.ts` (`result.agronomy`) e `bom.ts` (7º arg opcional de `generateProposalDiagnostics`) |
+| **Origem** | Fórmula extraída de proposta comercial REAL da Brasmáquinas (12,7 ha capim, NAAN 5035, 18×18 — `docs/relatorios/2026-06-11-analise-propostas-reais.md` §1); testes T59 reproduzem os números reais (6,51 mm/h; 1,54 h/setor; 8 setores; 12,28 h). |
+| **Insight registrado** | A regra legada `setores = jornada` coincide com a derivada APENAS no arranjo 5022-SD @ 12×12 com lâmina 10 (tempo/setor ≈ 0,96 h ≈ 1 h). Para qualquer outro emissor/espaçamento/lâmina, divergem — por isso o warning comparativo. |
+| **Risco** | Lâmina continua default 10 mm/dia (sem input do cliente); warnings podem divergir quando RT homologar novos emissores/espaçamentos sem substituir o critério de setorização. |
+| **Responsável futuro** | RT Brasmáquinas — decidir QUANDO o critério derivado substitui `setores = jornada` (mudança de comportamento de todos os layouts) e tornar lâmina/cultura inputs do usuário |
+| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+
+---
+
 ## Histórico de revisões
 
 | Data | Autor | O que mudou |
@@ -380,3 +397,4 @@ arquitetural**.
 | 2026-05-23 | Claude Opus 4.7 (TASK-056) | **Adicionadas 5 penalidades operacionais provisórias** para o motor de seleção arquitetural (`architecture-selector.ts`): `WEIGHT_PRINCIPAL_CROSSES = 0.05`; `WEIGHT_FRAGMENTATION = 1.0` + `PENALTY_FRAGMENTATION_PER_M_R$ = 35.0`; `PENALTY_ROUTE_BREAK_R$ = 100.0`; `WEIGHT_VALVE_DISPERSION = 0` (desativado no MVP) + `PENALTY_VALVE_DISPERSION_PER_M_R$ = 30.0` (reservado para TASK-056B pós-TASK-053-valves); `A3_MIN_ECONOMY_BOM_PCT = 0.05`. Todas com status `PENDENTE_CALIBRACAO_RT_CAMPO`. **Não são custos de material** — proxies operacionais; sem SKU do catálogo; BOM oficial continua via `buildBOM()`. Nenhuma premissa existente alterada nesta task; apenas adições. ADR-015 preservada (função objetivo "menor BOM válida e operacionalmente executável" — `executável` agora inclui critérios objetivos P1-P4). 870 → 887 testes vitest. |
 | 2026-05-23 | Claude Opus 4.7 (TASK-056 — correção metodológica) | **`WEIGHT_PRINCIPAL_CROSSES` e `A3_MIN_ECONOMY_BOM_PCT` reduzidos a 0** (desativados no MVP). Razão: usuário identificou que penalizar A3 (principal central) via score transformava **boa prática** (doc 13 §3.2 — "principal aproveita bordas, central ou corredores conforme conveniente") em **regra técnica absoluta**, violando ajuste 3 da TASK-055 (preservar distinção 4-tier). O custo real de A3 (mais cotovelos + spine_entries longos) já é capturado por P2 + P3 — penalty estética P1 e gate A3 eram redundantes. Helper `computePrincipalSplitsColumnsRatio` permanece exposto em `CandidateEvaluation.p1_*` como métrica diagnóstica; warning textual "principal central atravessa área — validar com RT/operacional" permanece ATIVO. Calibração RT/E09 pode reintroduzir peso > 0 com base empírica concreta (não estética). Testes vitest 887/887 preservados — comportamento da seleção arquitetural é equivalente no Projeto A pois A3 ainda perde naturalmente por scoreFinal (BOM A3 > BOM A0 por causa de secondaries mais longas). |
 | 2026-06-11 | Claude Fable 5 (TASK-054) | **Nova premissa: "Modelo de contagem de conexões fishbone".** BOM passa a contabilizar conexões da topologia v12 (resolve B-02): 1 tê principal→spine_entry + 1 junção spine_entry→spine (spine não-degenerado) + 1 tê spine→rib por rib, DN do tubo derivado, contagem conservadora (extremidade contada como tê; cruzeta como 2 conexões). DN sem SKU exato → `BOMPendingConnection` (sem fallback silencioso). Status `PENDENTE_REVISAO_RT_BRASMAQUINAS`. Nenhuma premissa existente alterada. 939 → 951 testes. |
+| 2026-06-11 | Claude Fable 5 (TASK-059) | **Nova premissa: "Equação agronômica de setorização — diagnóstico-only".** Motor agronômico mínimo (`agronomy.ts`): intensidade mm/h, tempo/setor, setores recomendados derivados — fórmula de proposta real Brasmáquinas; warnings comparativos em diagnostics (nunca blockers); setorização vigente intocada. Lâmina default 10 mm/dia agora sinalizada como premissa em todo diagnóstico. 953 → 965 testes. |

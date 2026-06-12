@@ -22,6 +22,7 @@ import {
   type FishboneConnectionFamily,
   countSecondaryLBends,
 } from "@/lib/layout/physical-connections";
+import { type AgronomyReport } from "@/lib/layout/agronomy";
 import {
   generateLateraisLegacyForDebug,
   generatePhysicalColumns,
@@ -922,6 +923,7 @@ export function generateProposalDiagnostics(
   networkAngleReport?: NetworkAngleReport | null,
   axisDeviationReport?: AxisDeviationReport | null,
   lateralCapacityReport?: LateralCapacityReport | null,
+  agronomyReport?: AgronomyReport | null,
 ): ProposalDiagnostics {
   const physCols = bom.meta.nColunasLaterais;
   const nLaterais = bom.meta.nLaterais;
@@ -953,6 +955,11 @@ export function generateProposalDiagnostics(
 
   const warnings: string[] = [];
   const blockers: string[] = [];
+
+  // TASK-059: avisos agronômicos (diagnóstico-only — nunca blockers).
+  if (agronomyReport) {
+    warnings.push(...agronomyReport.warnings);
+  }
 
   const { physicalColumnsSplitCount, splitControlPointsCount, maxSegmentsPerPhysicalColumn } =
     bom.meta;

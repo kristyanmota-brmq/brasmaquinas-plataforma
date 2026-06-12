@@ -50,6 +50,10 @@ import {
   type NetworkAngleReport,
 } from "@/lib/layout/network-angle-diagnostics";
 import {
+  computeAgronomyReport,
+  type AgronomyReport,
+} from "@/lib/layout/agronomy";
+import {
   buildBOM,
   generateProposalDiagnostics,
   type BOMResult,
@@ -157,6 +161,12 @@ export interface IrrigationProjectResult {
    * emite blocker técnico.
    */
   lateralCapacity: LateralCapacityReport | null;
+  /**
+   * TASK-059: relatório agronômico comparativo (diagnóstico-only). Calculado
+   * quando sprinklers + sectorization existem. NÃO altera a setorização —
+   * warnings de divergência são emitidos em generateProposalDiagnostics.
+   */
+  agronomy: AgronomyReport | null;
   /** Null quando o projeto ainda não tem todos os dados necessários para o solver hidráulico. */
   hydraulics: HydraulicSizingReport | null;
 }
@@ -198,6 +208,20 @@ export function calculateIrrigationProject(
 ): IrrigationProjectResult {
   const missing: string[] = [];
 
+  // ── 0. Relatório agronômico (TASK-059 — diagnóstico-only, aditivo) ────────
+  const agronomy: AgronomyReport | null =
+    layout.sprinklers && layout.sectorization && layout.sprinklers.count > 0
+      ? computeAgronomyReport({
+          vazaoEmissorM3h:
+            layout.sprinklers.vazaoProjetoM3PorHora / layout.sprinklers.count,
+          espacamentoLinhasM: layout.sprinklers.espacamentoM,
+          espacamentoEmissoresM: layout.sprinklers.espacamentoM,
+          laminaMmDia: layout.sectorization.laminaMm,
+          tempoDisponivelH: layout.sectorization.jornadaHoras,
+          setoresCountAtual: layout.sectorization.setoresCount,
+        })
+      : null;
+
   // ── 1. Validar entradas ───────────────────────────────────────────────────
 
   if (!layout.sprinklers) missing.push("sprinklers");
@@ -223,6 +247,7 @@ export function calculateIrrigationProject(
     networkAngle: null,
     axisDeviation: null,
     lateralCapacity: null,
+    agronomy,
     hydraulics: null,
     ...partial,
   });
@@ -445,6 +470,7 @@ export function calculateIrrigationProject(
     networkAngle,
     axisDeviation,
     lateralCapacity,
+    agronomy,
     hydraulics: null,
   };
 
@@ -468,6 +494,7 @@ export function calculateIrrigationProject(
     networkAngle,
     axisDeviation,
     lateralCapacity,
+    agronomy,
   );
 
   return { ...partialResult, bom, diagnostics, hydraulics };
