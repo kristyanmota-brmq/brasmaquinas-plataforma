@@ -213,13 +213,13 @@ describe("T40-8 — projeto-tipo Barreiras: sem violations após split", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("T40-9 — split mínimo necessário", () => {
-  it("n=10 (1 aspersor acima do limite DN50) → exatamente 2 sub-colunas", () => {
+  it("n=12 (acima do limite DN50 Dint 48,1) → exatamente 2 sub-colunas", () => {
     const subset = getCatalogoLateraisHomologadas5022();
-    const positions = makeColumn(10);
+    const positions = makeColumn(12); // 18 m³/h > 16,3 (cap. 2,5 m/s em 48,1 mm)
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, subset,
     );
-    // Caso limítrofe (lateral única DN50): n=10 → 15 m³/h → v=2,508 > 2,5; split mínimo = 2.
+    // Caso limítrofe (lateral única DN50, Dint real 48,1): n=12 → 18 m³/h → v=2,75 > 2,5; split mínimo = 2.
     expect(cols).toHaveLength(2);
     for (const c of cols) {
       expect(c.lateralCapacity.ok).toBe(true);

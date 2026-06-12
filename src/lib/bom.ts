@@ -452,7 +452,8 @@ export function buildBOM(input: BOMInput): BOMResult {
         // material — sem este skip a BOM emitia item de tubo com quantidade 0.
         if (sec.lengthM < 0.01) continue;
         const sku = sec.selectedTube.sku;
-        const tuboCat = TUBOS_PVC_RIGIDO.find((t) => t.sku === sku);
+        // TASK-084: rede secundária PN40 — SKUs vêm da família LF
+        const tuboCat = [...TUBOS_PVC_LF, ...TUBOS_PVC_RIGIDO].find((t) => t.sku === sku);
         if (!tuboCat) continue;
         const entry = secBySku.get(sku) ?? {
           descricao: tuboCat.descricao, marca: tuboCat.marca, unidade: tuboCat.unidade,
@@ -466,7 +467,7 @@ export function buildBOM(input: BOMInput): BOMResult {
         const barras = Math.ceil(comprimentoTotal / metrosPorBarra);
         itens.push({
           sku,
-          descricao: `${descricao} (ramais)`,
+          descricao: `${descricao} (secundárias)`,
           marca,
           unidade,
           quantidade: barras,
@@ -480,7 +481,7 @@ export function buildBOM(input: BOMInput): BOMResult {
       const barrasSecundarias = Math.ceil(comprimentoSecundariasM / tubo.metrosPorBarra);
       itens.push({
         sku: tubo.sku,
-        descricao: `${tubo.descricao} (ramais)`,
+        descricao: `${tubo.descricao} (secundárias)`,
         marca: tubo.marca,
         unidade: tubo.unidade,
         quantidade: barrasSecundarias,
@@ -633,7 +634,7 @@ export function buildBOM(input: BOMInput): BOMResult {
       curvas90RamaisLCount += qty;
       itens.push({
         sku: curva.sku,
-        descricao: `${curva.descricao} (ramais em L)`,
+        descricao: `${curva.descricao} (secundárias em L)`,
         marca: curva.marca,
         unidade: curva.unidade,
         quantidade: qty,

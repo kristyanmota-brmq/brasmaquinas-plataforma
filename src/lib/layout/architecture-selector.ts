@@ -40,7 +40,7 @@ import {
   computeRouteBreaksCount,
   computeValveDispersionM,
 } from "./architecture-quality-metrics";
-import { TUBOS_PVC_RIGIDO } from "@/lib/catalog/aspersores";
+import { TUBOS_PVC_LF } from "@/lib/catalog/aspersores"; // TASK-084: secundárias PN40 (RT)
 import type { PhysicalColumn, Lateral } from "./laterais";
 import type { OperationalSegment } from "./sectorization";
 
@@ -53,7 +53,9 @@ import type { OperationalSegment } from "./sectorization";
  * (≈ 5 ft/s = 1,524 m/s para tubulação plástica enterrada com válvulas).
  * Status: PENDENTE_REVISAO_RT_BRASMAQUINAS.
  */
-export const MAX_VELOCITY_RAMAL_MS = 1.5;
+// TASK-084 (RT, 2026-06-12): limite de velocidade da SECUNDÁRIA elevado para
+// 2,5 m/s (era 1,5 NRCS conservador) — coerente com a família PN40 adotada.
+export const MAX_VELOCITY_RAMAL_MS = 2.5;
 
 /**
  * Limite de perda de carga em ramal (mca). Boa prática: ≤ 10% da pressão de
@@ -66,7 +68,7 @@ export const MAX_HEADLOSS_RAMAL_MCA = 3.0;
  * de principal e adutora no MVP (ambas usam DN100 R PN80 hoje).
  */
 const PRECO_TUBO_R_100_PN80 = (() => {
-  const tube = TUBOS_PVC_RIGIDO.find((t) => t.diametroMm === 100);
+  const tube = TUBOS_PVC_LF.find((t) => t.diametroMm === 100);
   if (!tube) throw new Error("Catálogo inconsistente: TIGRE_R_100_PN80 não encontrado");
   return tube.precoVenda;
 })();
@@ -297,7 +299,7 @@ function polylineLengthM(coords: [number, number][]): number {
 }
 
 function priceByDn(diametroMm: number): number {
-  const tube = TUBOS_PVC_RIGIDO.find((t) => t.diametroMm === diametroMm);
+  const tube = TUBOS_PVC_LF.find((t) => t.diametroMm === diametroMm) ?? TUBOS_PVC_LF[TUBOS_PVC_LF.length - 1];
   return tube?.precoVenda ?? 0;
 }
 
@@ -354,7 +356,7 @@ function evaluateCandidate(
   const sizedSecondaries = sizeAllSecondaries(
     secondaries,
     laterais,
-    TUBOS_PVC_RIGIDO as unknown as Parameters<typeof sizeAllSecondaries>[2],
+    TUBOS_PVC_LF as unknown as Parameters<typeof sizeAllSecondaries>[2],
     maxVelocityRamalMs,
     maxHeadlossRamalMca,
   );
@@ -385,7 +387,7 @@ function evaluateCandidate(
     const maxVel = Math.max(...violatingRamais.map((s) => s.velocityMs));
     const maxHf = Math.max(...violatingRamais.map((s) => s.headLossMca));
     invalidReason =
-      `${violatingRamais.length} ramal(is) excedem limites hidráulicos ` +
+      `${violatingRamais.length} secundária(s) excedem limites hidráulicos ` +
       `(velocidade máx: ${maxVel.toFixed(2)} m/s vs. limite ${maxVelocityRamalMs.toFixed(1)}; ` +
       `perda máx: ${maxHf.toFixed(2)} mca vs. limite ${maxHeadlossRamalMca.toFixed(1)})`;
   }

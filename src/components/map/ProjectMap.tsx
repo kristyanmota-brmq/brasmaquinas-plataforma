@@ -1968,7 +1968,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                 <LegendRow color="#1B5680" label="Principal" />
               )}
               {secondaries.length > 0 && (
-                <LegendRow color="#0D9F6E" label="Ramal/secundária" dashed />
+                <LegendRow color="#0D9F6E" label="Secundária" dashed />
               )}
               <LegendRow color="#BE185D" label="Lateral física (tubo real)" thin />
               {laterais.length > 0 && (
@@ -2535,7 +2535,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                 {secondaries.length > 0 && (
                   <div className="col-span-2">
                     <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-0.5">
-                      Ramais de conexão
+                      Secundárias de conexão
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-mono text-[#0D9F6E] font-medium">

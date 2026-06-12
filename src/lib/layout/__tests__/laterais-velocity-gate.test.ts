@@ -20,7 +20,7 @@ const SPACING = 12;
 const CENTROID = { lng: -46.0, lat: -12.0 };
 const ASPERSOR_MIN = { vazao: ASPERSOR_5022_SD_40X18.vazaoM3PorHora, pressaoServico: PRESSAO_SERVICO };
 
-// DN50 LF: Dint=46mm — com Q=15 m³/h → v = 2,508 m/s (> 2,5 → gate rejeita)
+// DN50 LF: Dint=46mm (fixture sintética) — com Q=15 m³/h → v = 2,508 m/s (> 2,5)
 const DN50: TuboCandidato = { sku: "DN50", diametroMm: 50, diametroInternoMm: 46, coefC: 145, pressaoMca: 40, custo: 1, precoVenda: 1 };
 // DN75 LF: Dint=69mm — com Q=15 m³/h → v = 1,114 m/s (< 2,5 → aprovado)
 const DN75: TuboCandidato = { sku: "DN75", diametroMm: 75, diametroInternoMm: 69, coefC: 145, pressaoMca: 40, custo: 1, precoVenda: 1 };
@@ -37,7 +37,7 @@ function makePositions(n: number): [number, number][] {
 // ── Testes ───────────────────────────────────────────────────────────────────
 
 describe("selectLateralTube — gate de velocidade com diâmetro interno", () => {
-  it("n=10 (TASK-083): 15 m³/h não cabe em DN50 → coluna DIVIDE em 2 laterais DN50 válidas (encurta, não engorda)", () => {
+  it("n=10 (TASK-083): 15 m³/h não cabe em DN50 (fixture Dint 46) → coluna DIVIDE em 2 laterais DN50 válidas", () => {
     const positions = makePositions(10);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, CATALOG_2,
@@ -155,9 +155,10 @@ describe("selectLateralTube — gate de velocidade com diâmetro interno", () =>
     expect(laterais[0].selecao.perdaCargaM).toBeCloseTo(cols[0].selecao.perdaCargaM, 4);
   });
 
-  it("com TUBOS_PVC_LF real e 5022 4.0x1.8 (1,5 m³/h): n=10 divide e TODAS as laterais são DN50 (TASK-083)", () => {
-    // TASK-083: 15 m³/h não cabe em DN50 → divide; nenhuma lateral sobe de diâmetro.
-    const positions = makePositions(10);
+  it("com TUBOS_PVC_LF real e 5022 4.0x1.8 (1,5 m³/h): n=12 divide e TODAS as laterais são DN50 (TASK-083/084)", () => {
+    // TASK-084: Dint REAL do DN50 PN40 = 48,1 mm → capacidade ~16,3 m³/h a
+    // 2,5 m/s; n=12 (18 m³/h) não cabe → divide; nenhuma lateral sobe de DN.
+    const positions = makePositions(12);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING,
       { vazao: ASPERSOR_5022_SD_40X18.vazaoM3PorHora, pressaoServico: ASPERSOR_5022_SD_40X18.pressaoServicoMca },

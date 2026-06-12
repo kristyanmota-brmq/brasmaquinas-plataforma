@@ -148,9 +148,9 @@ describe("T60 — catálogo 5035 SD (homologação provisória) × agronomia", (
 
   it("T60-3: espaçamento ≤ raio molhado × 2 (sobreposição garantida) nos aspersores não-padrão", async () => {
     const { ASPERSORES, ASPERSOR_PADRAO } = await import("@/lib/catalog/aspersores");
-    // TASK-082: + entrada preservada 5022 4.0x1.8 (o padrão virou o 3.0x1.8 do RT)
+    // TASK-082: + entrada preservada 5022 4.0x1.8; TASK-084: 5035 3,5×2,5 REMOVIDO (RT)
     const novos = ASPERSORES.filter((a) => a !== ASPERSOR_PADRAO);
-    expect(novos).toHaveLength(4);
+    expect(novos).toHaveLength(3);
     for (const a of novos) {
       expect(a.espacamentoPadraoM).toBeLessThanOrEqual(a.raioMolhadoM * 2);
       expect(a.custo).toBeGreaterThan(0);

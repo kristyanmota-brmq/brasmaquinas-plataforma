@@ -276,7 +276,7 @@ describe("TASK-043 — selectArchitectureByBom", () => {
     // V = (200/3600) / (π × 0.0665²) ≈ 4,0 m/s ≫ 1,5 m/s
     expect(evalA0.isValid).toBe(false);
     expect(evalA0.invalidReason).toBeTruthy();
-    expect(evalA0.invalidReason).toContain("ramal");
+    expect(evalA0.invalidReason).toContain("secundária"); // TASK-084: nomenclatura do RT
 
     if (result.evaluations.every((e) => !e.isValid)) {
       expect(result.decision).toBe("no_valid_candidate");
@@ -412,7 +412,7 @@ describe("TASK-043 — selectArchitectureByBom", () => {
   });
 
   it("T43-11 — constantes exportadas correspondem ao briefing (1,5 m/s e 3,0 mca)", () => {
-    expect(MAX_VELOCITY_RAMAL_MS).toBe(1.5);
+    expect(MAX_VELOCITY_RAMAL_MS).toBe(2.5); // TASK-084 (RT): secundária ≤ 2,5 m/s
     expect(MAX_HEADLOSS_RAMAL_MCA).toBe(3.0);
   });
 });

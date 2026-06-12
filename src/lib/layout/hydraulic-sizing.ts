@@ -808,7 +808,7 @@ export function sizeHydraulics(
   }
   if (hasSecLoss) {
     warnings.push(
-      `${invalidSegs.filter((s) => s.secondaryLossExceeds).length} ramal(is) com perda de carga > 10% da pressão de serviço. ` +
+      `${invalidSegs.filter((s) => s.secondaryLossExceeds).length} secundária(s) com perda de carga > 10% da pressão de serviço. ` +
       "Revisar comprimento ou diâmetro dos ramais.",
     );
   }

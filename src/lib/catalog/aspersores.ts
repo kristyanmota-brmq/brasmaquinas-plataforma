@@ -101,20 +101,8 @@ export const ASPERSOR_5035_SD_50X25: Aspersor = {
   espacamentoPadraoM: 18,
 };
 
-export const ASPERSOR_5035_SD_35X25: Aspersor = {
-  sku: "101084779",
-  descricao: "Aspersor 5035 SD - 1240l/h (3,0bar) - Bocais 3,5 x 2,5 mm (Azul) - NAAN",
-  marca: "NAAN",
-  modelo: "5035-SD",
-  bocal: "3,5 x 2,5 mm",
-  unidade: "UN",
-  custo: 43.86,
-  precoVenda: 52.6,
-  pressaoServicoMca: 30,
-  vazaoM3PorHora: 1.24,
-  raioMolhadoM: 13.6, // D = 27,2 m @ 3,0 bar
-  espacamentoPadraoM: 18,
-};
+// TASK-084: ASPERSOR 5035 SD 3,5×2,5 REMOVIDO por ordem do RT (2026-06-12).
+
 
 /** Variante PC (part-circle) usada nas bordas dos projetos reais (~6% dos emissores). */
 export const ASPERSOR_5035_SD_PC_45: Aspersor = {
@@ -136,7 +124,6 @@ export const ASPERSORES: Aspersor[] = [
   ASPERSOR_PADRAO,
   ASPERSOR_5022_SD_40X18,
   ASPERSOR_5035_SD_50X25,
-  ASPERSOR_5035_SD_35X25,
   ASPERSOR_5035_SD_PC_45,
 ];
 
@@ -353,6 +340,108 @@ export const BOMBAS_HOMOLOGADAS: BombaCatalogo[] = [
     hmtMca: 73,
     fonte: "proposta real 32 ha pastagem (corpus) — 134 m³/h em 2 conjuntos @ 73 mca",
   },
+  // ── TASK-085 — Catálogo de fabricante (PENDENTE_CONFIRMACAO_RT) ──
+  // Ponto nominal = ponto MEDIANO da tabela vazão×altura do fabricante
+  // (conservador: à esquerda do ponto a curva real entrega altura maior).
+  // Fonte: Catálogo de Produtos de Superfície 60 Hz 2025 rev00 (EBAS —
+  // Ebara/Thebe), download 2026-06-12 — ver docs/catalogos/bombas/README.md.
+  { modelo: "THEBE R-20 (7,5 CV, rotor 183)", marca: "THEBE", potenciaCv: 7.5, vazaoMaxM3h: 57, hmtMca: 21.6, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — R-20 rotor 183 mm, ponto mediano (η≈0,61)" },
+  { modelo: "THEBE R-20 (10 CV, rotor 192)", marca: "THEBE", potenciaCv: 10, vazaoMaxM3h: 58, hmtMca: 22.8, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — R-20 rotor 192 mm, ponto mediano (η≈0,49)" },
+  { modelo: "THEBE R-20 (12,5 CV, rotor 197)", marca: "THEBE", potenciaCv: 12.5, vazaoMaxM3h: 60, hmtMca: 30.4, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — R-20 rotor 197 mm, ponto mediano (η≈0,54)" },
+  { modelo: "THEBE R-20 (15 CV, rotor 197)", marca: "THEBE", potenciaCv: 15, vazaoMaxM3h: 60, hmtMca: 30.4, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — R-20 rotor 197 mm, ponto mediano (η≈0,45)" },
+  { modelo: "THEBE RL-20B (10 CV, rotor 147)", marca: "THEBE", potenciaCv: 10, vazaoMaxM3h: 34, hmtMca: 47.8, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 147 mm, ponto mediano (η≈0,6)" },
+  { modelo: "THEBE RL-20B (10 CV, rotor 157)", marca: "THEBE", potenciaCv: 10, vazaoMaxM3h: 46, hmtMca: 34.3, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 157 mm, ponto mediano (η≈0,58)" },
+  { modelo: "THEBE RL-20B (12,5 CV, rotor 157)", marca: "THEBE", potenciaCv: 12.5, vazaoMaxM3h: 40, hmtMca: 49.7, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 157 mm, ponto mediano (η≈0,59)" },
+  { modelo: "THEBE RL-20B (12,5 CV, rotor 166)", marca: "THEBE", potenciaCv: 12.5, vazaoMaxM3h: 50, hmtMca: 41.3, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 166 mm, ponto mediano (η≈0,61)" },
+  { modelo: "THEBE RL-20B (15 CV, rotor 166)", marca: "THEBE", potenciaCv: 15, vazaoMaxM3h: 46, hmtMca: 50.1, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 166 mm, ponto mediano (η≈0,57)" },
+  { modelo: "THEBE RL-20B (15 CV, rotor 175)", marca: "THEBE", potenciaCv: 15, vazaoMaxM3h: 56, hmtMca: 42.1, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 175 mm, ponto mediano (η≈0,58)" },
+  { modelo: "THEBE RL-20B (15 CV, rotor 184)", marca: "THEBE", potenciaCv: 15, vazaoMaxM3h: 66, hmtMca: 33.1, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 184 mm, ponto mediano (η≈0,54)" },
+  { modelo: "THEBE RL-20B (20 CV, rotor 184)", marca: "THEBE", potenciaCv: 20, vazaoMaxM3h: 60, hmtMca: 49, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 184 mm, ponto mediano (η≈0,54)" },
+  { modelo: "THEBE RL-20B (20 CV, rotor 192)", marca: "THEBE", potenciaCv: 20, vazaoMaxM3h: 70, hmtMca: 51.2, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 192 mm, ponto mediano (η≈0,66)" },
+  { modelo: "THEBE RL-20B (20 CV, rotor 200)", marca: "THEBE", potenciaCv: 20, vazaoMaxM3h: 78, hmtMca: 43.1, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 200 mm, ponto mediano (η≈0,62)" },
+  { modelo: "THEBE RL-20B (25 CV, rotor 200)", marca: "THEBE", potenciaCv: 25, vazaoMaxM3h: 74, hmtMca: 58.8, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 13 — RL-20B rotor 200 mm, ponto mediano (η≈0,64)" },
+  { modelo: "THEBE THS-18 (3 CV, rotor 123)", marca: "THEBE", potenciaCv: 3, vazaoMaxM3h: 22, hmtMca: 22.9, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 123 mm, ponto mediano (η≈0,62)" },
+  { modelo: "THEBE THS-18 (3 CV, rotor 128)", marca: "THEBE", potenciaCv: 3, vazaoMaxM3h: 26, hmtMca: 22.5, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 128 mm, ponto mediano (η≈0,72)" },
+  { modelo: "THEBE THS-18 (4 CV, rotor 132)", marca: "THEBE", potenciaCv: 4, vazaoMaxM3h: 22, hmtMca: 29.2, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 132 mm, ponto mediano (η≈0,59)" },
+  { modelo: "THEBE THS-18 (4 CV, rotor 136)", marca: "THEBE", potenciaCv: 4, vazaoMaxM3h: 28, hmtMca: 25.3, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 136 mm, ponto mediano (η≈0,66)" },
+  { modelo: "THEBE THS-18 (5 CV, rotor 141)", marca: "THEBE", potenciaCv: 5, vazaoMaxM3h: 28, hmtMca: 30, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 141 mm, ponto mediano (η≈0,62)" },
+  { modelo: "THEBE THS-18 (5 CV, rotor 147)", marca: "THEBE", potenciaCv: 5, vazaoMaxM3h: 36, hmtMca: 25.1, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 147 mm, ponto mediano (η≈0,67)" },
+  { modelo: "THEBE THS-18 (5 CV, rotor 156)", marca: "THEBE", potenciaCv: 5, vazaoMaxM3h: 42, hmtMca: 18.9, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 156 mm, ponto mediano (η≈0,59)" },
+  { modelo: "THEBE THS-18 (6 CV, rotor 151)", marca: "THEBE", potenciaCv: 6, vazaoMaxM3h: 36, hmtMca: 28.3, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 151 mm, ponto mediano (η≈0,63)" },
+  { modelo: "THEBE THS-18 (6 CV, rotor 159)", marca: "THEBE", potenciaCv: 6, vazaoMaxM3h: 44, hmtMca: 25.9, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 159 mm, ponto mediano (η≈0,7)" },
+  { modelo: "THEBE THS-18 (7,5 CV, rotor 163)", marca: "THEBE", potenciaCv: 7.5, vazaoMaxM3h: 42, hmtMca: 30.6, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 163 mm, ponto mediano (η≈0,63)" },
+  { modelo: "THEBE THS-18 (7,5 CV, rotor 168)", marca: "THEBE", potenciaCv: 7.5, vazaoMaxM3h: 50, hmtMca: 26.7, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 168 mm, ponto mediano (η≈0,66)" },
+  { modelo: "THEBE THS-18 (10 CV, rotor 172)", marca: "THEBE", potenciaCv: 10, vazaoMaxM3h: 38, hmtMca: 42.2, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 172 mm, ponto mediano (η≈0,59)" },
+  { modelo: "THEBE THS-18 (10 CV, rotor 179)", marca: "THEBE", potenciaCv: 10, vazaoMaxM3h: 52, hmtMca: 33.8, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 179 mm, ponto mediano (η≈0,65)" },
+  { modelo: "THEBE THS-18 (12,5 CV, rotor 179)", marca: "THEBE", potenciaCv: 12.5, vazaoMaxM3h: 44, hmtMca: 44, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 11 — THS-18 rotor 179 mm, ponto mediano (η≈0,57)" },
+  { modelo: "EBARA GS/GSD 32-125 (3 CV, rotor 106)", marca: "EBARA", potenciaCv: 3, vazaoMaxM3h: 25.8, hmtMca: 15, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-125 3500 rpm rotor 106 mm, ponto mediano (η≈0,48)" },
+  { modelo: "EBARA GS/GSD 32-125 (4 CV, rotor 119)", marca: "EBARA", potenciaCv: 4, vazaoMaxM3h: 33, hmtMca: 19, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-125 3500 rpm rotor 119 mm, ponto mediano (η≈0,58)" },
+  { modelo: "EBARA GS/GSD 32-125 (5 CV, rotor 131)", marca: "EBARA", potenciaCv: 5, vazaoMaxM3h: 36.4, hmtMca: 26, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-125 3500 rpm rotor 131 mm, ponto mediano (η≈0,7)" },
+  { modelo: "EBARA GS/GSD 32-125 (6 CV, rotor 142)", marca: "EBARA", potenciaCv: 6, vazaoMaxM3h: 42.4, hmtMca: 28, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-125 3500 rpm rotor 142 mm, ponto mediano (η≈0,73)" },
+  { modelo: "EBARA GS/GSD 32-125.1 (3 CV, rotor 115)", marca: "EBARA", potenciaCv: 3, vazaoMaxM3h: 25.7, hmtMca: 18, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-125.1 3500 rpm rotor 115 mm, ponto mediano (η≈0,57)" },
+  { modelo: "EBARA GS/GSD 32-125.1 (4 CV, rotor 129)", marca: "EBARA", potenciaCv: 4, vazaoMaxM3h: 28.6, hmtMca: 26, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-125.1 3500 rpm rotor 129 mm, ponto mediano (η≈0,69)" },
+  { modelo: "EBARA GS/GSD 32-125.1 (5 CV, rotor 140)", marca: "EBARA", potenciaCv: 5, vazaoMaxM3h: 28.8, hmtMca: 32, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-125.1 3500 rpm rotor 140 mm, ponto mediano (η≈0,68)" },
+  { modelo: "EBARA GS/GSD 32-160 (6 CV, rotor 139)", marca: "EBARA", potenciaCv: 6, vazaoMaxM3h: 32.8, hmtMca: 32, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-160 3500 rpm rotor 139 mm, ponto mediano (η≈0,65)" },
+  { modelo: "EBARA GS/GSD 32-160 (7,5 CV, rotor 152)", marca: "EBARA", potenciaCv: 7.5, vazaoMaxM3h: 37.9, hmtMca: 39, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-160 3500 rpm rotor 152 mm, ponto mediano (η≈0,73)" },
+  { modelo: "EBARA GS/GSD 32-160 (12,5 CV, rotor 164)", marca: "EBARA", potenciaCv: 12.5, vazaoMaxM3h: 43.5, hmtMca: 44, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-160 3500 rpm rotor 164 mm, ponto mediano (η≈0,57)" },
+  { modelo: "EBARA GS/GSD 32-160 (12,5 CV, rotor 177)", marca: "EBARA", potenciaCv: 12.5, vazaoMaxM3h: 44.1, hmtMca: 48, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-160 3500 rpm rotor 177 mm, ponto mediano (η≈0,63)" },
+  { modelo: "EBARA GS/GSD 32-160.1 (4 CV, rotor 126)", marca: "EBARA", potenciaCv: 4, vazaoMaxM3h: 23.5, hmtMca: 24, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-160.1 3500 rpm rotor 126 mm, ponto mediano (η≈0,52)" },
+  { modelo: "EBARA GS/GSD 32-160.1 (6 CV, rotor 145)", marca: "EBARA", potenciaCv: 6, vazaoMaxM3h: 27.6, hmtMca: 36, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-160.1 3500 rpm rotor 145 mm, ponto mediano (η≈0,61)" },
+  { modelo: "EBARA GS/GSD 32-160.1 (7,5 CV, rotor 163)", marca: "EBARA", potenciaCv: 7.5, vazaoMaxM3h: 31.4, hmtMca: 44, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-160.1 3500 rpm rotor 163 mm, ponto mediano (η≈0,68)" },
+  { modelo: "EBARA GS/GSD 32-160.1 (10 CV, rotor 177)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 34.8, hmtMca: 50, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 60 — GS 32-160.1 3500 rpm rotor 177 mm, ponto mediano (η≈0,64)" },
+  { modelo: "EBARA GS/GSD 32-200 (10 CV, rotor 175)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 38.3, hmtMca: 48, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-200 3500 rpm rotor 175 mm, ponto mediano (η≈0,68)" },
+  { modelo: "EBARA GS/GSD 32-200 (12,5 CV, rotor 184)", marca: "EBARA", potenciaCv: 12.5, vazaoMaxM3h: 43.7, hmtMca: 52, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-200 3500 rpm rotor 184 mm, ponto mediano (η≈0,67)" },
+  { modelo: "EBARA GS/GSD 32-200 (15 CV, rotor 197)", marca: "EBARA", potenciaCv: 15, vazaoMaxM3h: 44.9, hmtMca: 63, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-200 3500 rpm rotor 197 mm, ponto mediano (η≈0,7)" },
+  { modelo: "EBARA GS/GSD 32-200 (15 CV, rotor 208)", marca: "EBARA", potenciaCv: 15, vazaoMaxM3h: 46.2, hmtMca: 72, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-200 3500 rpm rotor 208 mm, ponto mediano (η≈0,82)" },
+  { modelo: "EBARA GS/GSD 32-200 (20 CV, rotor 219)", marca: "EBARA", potenciaCv: 20, vazaoMaxM3h: 52.4, hmtMca: 78, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-200 3500 rpm rotor 219 mm, ponto mediano (η≈0,76)" },
+  { modelo: "EBARA GS/GSD 32-200.1 (5 CV, rotor 172)", marca: "EBARA", potenciaCv: 5, vazaoMaxM3h: 29.9, hmtMca: 35, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-200.1 3500 rpm rotor 172 mm, ponto mediano (η≈0,78)" },
+  { modelo: "EBARA GS/GSD 32-200.1 (7,5 CV, rotor 184)", marca: "EBARA", potenciaCv: 7.5, vazaoMaxM3h: 32.9, hmtMca: 41, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-200.1 3500 rpm rotor 184 mm, ponto mediano (η≈0,67)" },
+  { modelo: "EBARA GS/GSD 32-200.1 (10 CV, rotor 196)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 34.1, hmtMca: 50, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-200.1 3500 rpm rotor 196 mm, ponto mediano (η≈0,63)" },
+  { modelo: "EBARA GS/GSD 32-200.1 (10 CV, rotor 207)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 35.6, hmtMca: 59, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-200.1 3500 rpm rotor 207 mm, ponto mediano (η≈0,78)" },
+  { modelo: "EBARA GS/GSD 32-250 (10 CV, rotor 198)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 29.2, hmtMca: 68, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-250 3500 rpm rotor 198 mm, ponto mediano (η≈0,74)" },
+  { modelo: "EBARA GS/GSD 32-250 (12,5 CV, rotor 222)", marca: "EBARA", potenciaCv: 12.5, vazaoMaxM3h: 31.7, hmtMca: 88, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 32-250 3500 rpm rotor 222 mm, ponto mediano (η≈0,83)" },
+  { modelo: "EBARA GS/GSD 40-125 (3 CV, rotor 105)", marca: "EBARA", potenciaCv: 3, vazaoMaxM3h: 38.7, hmtMca: 15, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 40-125 3500 rpm rotor 105 mm, ponto mediano (η≈0,72)" },
+  { modelo: "EBARA GS/GSD 40-125 (5 CV, rotor 119)", marca: "EBARA", potenciaCv: 5, vazaoMaxM3h: 43.5, hmtMca: 21, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 40-125 3500 rpm rotor 119 mm, ponto mediano (η≈0,68)" },
+  { modelo: "EBARA GS/GSD 40-125 (7,5 CV, rotor 131)", marca: "EBARA", potenciaCv: 7.5, vazaoMaxM3h: 54.5, hmtMca: 27, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 40-125 3500 rpm rotor 131 mm, ponto mediano (η≈0,73)" },
+  { modelo: "EBARA GS/GSD 40-125 (10 CV, rotor 142)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 61.7, hmtMca: 31, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 61 — GS 40-125 3500 rpm rotor 142 mm, ponto mediano (η≈0,71)" },
+  { modelo: "EBARA GS/GSD 40-160 (7,5 CV, rotor 134)", marca: "EBARA", potenciaCv: 7.5, vazaoMaxM3h: 56.8, hmtMca: 26, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 40-160 3500 rpm rotor 134 mm, ponto mediano (η≈0,73)" },
+  { modelo: "EBARA GS/GSD 40-160 (10 CV, rotor 150)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 61.1, hmtMca: 36, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 40-160 3500 rpm rotor 150 mm, ponto mediano (η≈0,81)" },
+  { modelo: "EBARA GS/GSD 40-160 (15 CV, rotor 163)", marca: "EBARA", potenciaCv: 15, vazaoMaxM3h: 71.9, hmtMca: 44, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 40-160 3500 rpm rotor 163 mm, ponto mediano (η≈0,78)" },
+  { modelo: "EBARA GS/GSD 40-160 (20 CV, rotor 177)", marca: "EBARA", potenciaCv: 20, vazaoMaxM3h: 74.7, hmtMca: 52, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 40-160 3500 rpm rotor 177 mm, ponto mediano (η≈0,72)" },
+  { modelo: "EBARA GS/GSD 40-200 (15 CV, rotor 172)", marca: "EBARA", potenciaCv: 15, vazaoMaxM3h: 64.1, hmtMca: 52, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 40-200 3500 rpm rotor 172 mm, ponto mediano (η≈0,82)" },
+  { modelo: "EBARA GS/GSD 40-200 (25 CV, rotor 189)", marca: "EBARA", potenciaCv: 25, vazaoMaxM3h: 72.1, hmtMca: 64, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 40-200 3500 rpm rotor 189 mm, ponto mediano (η≈0,68)" },
+  { modelo: "EBARA GS/GSD 40-200 (30 CV, rotor 205)", marca: "EBARA", potenciaCv: 30, vazaoMaxM3h: 77.4, hmtMca: 76, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 40-200 3500 rpm rotor 205 mm, ponto mediano (η≈0,73)" },
+  { modelo: "EBARA GS/GSD 40-200 (30 CV, rotor 219)", marca: "EBARA", potenciaCv: 30, vazaoMaxM3h: 72.4, hmtMca: 88, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 40-200 3500 rpm rotor 219 mm, ponto mediano (η≈0,79)" },
+  { modelo: "EBARA GS/GSD 40-250 (25 CV, rotor 211)", marca: "EBARA", potenciaCv: 25, vazaoMaxM3h: 62.3, hmtMca: 77, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 40-250 3500 rpm rotor 211 mm, ponto mediano (η≈0,71)" },
+  { modelo: "EBARA GS/GSD 50-125 (5 CV, rotor 111)", marca: "EBARA", potenciaCv: 5, vazaoMaxM3h: 59.1, hmtMca: 16, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 50-125 3500 rpm rotor 111 mm, ponto mediano (η≈0,7)" },
+  { modelo: "EBARA GS/GSD 50-125 (7,5 CV, rotor 123)", marca: "EBARA", potenciaCv: 7.5, vazaoMaxM3h: 75.6, hmtMca: 20, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 50-125 3500 rpm rotor 123 mm, ponto mediano (η≈0,75)" },
+  { modelo: "EBARA GS/GSD 50-125 (10 CV, rotor 134)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 90.7, hmtMca: 25, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 50-125 3500 rpm rotor 134 mm, ponto mediano (η≈0,84)" },
+  { modelo: "EBARA GS/GSD 50-125 (15 CV, rotor 144)", marca: "EBARA", potenciaCv: 15, vazaoMaxM3h: 114.3, hmtMca: 26, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 62 — GS 50-125 3500 rpm rotor 144 mm, ponto mediano (η≈0,73)" },
+  { modelo: "EBARA GS/GSD 50-160 (10 CV, rotor 131)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 74.8, hmtMca: 25, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 50-160 3500 rpm rotor 131 mm, ponto mediano (η≈0,69)" },
+  { modelo: "EBARA GS/GSD 50-160 (15 CV, rotor 148)", marca: "EBARA", potenciaCv: 15, vazaoMaxM3h: 78.6, hmtMca: 35, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 50-160 3500 rpm rotor 148 mm, ponto mediano (η≈0,68)" },
+  { modelo: "EBARA GS/GSD 50-160 (20 CV, rotor 164)", marca: "EBARA", potenciaCv: 20, vazaoMaxM3h: 95.7, hmtMca: 47, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 50-160 3500 rpm rotor 164 mm, ponto mediano (η≈0,83)" },
+  { modelo: "EBARA GS/GSD 50-160 (25 CV, rotor 177)", marca: "EBARA", potenciaCv: 25, vazaoMaxM3h: 104, hmtMca: 53, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 50-160 3500 rpm rotor 177 mm, ponto mediano (η≈0,82)" },
+  { modelo: "EBARA GS/GSD 50-200 (25 CV, rotor 171)", marca: "EBARA", potenciaCv: 25, vazaoMaxM3h: 95.1, hmtMca: 52, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 50-200 3500 rpm rotor 171 mm, ponto mediano (η≈0,73)" },
+  { modelo: "EBARA GS/GSD 50-200 (30 CV, rotor 188)", marca: "EBARA", potenciaCv: 30, vazaoMaxM3h: 108.7, hmtMca: 61, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 50-200 3500 rpm rotor 188 mm, ponto mediano (η≈0,82)" },
+  { modelo: "EBARA GS/GSD 50-200 (40 CV, rotor 203)", marca: "EBARA", potenciaCv: 40, vazaoMaxM3h: 102.7, hmtMca: 76, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 50-200 3500 rpm rotor 203 mm, ponto mediano (η≈0,72)" },
+  { modelo: "EBARA GS/GSD 50-200 (50 CV, rotor 219)", marca: "EBARA", potenciaCv: 50, vazaoMaxM3h: 113.4, hmtMca: 85, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 50-200 3500 rpm rotor 219 mm, ponto mediano (η≈0,71)" },
+  { modelo: "EBARA GS/GSD 50-250 (40 CV, rotor 210)", marca: "EBARA", potenciaCv: 40, vazaoMaxM3h: 101.7, hmtMca: 86, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 50-250 3500 rpm rotor 210 mm, ponto mediano (η≈0,81)" },
+  { modelo: "EBARA GS/GSD 65-125 (10 CV, rotor 120)", marca: "EBARA", potenciaCv: 10, vazaoMaxM3h: 107.8, hmtMca: 19, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 65-125 3500 rpm rotor 120 mm, ponto mediano (η≈0,76)" },
+  { modelo: "EBARA GS/GSD 65-125 (15 CV, rotor 130)", marca: "EBARA", potenciaCv: 15, vazaoMaxM3h: 132.4, hmtMca: 22, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 65-125 3500 rpm rotor 130 mm, ponto mediano (η≈0,72)" },
+  { modelo: "EBARA GS/GSD 65-125 (20 CV, rotor 139)", marca: "EBARA", potenciaCv: 20, vazaoMaxM3h: 158.4, hmtMca: 27, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 65-125 3500 rpm rotor 139 mm, ponto mediano (η≈0,79)" },
+  { modelo: "EBARA GS/GSD 65-125 (25 CV, rotor 147)", marca: "EBARA", potenciaCv: 25, vazaoMaxM3h: 161.7, hmtMca: 29, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 63 — GS 65-125 3500 rpm rotor 147 mm, ponto mediano (η≈0,69)" },
+  { modelo: "EBARA GS/GSD 65-160 (12,5 CV, rotor 135)", marca: "EBARA", potenciaCv: 12.5, vazaoMaxM3h: 123.3, hmtMca: 23, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 65-160 3500 rpm rotor 135 mm, ponto mediano (η≈0,84)" },
+  { modelo: "EBARA GS/GSD 65-160 (20 CV, rotor 150)", marca: "EBARA", potenciaCv: 20, vazaoMaxM3h: 132.6, hmtMca: 32, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 65-160 3500 rpm rotor 150 mm, ponto mediano (η≈0,79)" },
+  { modelo: "EBARA GS/GSD 65-160 (30 CV, rotor 165)", marca: "EBARA", potenciaCv: 30, vazaoMaxM3h: 142.7, hmtMca: 41, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 65-160 3500 rpm rotor 165 mm, ponto mediano (η≈0,72)" },
+  { modelo: "EBARA GS/GSD 65-160 (40 CV, rotor 177)", marca: "EBARA", potenciaCv: 40, vazaoMaxM3h: 158.2, hmtMca: 50, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 65-160 3500 rpm rotor 177 mm, ponto mediano (η≈0,73)" },
+  { modelo: "EBARA GS/GSD 65-200 (30 CV, rotor 162)", marca: "EBARA", potenciaCv: 30, vazaoMaxM3h: 137.7, hmtMca: 44, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 65-200 3500 rpm rotor 162 mm, ponto mediano (η≈0,75)" },
+  { modelo: "EBARA GS/GSD 65-200 (40 CV, rotor 183)", marca: "EBARA", potenciaCv: 40, vazaoMaxM3h: 145.2, hmtMca: 60, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 65-200 3500 rpm rotor 183 mm, ponto mediano (η≈0,81)" },
+  { modelo: "EBARA GS/GSD 65-200 (60 CV, rotor 203)", marca: "EBARA", potenciaCv: 60, vazaoMaxM3h: 164.6, hmtMca: 76, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 65-200 3500 rpm rotor 203 mm, ponto mediano (η≈0,77)" },
+  { modelo: "EBARA GS/GSD 65-200 (60 CV, rotor 215)", marca: "EBARA", potenciaCv: 60, vazaoMaxM3h: 145.8, hmtMca: 80, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 65-200 3500 rpm rotor 215 mm, ponto mediano (η≈0,72)" },
+  { modelo: "EBARA GS/GSD 65-250 (60 CV, rotor 215)", marca: "EBARA", potenciaCv: 60, vazaoMaxM3h: 169.3, hmtMca: 78, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 65-250 3500 rpm rotor 215 mm, ponto mediano (η≈0,82)" },
+  { modelo: "EBARA GS/GSD 80-160 (20 CV, rotor 147)", marca: "EBARA", potenciaCv: 20, vazaoMaxM3h: 178.7, hmtMca: 23, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 64 — GS 80-160 3500 rpm rotor 147 mm, ponto mediano (η≈0,76)" },
+  { modelo: "EBARA GS/GSD 100-160 (30 CV, rotor 149)", marca: "EBARA", potenciaCv: 30, vazaoMaxM3h: 180.9, hmtMca: 31, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 65 — GS 100-160 3500 rpm rotor 149 mm, ponto mediano (η≈0,69)" },
+  { modelo: "EBARA GS/GSD 100-160 (40 CV, rotor 156)", marca: "EBARA", potenciaCv: 40, vazaoMaxM3h: 196.1, hmtMca: 35, fonte: "Cat. Produtos Superfície 60Hz 2025 EBAS, pág. 65 — GS 100-160 3500 rpm rotor 156 mm, ponto mediano (η≈0,64)" },
 ];
 
 // TASK-074 — Transição da lateral telescopada (75→50): tê de redução soldável
@@ -511,21 +600,21 @@ export const TUBO_SUBIDA_PVC_BR = {
 // PVC LF (Liga Fácil) — laterais (rede secundária)
 // diametroMm = diâmetro nominal/externo (OD). Espessuras PN40 ABNT NBR 5648.
 export const TUBOS_PVC_LF = [
-  { sku: "TIGRE_LF_50_PN40",  descricao: "Tubo PVC LF Ø50mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  diametroExternoMm: 50,  espessuraParedeMm: 2.0, diametroInternoMm: 46,  pressaoMca: 40, metrosPorBarra: 6, custo: 28.4, precoVenda:  52.0, coefC: 145 },
-  { sku: "TIGRE_LF_75_PN40",  descricao: "Tubo PVC LF Ø75mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  diametroExternoMm: 75,  espessuraParedeMm: 3.0, diametroInternoMm: 69,  pressaoMca: 40, metrosPorBarra: 6, custo: 58.9, precoVenda: 108.0, coefC: 145 },
-  { sku: "TIGRE_LF_100_PN40", descricao: "Tubo PVC LF Ø100mm PN40 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroExternoMm: 100, espessuraParedeMm: 4.0, diametroInternoMm: 92,  pressaoMca: 40, metrosPorBarra: 6, custo: 98.7, precoVenda: 178.0, coefC: 145 },
+  { sku: "TIGRE_LF_50_PN40",  descricao: "Tubo PVC LF Ø50mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  diametroExternoMm: 50,  espessuraParedeMm: 0.95, diametroInternoMm: 48.1, pressaoMca: 40, metrosPorBarra: 6, custo: 28.4, precoVenda:  52.0, coefC: 140 },
+  { sku: "TIGRE_LF_75_PN40",  descricao: "Tubo PVC LF Ø75mm PN40 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  diametroExternoMm: 75,  espessuraParedeMm: 3.0, diametroInternoMm: 69,  pressaoMca: 40, metrosPorBarra: 6, custo: 58.9, precoVenda: 108.0, coefC: 140 },
+  { sku: "TIGRE_LF_100_PN40", descricao: "Tubo PVC LF Ø100mm PN40 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroExternoMm: 100, espessuraParedeMm: 4.0, diametroInternoMm: 92,  pressaoMca: 40, metrosPorBarra: 6, custo: 98.7, precoVenda: 178.0, coefC: 140 },
 ] as const;
 
 // PVC RÍGIDO (soldável) — principal e adutora
 // diametroMm = diâmetro nominal = externo (OD). Espessuras PN80 ABNT NBR 5647.
 export const TUBOS_PVC_RIGIDO = [
-  { sku: "TIGRE_R_50_PN80",  descricao: "Tubo PVC rígido Ø50mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  diametroNominalMm: 50,  diametroExternoMm: 50,  espessuraParedeMm: 3.0, diametroInternoMm: 44,  pressaoMca: 80, metrosPorBarra: 6, custo:  34.2, precoVenda:  62.0, coefC: 145 },
-  { sku: "TIGRE_R_75_PN80",  descricao: "Tubo PVC rígido Ø75mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  diametroNominalMm: 75,  diametroExternoMm: 75,  espessuraParedeMm: 4.5, diametroInternoMm: 66,  pressaoMca: 80, metrosPorBarra: 6, custo:  72.1, precoVenda: 132.0, coefC: 145 },
-  { sku: "15293527", descricao: "Tubo PVC rígido Ø100mm PN60 DEFOFO - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroNominalMm: 100, diametroExternoMm: 100, espessuraParedeMm: 4.6, diametroInternoMm: 90.8, pressaoMca: 60, metrosPorBarra: 6, custo: 176.05, precoVenda: 272.10, coefC: 145 }, // TASK-070: lista mestra 25.08.2025 (custo/venda reais)
-  { sku: "TIGRE_R_100_PN80", descricao: "Tubo PVC rígido Ø100mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroNominalMm: 100, diametroExternoMm: 100, espessuraParedeMm: 6.0, diametroInternoMm: 88,  pressaoMca: 80, metrosPorBarra: 6, custo: 118.5, precoVenda: 215.0, coefC: 145 },
-  { sku: "TIGRE_R_125_PN80", descricao: "Tubo PVC rígido Ø125mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 125, diametroNominalMm: 125, diametroExternoMm: 125, espessuraParedeMm: 7.0, diametroInternoMm: 111, pressaoMca: 80, metrosPorBarra: 6, custo: 178.4, precoVenda: 322.0, coefC: 145 },
-  { sku: "15293543", descricao: "Tubo PVC rígido Ø150mm PN60 DEFOFO - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, diametroExternoMm: 150, espessuraParedeMm: 6.9, diametroInternoMm: 136.2, pressaoMca: 60, metrosPorBarra: 6, custo: 390.30, precoVenda: 603.25, coefC: 145 }, // TASK-070: lista mestra 25.08.2025 (custo/venda reais)
-  { sku: "TIGRE_R_150_PN80", descricao: "Tubo PVC rígido Ø150mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, diametroExternoMm: 150, espessuraParedeMm: 8.5, diametroInternoMm: 133, pressaoMca: 80, metrosPorBarra: 6, custo: 248.9, precoVenda: 448.0, coefC: 145 },
+  { sku: "TIGRE_R_50_PN80",  descricao: "Tubo PVC rígido Ø50mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  diametroNominalMm: 50,  diametroExternoMm: 50,  espessuraParedeMm: 3.0, diametroInternoMm: 44,  pressaoMca: 80, metrosPorBarra: 6, custo:  34.2, precoVenda:  62.0, coefC: 140 },
+  { sku: "TIGRE_R_75_PN80",  descricao: "Tubo PVC rígido Ø75mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  diametroNominalMm: 75,  diametroExternoMm: 75,  espessuraParedeMm: 4.5, diametroInternoMm: 66,  pressaoMca: 80, metrosPorBarra: 6, custo:  72.1, precoVenda: 132.0, coefC: 140 },
+  { sku: "15293527", descricao: "Tubo PVC rígido Ø100mm PN60 DEFOFO - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroNominalMm: 100, diametroExternoMm: 100, espessuraParedeMm: 4.6, diametroInternoMm: 90.8, pressaoMca: 60, metrosPorBarra: 6, custo: 176.05, precoVenda: 272.10, coefC: 140 }, // TASK-070: lista mestra 25.08.2025 (custo/venda reais)
+  { sku: "TIGRE_R_100_PN80", descricao: "Tubo PVC rígido Ø100mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroNominalMm: 100, diametroExternoMm: 100, espessuraParedeMm: 6.0, diametroInternoMm: 88,  pressaoMca: 80, metrosPorBarra: 6, custo: 118.5, precoVenda: 215.0, coefC: 140 },
+  { sku: "TIGRE_R_125_PN80", descricao: "Tubo PVC rígido Ø125mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 125, diametroNominalMm: 125, diametroExternoMm: 125, espessuraParedeMm: 7.0, diametroInternoMm: 111, pressaoMca: 80, metrosPorBarra: 6, custo: 178.4, precoVenda: 322.0, coefC: 140 },
+  { sku: "15293543", descricao: "Tubo PVC rígido Ø150mm PN60 DEFOFO - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, diametroExternoMm: 150, espessuraParedeMm: 6.9, diametroInternoMm: 136.2, pressaoMca: 60, metrosPorBarra: 6, custo: 390.30, precoVenda: 603.25, coefC: 140 }, // TASK-070: lista mestra 25.08.2025 (custo/venda reais)
+  { sku: "TIGRE_R_150_PN80", descricao: "Tubo PVC rígido Ø150mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, diametroExternoMm: 150, espessuraParedeMm: 8.5, diametroInternoMm: 133, pressaoMca: 80, metrosPorBarra: 6, custo: 248.9, precoVenda: 448.0, coefC: 140 },
 ] as const;
 
 // ============================================================

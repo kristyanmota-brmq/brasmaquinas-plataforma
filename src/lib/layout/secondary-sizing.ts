@@ -12,7 +12,7 @@
  */
 
 import { headLoss, velocity, type TuboCandidato } from "@/lib/hydraulics/hazenWilliams";
-import { TUBOS_PVC_RIGIDO } from "@/lib/catalog/aspersores";
+import { TUBOS_PVC_LF } from "@/lib/catalog/aspersores"; // TASK-084: rede secundária SOMENTE PN40 (RT)
 import type { SecondaryPipe } from "@/lib/layout/hydraulic-connectivity";
 import type { Lateral } from "@/lib/layout/laterais";
 
@@ -175,14 +175,14 @@ export function selectSecondaryPipe(input: SelectSecondaryPipeInput): {
  *
  * @param secondaries  Ramais gerados por generateSecondaries().
  * @param laterais     Laterais derivadas pela rede (todas as laterais do projeto).
- * @param candidatePipes  Catálogo de tubos candidatos (padrão: TUBOS_PVC_RIGIDO).
+ * @param candidatePipes  Catálogo de tubos candidatos (padrão: TUBOS_PVC_LF — rede secundária PN40, ordem do RT 2026-06-12).
  * @param maxVelocityMs   Limite de velocidade (padrão: 1,5 m/s).
  * @param maxHeadLossMca  Limite de perda de carga (padrão: 3,0 mca = 10 % × 30 mca).
  */
 export function sizeAllSecondaries(
   secondaries: SecondaryPipe[],
   laterais: Lateral[],
-  candidatePipes: readonly TuboCandidato[] = TUBOS_PVC_RIGIDO as readonly TuboCandidato[],
+  candidatePipes: readonly TuboCandidato[] = TUBOS_PVC_LF as readonly TuboCandidato[],
   maxVelocityMs: number = DEFAULT_MAX_VEL_MS,
   maxHeadLossMca: number = DEFAULT_MAX_HF_MCA,
 ): SizedSecondaryPipe[] {

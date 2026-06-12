@@ -289,7 +289,7 @@ describe("T22-f..i — countSecondaryLBends", () => {
     expect(r.indeterminate).toBe(1);
   });
 
-  it("T22-j: 2 ramais em L com DNs diferentes → 2 entradas em byDnMm", () => {
+  it("T22-j: 2 secundárias em L com DNs diferentes → 2 entradas em byDnMm", () => {
     const sec1 = makeLShape("s1", "col-0");
     const sec2 = makeLShape("s2", "col-1");
     const sized = [makeSizedSec(sec1, 75), makeSizedSec(sec2, 100)];
@@ -357,7 +357,7 @@ describe("T22-m..p — buildBOM integração", () => {
     }));
 
     const curvaItem = bom.itens.find(
-      (i) => i.categoria === "CONEXAO" && i.descricao.toLowerCase().includes("ramais em l"),
+      (i) => i.categoria === "CONEXAO" && i.descricao.toLowerCase().includes("secundárias em l"),
     );
     expect(curvaItem).toBeDefined();
     expect(curvaItem!.quantidade).toBe(1);
@@ -428,7 +428,7 @@ describe("T22-m..p — buildBOM integração", () => {
       secondaries: [sec],
     }));
     const curvaRamal = bom.itens.find(
-      (i) => i.categoria === "CONEXAO" && i.descricao.includes("ramais em L"),
+      (i) => i.categoria === "CONEXAO" && i.descricao.includes("secundárias em L"),
     );
     expect(curvaRamal).toBeUndefined();
     expect(bom.meta.curvas90RamaisLCount).toBe(0);

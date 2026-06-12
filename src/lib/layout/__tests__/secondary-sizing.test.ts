@@ -244,7 +244,7 @@ describe("buildBOM — T9: ramais na BOM agrupados por SKU próprio (P4)", () =>
     if (result.hydraulic!.secondaries.length === 0) return; // sem ramais, ignorar
 
     const bomRamais = result.bom!.itens.filter(
-      (i) => i.categoria === "TUBO" && i.descricao.includes("ramais"),
+      (i) => i.categoria === "TUBO" && i.descricao.includes("secundárias"),
     );
     // Deve existir pelo menos um item de ramal na BOM
     expect(bomRamais.length).toBeGreaterThan(0);
