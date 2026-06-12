@@ -65,3 +65,6 @@ ai/.cache/
 # Evidências formais (PNGs e screenshots) ficam em docs/relatorios/evidencias/<TASK>/.
 .playwright-mcp/
 playwright-trace/
+
+# Propostas comerciais reais e dados de clientes (PII/contratos — nunca versionar)
+docs/PROJETO/
