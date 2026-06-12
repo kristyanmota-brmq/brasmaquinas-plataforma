@@ -48,7 +48,79 @@ export const ASPERSOR_PADRAO: Aspersor = {
   espacamentoPadraoM: 12,
 };
 
-export const ASPERSORES: Aspersor[] = [ASPERSOR_PADRAO];
+// ============================================================
+// TASK-060 — Família NAAN/NaanDanJain 5035 SD (homologação provisória)
+//
+// Origem dos dados:
+//  - SKU/custo/preço: lista de preços Rivulis no corpus de propostas reais
+//    (docs/PROJETO/, gitignored — ver docs/relatorios/2026-06-11-analise-propostas-reais.md)
+//  - Dados técnicos (vazão, diâmetro molhado, precipitação): tabela de
+//    performance Acurain 5035 SD do fabricante (jains.com, catálogo oficial)
+//  - Espaçamento 18×18: padrão das 3 propostas reais de aspersão analisadas
+//    (precipitação 6,5 mm/h no bocal 5,0×2,5 @ 3,0 bar — confere com proposta real)
+//
+// Status: PENDENTE_CONFIRMACAO_RT (ver 12-premissas §TASK-060). O 5035 SD
+// 5,0×2,5 é o aspersor mais usado nas propostas reais da Brasmáquinas.
+// ============================================================
+
+export const ASPERSOR_5035_SD_50X25: Aspersor = {
+  sku: "101080547",
+  descricao: "Aspersor 5035 SD - 2110l/h (3,0bar) - Bocais 5,0 x 2,5 mm (Púrpura) - NAAN",
+  marca: "NAAN",
+  modelo: "5035-SD",
+  bocal: "5,0 x 2,5 mm",
+  unidade: "UN",
+  custo: 43.86,
+  precoVenda: 52.6,
+  pressaoServicoMca: 30, // 3,0 kg/cm² — pressão da tabela do fabricante e das propostas reais
+  vazaoM3PorHora: 2.11,
+  raioMolhadoM: 15.75, // D = 31,5 m @ 3,0 bar (tabela Acurain 5035 SD dual nozzle)
+  espacamentoPadraoM: 18,
+};
+
+export const ASPERSOR_5035_SD_35X25: Aspersor = {
+  sku: "101084779",
+  descricao: "Aspersor 5035 SD - 1240l/h (3,0bar) - Bocais 3,5 x 2,5 mm (Azul) - NAAN",
+  marca: "NAAN",
+  modelo: "5035-SD",
+  bocal: "3,5 x 2,5 mm",
+  unidade: "UN",
+  custo: 43.86,
+  precoVenda: 52.6,
+  pressaoServicoMca: 30,
+  vazaoM3PorHora: 1.24,
+  raioMolhadoM: 13.6, // D = 27,2 m @ 3,0 bar
+  espacamentoPadraoM: 18,
+};
+
+/** Variante PC (part-circle) usada nas bordas dos projetos reais (~6% dos emissores). */
+export const ASPERSOR_5035_SD_PC_45: Aspersor = {
+  sku: "101085663",
+  descricao: "Aspersor 5035 SD PC - 1210l/h (2,5bar) - Bocal 4,5 mm (Marrom) - NAAN",
+  marca: "NAAN",
+  modelo: "5035-SD-PC",
+  bocal: "4,5 mm",
+  unidade: "UN",
+  custo: 71.42,
+  precoVenda: 85.64,
+  pressaoServicoMca: 25, // 2,5 kg/cm² — linha da tabela do fabricante para bocal 4,5 single
+  vazaoM3PorHora: 1.21,
+  raioMolhadoM: 14, // D = 28 m @ 2,5 bar
+  espacamentoPadraoM: 18,
+};
+
+export const ASPERSORES: Aspersor[] = [
+  ASPERSOR_PADRAO,
+  ASPERSOR_5035_SD_50X25,
+  ASPERSOR_5035_SD_35X25,
+  ASPERSOR_5035_SD_PC_45,
+];
+
+/** TASK-060: resolve aspersor por SKU; fallback para o padrão (5022) preserva legado. */
+export function getAspersorBySku(sku: string | undefined): Aspersor {
+  if (!sku) return ASPERSOR_PADRAO;
+  return ASPERSORES.find((a) => a.sku === sku) ?? ASPERSOR_PADRAO;
+}
 
 // ============================================================
 // TUBOS PVC TIGRE — linha LF (Liga Fácil) PN40 e PN60

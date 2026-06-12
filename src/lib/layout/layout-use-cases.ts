@@ -143,6 +143,9 @@ export function buildSectorizationForJornada(
   totalSprinklerCount: number,
   vazaoM3PorHoraPerSprinkler: number,
   tempoPorSetorMinutos: number,
+  // TASK-060: lâmina como input do projetista (default preserva comportamento) + cultura opcional
+  laminaMm: number = LAMINA_MM,
+  cultura?: string,
 ): NonNullable<ProjectLayout["sectorization"]> {
   const { sectorIndices } = buildSectorsByFlowWithColumnSplitting(
     physicalColumns,
@@ -155,7 +158,8 @@ export function buildSectorizationForJornada(
 
   return {
     jornadaHoras: jornada,
-    laminaMm: LAMINA_MM,
+    laminaMm,
+    cultura,
     setoresCount: jornada,
     tempoPorSetorMinutos,
     aspersoresPorSetor,

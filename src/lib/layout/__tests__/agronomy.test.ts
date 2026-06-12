@@ -122,3 +122,87 @@ describe("T59-4 — integração com calculateIrrigationProject", () => {
     expect(result.agronomy).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-060 — Família 5035 SD no catálogo + lâmina como input
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T60 — catálogo 5035 SD (homologação provisória) × agronomia", () => {
+  it("T60-1: getAspersorBySku resolve 5035 e faz fallback para o padrão", async () => {
+    const { getAspersorBySku, ASPERSOR_PADRAO, ASPERSOR_5035_SD_50X25 } =
+      await import("@/lib/catalog/aspersores");
+    expect(getAspersorBySku("101080547")).toBe(ASPERSOR_5035_SD_50X25);
+    expect(getAspersorBySku(undefined)).toBe(ASPERSOR_PADRAO);
+    expect(getAspersorBySku("sku-inexistente")).toBe(ASPERSOR_PADRAO);
+  });
+
+  it("T60-2: 5035 SD 5,0×2,5 @ 18×18 reproduz a intensidade da proposta real (6,51 mm/h)", async () => {
+    const { ASPERSOR_5035_SD_50X25 } = await import("@/lib/catalog/aspersores");
+    const intensidade = computeApplicationIntensityMmH(
+      ASPERSOR_5035_SD_50X25.vazaoM3PorHora,
+      ASPERSOR_5035_SD_50X25.espacamentoPadraoM,
+      ASPERSOR_5035_SD_50X25.espacamentoPadraoM,
+    );
+    expect(intensidade).toBeCloseTo(6.512, 2);
+  });
+
+  it("T60-3: espaçamento 18 ≤ raio molhado × 2 (sobreposição garantida) nos 3 aspersores novos", async () => {
+    const { ASPERSORES, ASPERSOR_PADRAO } = await import("@/lib/catalog/aspersores");
+    const novos = ASPERSORES.filter((a) => a !== ASPERSOR_PADRAO);
+    expect(novos).toHaveLength(3);
+    for (const a of novos) {
+      expect(a.espacamentoPadraoM).toBeLessThanOrEqual(a.raioMolhadoM * 2);
+      expect(a.custo).toBeGreaterThan(0);
+      expect(a.precoVenda).toBeGreaterThan(a.custo);
+    }
+  });
+
+  it("T60-4: ASPERSOR_PADRAO (5022) byte-idêntico — catálogo read-only preservado", async () => {
+    const { ASPERSOR_PADRAO } = await import("@/lib/catalog/aspersores");
+    expect(ASPERSOR_PADRAO.sku).toBe("101092");
+    expect(ASPERSOR_PADRAO.vazaoM3PorHora).toBe(1.5);
+    expect(ASPERSOR_PADRAO.espacamentoPadraoM).toBe(12);
+    expect(ASPERSOR_PADRAO.precoVenda).toBe(32.0);
+  });
+});
+
+describe("T60 — lâmina como input em buildSectorizationForJornada", () => {
+  it("T60-5: default preserva comportamento legado (laminaMm = 10, cultura ausente)", async () => {
+    const { buildSectorizationForJornada } = await import("@/lib/layout/layout-use-cases");
+    const layout = makeLayoutL();
+    const { generatePhysicalColumns } = await import("@/lib/layout/laterais");
+    const { ASPERSOR_PADRAO, TUBOS_PVC_LF } = await import("@/lib/catalog/aspersores");
+    const cols = generatePhysicalColumns(
+      layout.sprinklers!.positions, layout.sprinklers!.gridAngleDegrees,
+      layout.centroid!, layout.sprinklers!.espacamentoM,
+      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
+      TUBOS_PVC_LF,
+    );
+    const sec = buildSectorizationForJornada(cols, 9, layout.sprinklers!.positions.length, 1.5, 60);
+    expect(sec.laminaMm).toBe(10);
+    expect(sec.cultura).toBeUndefined();
+  });
+
+  it("T60-6: lâmina e cultura informadas fluem para a sectorization e o relatório agronômico", async () => {
+    const { buildSectorizationForJornada } = await import("@/lib/layout/layout-use-cases");
+    const layout = makeLayoutL();
+    const { generatePhysicalColumns } = await import("@/lib/layout/laterais");
+    const { ASPERSOR_PADRAO, TUBOS_PVC_LF } = await import("@/lib/catalog/aspersores");
+    const cols = generatePhysicalColumns(
+      layout.sprinklers!.positions, layout.sprinklers!.gridAngleDegrees,
+      layout.centroid!, layout.sprinklers!.espacamentoM,
+      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
+      TUBOS_PVC_LF,
+    );
+    const sec = buildSectorizationForJornada(
+      cols, 9, layout.sprinklers!.positions.length, 1.5, 60, 6.5, "pastagem",
+    );
+    expect(sec.laminaMm).toBe(6.5);
+    expect(sec.cultura).toBe("pastagem");
+
+    const result = calculateIrrigationProject({ ...layout, sectorization: sec });
+    expect(result.agronomy).not.toBeNull();
+    // lâmina 6,5 com 5022@12×12 (10,42 mm/h) → tempo/setor 0,624 h → floor(9/0,624) = 14
+    expect(result.agronomy!.tempoPorSetorH).toBeCloseTo(6.5 / 10.4167, 3);
+  });
+});

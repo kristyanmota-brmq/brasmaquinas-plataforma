@@ -87,7 +87,10 @@ export interface ProjectLayout {
   };
   sectorization?: {
     jornadaHoras: 9 | 14 | 21;
-    laminaMm: 10;
+    /** TASK-060: lâmina desejada (mm/dia) — input do projetista; default 10. */
+    laminaMm: number;
+    /** TASK-060: cultura informada pelo projetista (opcional; ex.: pastagem, capim). */
+    cultura?: string;
     setoresCount: number;
     tempoPorSetorMinutos: number;
     aspersoresPorSetor: number;

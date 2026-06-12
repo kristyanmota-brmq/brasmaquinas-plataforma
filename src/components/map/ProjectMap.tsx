@@ -881,11 +881,31 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
         layout.sprinklers.positions.length,
         ASPERSOR_PADRAO.vazaoM3PorHora,
         tempoPorSetorMinutos,
+        // TASK-060: preserva lâmina/cultura informadas ao trocar de jornada
+        layout.sectorization?.laminaMm ?? 10,
+        layout.sectorization?.cultura,
       );
       setLayout((l) => ({ ...l, sectorization }));
     },
-    [layout.sprinklers, layout.centroid, physicalColumns, tempoPorSetorMinutos]
+    [layout.sprinklers, layout.centroid, layout.sectorization, physicalColumns, tempoPorSetorMinutos]
   );
+
+  // TASK-060: lâmina/cultura são inputs do projetista — atualizam a sectorization
+  // sem reconstruir setores (não alteram sectorIndices; só o relatório agronômico).
+  const applyLamina = useCallback((laminaMm: number) => {
+    if (!Number.isFinite(laminaMm) || laminaMm <= 0) return;
+    setLayout((l) =>
+      l.sectorization ? { ...l, sectorization: { ...l.sectorization, laminaMm } } : l,
+    );
+  }, []);
+
+  const applyCultura = useCallback((cultura: string) => {
+    setLayout((l) =>
+      l.sectorization
+        ? { ...l, sectorization: { ...l.sectorization, cultura: cultura.trim() || undefined } }
+        : l,
+    );
+  }, []);
 
   const clearSectorization = useCallback(() => {
     setLayout((l) => {
@@ -2586,11 +2606,43 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
               </div>
             </div>
 
+            {/* TASK-060: lâmina desejada e cultura como inputs do projetista */}
+            {layout.sectorization && (
+              <div className="mb-3 grid grid-cols-2 gap-1.5">
+                <label className="text-[11px] uppercase tracking-[0.1em] text-ink-3">
+                  Lâmina (mm/dia)
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    step={0.5}
+                    value={layout.sectorization.laminaMm}
+                    onChange={(e) => applyLamina(parseFloat(e.target.value))}
+                    className="mt-1 w-full px-2 py-1.5 rounded-sm border border-border bg-background text-sm text-ink font-mono normal-case tracking-normal focus:outline-none focus:border-border-strong"
+                  />
+                </label>
+                <label className="text-[11px] uppercase tracking-[0.1em] text-ink-3">
+                  Cultura
+                  <input
+                    type="text"
+                    value={layout.sectorization.cultura ?? ""}
+                    onChange={(e) => applyCultura(e.target.value)}
+                    placeholder="ex.: pastagem"
+                    className="mt-1 w-full px-2 py-1.5 rounded-sm border border-border bg-background text-sm text-ink normal-case tracking-normal focus:outline-none focus:border-border-strong"
+                  />
+                </label>
+              </div>
+            )}
+
             {layout.sectorization && (
               <div className="space-y-2">
                 <div className="bg-background border border-border rounded-sm p-3">
                   <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-xs">
-                    <Row label="Lâmina bruta" value="10 mm" mono />
+                    <Row
+                      label="Lâmina bruta"
+                      value={`${layout.sectorization.laminaMm} mm/dia`}
+                      mono
+                    />
                     <Row
                       label="Tempo/setor"
                       value={`${layout.sectorization.tempoPorSetorMinutos} min`}
@@ -2610,6 +2662,20 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                       mono
                       span={2}
                     />
+                    {/* TASK-060: leitura agronômica (diagnóstico-only, TASK-059) */}
+                    {projectResult.agronomy && (
+                      <>
+                        <Row
+                          label="Intensidade"
+                          value={`${projectResult.agronomy.intensidadeAplicacaoMmH.toFixed(1)} mm/h`}
+                          mono
+                        />
+                        <Row
+                          label="Setores (agronômico)"
+                          value={String(projectResult.agronomy.setoresRecomendados)}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 

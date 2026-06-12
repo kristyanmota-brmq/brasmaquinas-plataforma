@@ -88,7 +88,7 @@ export interface ProjectInput {
   vazaoPorAspersorM3h: number;
   nSetores: number;
   jornadaHoras: 9 | 14 | 21;
-  laminaMm: 10;
+  laminaMm: number;
   principalLengthM: number;
   principalSegments: number;
   corridorValidated: boolean;

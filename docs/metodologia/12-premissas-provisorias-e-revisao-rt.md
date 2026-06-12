@@ -375,6 +375,22 @@ arquitetural**.
 
 ---
 
+## Família 5035 SD — homologação provisória (TASK-060)
+
+### Aspersores NAAN 5035 SD no catálogo
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `ASPERSOR_5035_SD_50X25` (101080547), `ASPERSOR_5035_SD_35X25` (101084779), `ASPERSOR_5035_SD_PC_45` (101085663) em `src/lib/catalog/aspersores.ts` |
+| **Valor usado** | Vazões/raios da tabela de performance Acurain 5035 SD do fabricante (jains.com); custo/preço da lista Rivulis do corpus interno; espaçamento padrão 18×18 m (padrão das propostas reais) |
+| **Motivo** | 5035 SD é o aspersor mais usado nas propostas reais da Brasmáquinas (3/3 propostas de aspersão analisadas); sem ele o gerador não reproduz o projeto típico |
+| **Origem** | Corpus de propostas reais (2026-06-11) + catálogo oficial do fabricante. Sem validação de campo própria. |
+| **Risco** | Raio/vazão de tabela de fabricante podem divergir de bocais desgastados/pressões reais; preço Rivulis pode estar defasado |
+| **Responsável futuro** | RT Brasmáquinas — confirmar homologação (vira APROVADO_RT) e completar a família (demais bocais) se necessário |
+| **Status** | `PENDENTE_CONFIRMACAO_RT` |
+
+---
+
 ## Histórico de revisões
 
 | Data | Autor | O que mudou |
@@ -398,3 +414,4 @@ arquitetural**.
 | 2026-05-23 | Claude Opus 4.7 (TASK-056 — correção metodológica) | **`WEIGHT_PRINCIPAL_CROSSES` e `A3_MIN_ECONOMY_BOM_PCT` reduzidos a 0** (desativados no MVP). Razão: usuário identificou que penalizar A3 (principal central) via score transformava **boa prática** (doc 13 §3.2 — "principal aproveita bordas, central ou corredores conforme conveniente") em **regra técnica absoluta**, violando ajuste 3 da TASK-055 (preservar distinção 4-tier). O custo real de A3 (mais cotovelos + spine_entries longos) já é capturado por P2 + P3 — penalty estética P1 e gate A3 eram redundantes. Helper `computePrincipalSplitsColumnsRatio` permanece exposto em `CandidateEvaluation.p1_*` como métrica diagnóstica; warning textual "principal central atravessa área — validar com RT/operacional" permanece ATIVO. Calibração RT/E09 pode reintroduzir peso > 0 com base empírica concreta (não estética). Testes vitest 887/887 preservados — comportamento da seleção arquitetural é equivalente no Projeto A pois A3 ainda perde naturalmente por scoreFinal (BOM A3 > BOM A0 por causa de secondaries mais longas). |
 | 2026-06-11 | Claude Fable 5 (TASK-054) | **Nova premissa: "Modelo de contagem de conexões fishbone".** BOM passa a contabilizar conexões da topologia v12 (resolve B-02): 1 tê principal→spine_entry + 1 junção spine_entry→spine (spine não-degenerado) + 1 tê spine→rib por rib, DN do tubo derivado, contagem conservadora (extremidade contada como tê; cruzeta como 2 conexões). DN sem SKU exato → `BOMPendingConnection` (sem fallback silencioso). Status `PENDENTE_REVISAO_RT_BRASMAQUINAS`. Nenhuma premissa existente alterada. 939 → 951 testes. |
 | 2026-06-11 | Claude Fable 5 (TASK-059) | **Nova premissa: "Equação agronômica de setorização — diagnóstico-only".** Motor agronômico mínimo (`agronomy.ts`): intensidade mm/h, tempo/setor, setores recomendados derivados — fórmula de proposta real Brasmáquinas; warnings comparativos em diagnostics (nunca blockers); setorização vigente intocada. Lâmina default 10 mm/dia agora sinalizada como premissa em todo diagnóstico. 953 → 965 testes. |
+| 2026-06-11 | Claude Fable 5 (TASK-060) | **Nova premissa: "Aspersores NAAN 5035 SD no catálogo" (homologação provisória PENDENTE_CONFIRMACAO_RT).** 3 entradas aditivas (5,0×2,5 @3bar; 3,5×2,5; PC 4,5) com dados do fabricante (jains.com) + custo/preço do corpus Rivulis; espaçamento 18×18. `laminaMm` virou input (`number`, default 10) + `cultura?` no schema. ASPERSOR_PADRAO byte-idêntico. 965 → 971 testes. |
