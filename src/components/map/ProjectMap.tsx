@@ -639,7 +639,14 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
           const prevCenter = map.getCenter();
           const prevZoom = map.getZoom();
           await new Promise<void>((resolve) => {
-            map.once("idle", () => resolve());
+            // TASK-062: timeout de segurança — se o mapa não disparar "idle"
+            // (tiles lentos/ambiente automatizado), segue com o canvas atual em
+            // vez de travar o export para sempre.
+            const fallback = setTimeout(() => resolve(), 5000);
+            map.once("idle", () => {
+              clearTimeout(fallback);
+              resolve();
+            });
             map.fitBounds(
               [[minLng, minLat], [maxLng, maxLat]] as [[number, number], [number, number]],
               { padding: 80, animate: false },

@@ -659,3 +659,42 @@ describe("T54-3..9 — buildBOM integração fishbone", () => {
     expect(diag.blockers.some((b) => b.includes("BOM incompleta"))).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-062 — Fallback de família TES para conexões fishbone DN 125/150
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T62 — fishbone DN125 resolve via família TES (PN80)", () => {
+  it("T62-1: spine_entry/spine/ribs DN125 → itens precificados com TE PVC SOLD. IRRIG PN80 125MM", () => {
+    const { spine, spineEntry, ribs } = makeFishboneSet(1, 2);
+    const secondaries = [spine, spineEntry, ...ribs];
+    const sized = [
+      makeSizedSec(spine, 125),
+      makeSizedSec(spineEntry, 125),
+      ...ribs.map((r) => makeSizedSec(r, 125)),
+    ];
+    const bom = buildBOM(makeMinimalBOMInput({ secondaries, sizedSecondaries: sized }));
+    const te125 = bom.itens.filter((i) => i.sku === "1000363");
+    expect(te125.length).toBeGreaterThanOrEqual(2); // principal→entry + junção (+ ribs)
+    expect(bom.meta.conexoesFishbonePendentesCount).toBe(0);
+    expect(bom.meta.tesPrincipalSpineEntryCount).toBe(1);
+    expect(bom.meta.juncoesSpineEntrySpineCount).toBe(1);
+    expect(bom.meta.tesSpineRibCount).toBe(2);
+  });
+
+  it("T62-2: DN sem match em NENHUMA família (32) continua pendência — sem aproximação", () => {
+    const { spine, spineEntry, ribs } = makeFishboneSet(2, 1);
+    const sized = [
+      makeSizedSec(spine, 75),
+      makeSizedSec(spineEntry, 75),
+      makeSizedSec(ribs[0], 32),
+    ];
+    const bom = buildBOM(makeMinimalBOMInput({
+      secondaries: [spine, spineEntry, ...ribs],
+      sizedSecondaries: sized,
+    }));
+    const pend = bom.meta.conexoesFisicasPendentes.filter((c) => c.tipo === "te_spine_rib");
+    expect(pend).toHaveLength(1);
+    expect(pend[0].dnMm).toBe(32);
+  });
+});

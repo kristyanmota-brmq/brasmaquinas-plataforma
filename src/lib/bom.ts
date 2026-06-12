@@ -5,6 +5,7 @@ import {
   TUBOS_PVC_RIGIDO,
   CURVAS_90,
   CURVAS_90_RIGIDAS,
+  TES,
   TES_DERIVACAO_LATERAL,
   selectTubo,
   selectCurva,
@@ -631,7 +632,14 @@ export function buildBOM(input: BOMInput): BOMResult {
     ): number => {
       let priced = 0;
       for (const [dn, qty] of family.byDnMm.entries()) {
-        const teCat = TES_DERIVACAO_LATERAL.find((t) => t.diametroMm === dn);
+        // TASK-062: resolução por DN exato em DUAS famílias — primeiro os tês LF
+        // de derivação lateral (DN 50/75/100, linha LF dos ribs), com fallback
+        // para a família TES soldável irrigação (DN 75/100/125/150 — inclui os
+        // PN80 de 125/150 usados em spine/spine_entry da linha rígida).
+        // Nunca aproxima DN: sem match exato → pendência.
+        const teCat =
+          TES_DERIVACAO_LATERAL.find((t) => t.diametroMm === dn) ??
+          TES.find((t) => t.diametroMm === dn);
         if (teCat) {
           priced += qty;
           itens.push({
