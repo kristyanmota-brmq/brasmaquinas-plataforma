@@ -246,3 +246,32 @@ describe("T61 — buildSelectedPipelineCoords com operationalSegments (topologia
     expect(result.lengthMeters).toBeGreaterThan(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-065 — Catálogo de bombas (ponto nominal) × validatePump
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T65 — bombas homologadas validam contra o projeto", () => {
+  it("T65-1: catálogo são (Q>0, HMT>0, fonte declarada)", async () => {
+    const { BOMBAS_HOMOLOGADAS } = await import("@/lib/catalog/aspersores");
+    expect(BOMBAS_HOMOLOGADAS.length).toBeGreaterThanOrEqual(2);
+    for (const b of BOMBAS_HOMOLOGADAS) {
+      expect(b.vazaoMaxM3h).toBeGreaterThan(0);
+      expect(b.hmtMca).toBeGreaterThan(0);
+      expect(b.fonte.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("T65-2: IMBIL 65-160 (100 m³/h @ 60 mca) → pumpValidation ok no fixture L", async () => {
+    const layout = { ...makeLayoutL(), pump: { hmtMca: 60, vazaoMaxM3h: 100, modelo: "IMBIL INI BLOC 65-160" } };
+    const result = calculateIrrigationProject(layout as Parameters<typeof calculateIrrigationProject>[0]);
+    expect(result.hydraulics?.pumpValidation.status).toBe("ok");
+    expect(result.diagnostics?.warnings.some((w) => w.includes("Bomba não informada"))).toBe(false);
+  });
+
+  it("T65-3: bomba subdimensionada → status insuficiente (gate preservado)", async () => {
+    const layout = { ...makeLayoutL(), pump: { hmtMca: 10, vazaoMaxM3h: 5 } };
+    const result = calculateIrrigationProject(layout as Parameters<typeof calculateIrrigationProject>[0]);
+    expect(result.hydraulics?.pumpValidation.status).toMatch(/pump_insufficient/);
+  });
+});

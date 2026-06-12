@@ -295,6 +295,42 @@ export const TES: Conexao[] = [
   },
 ];
 
+// ============================================================
+// TASK-065 — Bombas homologadas (provisório — PENDENTE_CONFIRMACAO_RT)
+// Pontos nominais extraídos de propostas REAIS do corpus (docs/PROJETO/,
+// gitignored): modelos nomeados pelos projetistas da Brasmáquinas.
+// Sem curva Q-H completa — validação por ponto nominal (validatePump).
+// ============================================================
+export interface BombaCatalogo {
+  modelo: string;
+  marca: string;
+  potenciaCv?: number;
+  /** Vazão nominal de operação (m³/h). */
+  vazaoMaxM3h: number;
+  /** HMT nominal de operação (mca). */
+  hmtMca: number;
+  /** Origem do dado de placa. */
+  fonte: string;
+}
+
+export const BOMBAS_HOMOLOGADAS: BombaCatalogo[] = [
+  {
+    modelo: "IMBIL INI BLOC 65-160",
+    marca: "IMBIL",
+    vazaoMaxM3h: 100,
+    hmtMca: 60,
+    fonte: "proposta real 12,7 ha (corpus 2026-06-11) — ponto de operação declarado",
+  },
+  {
+    modelo: "EBARA GSD MEGABLOC (30 CV)",
+    marca: "EBARA",
+    potenciaCv: 30,
+    vazaoMaxM3h: 67,
+    hmtMca: 73,
+    fonte: "proposta real 32 ha pastagem (corpus) — 134 m³/h em 2 conjuntos @ 73 mca",
+  },
+];
+
 // Adesivo PVC consumível
 export const ADESIVO_PVC: Produto = {
   sku: "1569000",

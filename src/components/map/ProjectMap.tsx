@@ -51,7 +51,7 @@ import {
   saveProjectLayout,
   type ProjectLayout,
 } from "@/app/projetos/[id]/actions";
-import { ASPERSOR_PADRAO, ASPERSORES, getAspersorBySku } from "@/lib/catalog/aspersores";
+import { ASPERSOR_PADRAO, ASPERSORES, BOMBAS_HOMOLOGADAS, getAspersorBySku } from "@/lib/catalog/aspersores";
 import type { BOMResult } from "@/lib/bom";
 import type { Lateral, PhysicalColumn } from "@/lib/layout/laterais";
 import { resolveSectorLabelAnchor } from "@/lib/layout/sector-label-anchor";
@@ -741,6 +741,20 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
 
   const removePumpSeparate = useCallback(() => {
     setLayout((l) => ({ ...l, pumpLocation: null, pumpSeparate: false }));
+  }, []);
+
+  // TASK-065: seleção de bomba do catálogo (ponto nominal) — alimenta validatePump.
+  const applyBomba = useCallback((modelo: string) => {
+    setLayout((l) => {
+      if (!modelo) {
+        const next = { ...l };
+        delete next.pump;
+        return next;
+      }
+      const b = BOMBAS_HOMOLOGADAS.find((x) => x.modelo === modelo);
+      if (!b) return l;
+      return { ...l, pump: { hmtMca: b.hmtMca, vazaoMaxM3h: b.vazaoMaxM3h, modelo: b.modelo } };
+    });
   }, []);
 
   const positionSprinklers = useCallback(() => {
@@ -2027,6 +2041,25 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                   : "Separar da captação"}
               </button>
             </div>
+            {/* TASK-065: conjunto moto-bomba do catálogo (ponto nominal; valida contra HMT/vazão) */}
+            <select
+              value={layout.pump?.modelo ?? ""}
+              onChange={(e) => applyBomba(e.target.value)}
+              className="mb-2 w-full px-2 py-1.5 rounded-sm border border-border bg-background text-xs text-ink focus:outline-none focus:border-border-strong"
+            >
+              <option value="">Selecionar conjunto moto-bomba…</option>
+              {BOMBAS_HOMOLOGADAS.map((b) => (
+                <option key={b.modelo} value={b.modelo}>
+                  {b.modelo} — {b.vazaoMaxM3h} m³/h @ {b.hmtMca} mca
+                </option>
+              ))}
+            </select>
+            {layout.pump && (
+              <div className="mb-2 text-[11px] font-mono text-ink-3">
+                Q {layout.pump.vazaoMaxM3h} m³/h · HMT {layout.pump.hmtMca} mca
+                {layout.pump.modelo ? ` · ${layout.pump.modelo}` : ""}
+              </div>
+            )}
             {!layout.pumpSeparate ? (
               <div className="text-xs text-ink-2 italic">
                 Posicionada junto da captação por padrão.

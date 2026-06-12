@@ -391,6 +391,20 @@ arquitetural**.
 
 ---
 
+## Bombas homologadas (TASK-065)
+
+### Catálogo de conjuntos moto-bomba — ponto nominal
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `BOMBAS_HOMOLOGADAS` em `src/lib/catalog/aspersores.ts` (IMBIL INI BLOC 65-160; EBARA GSD MEGABLOC 30 CV) |
+| **Valor usado** | Ponto nominal (Q, HMT) extraído de propostas reais do corpus; validação via `validatePump` (2 escalares) |
+| **Risco** | Sem curva Q-H completa, o ponto de operação real pode divergir do nominal; EBARA derivado (134 m³/h ÷ 2 conjuntos) |
+| **Responsável futuro** | RT — confirmar pontos com fabricante e evoluir para curva multiponto |
+| **Status** | `PENDENTE_CONFIRMACAO_RT` |
+
+---
+
 ## Histórico de revisões
 
 | Data | Autor | O que mudou |

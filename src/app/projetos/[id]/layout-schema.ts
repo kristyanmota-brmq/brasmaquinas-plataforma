@@ -114,5 +114,5 @@ export interface ProjectLayout {
   };
   center?: { lng: number; lat: number; zoom: number };
   /** Bomba selecionada. Quando ausente, HMT é calculada mas sem validação contra curva Q-H. */
-  pump?: { hmtMca: number; vazaoMaxM3h: number };
+  pump?: { hmtMca: number; vazaoMaxM3h: number; /** TASK-065: modelo do catálogo de bombas. */ modelo?: string };
 }
