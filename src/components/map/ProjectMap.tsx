@@ -26,6 +26,7 @@ import { candidateToSprinklers } from "@/lib/layout/optimizer-integration";
 import { selectBombaAutomatica } from "@/lib/layout/pump-auto-select";
 import { tuneSectorizationForValidArchitecture } from "@/lib/layout/architecture-auto-tune";
 import { fitTerrainGradient, MIN_TERRAIN_SAMPLES, type TerrainGradient, type TerrainSample } from "@/lib/layout/terrain-gradient";
+import { formatUtm } from "@/lib/layout/utm";
 import {
   MousePointer2,
   Hexagon,
@@ -2260,7 +2261,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
             label="Captação (fonte hídrica)"
             value={
               layout.waterSource
-                ? `Lat ${layout.waterSource.lat.toFixed(4)} · Lng ${layout.waterSource.lng.toFixed(4)}`
+                ? formatUtm(layout.waterSource.lat, layout.waterSource.lng)
                 : "Não marcada"
             }
             mono={!!layout.waterSource}
@@ -2316,8 +2317,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
             ) : layout.pumpLocation ? (
               <div className="group">
                 <div className="font-mono text-xs text-ink">
-                  {layout.pumpLocation.lng.toFixed(4)},{" "}
-                  {layout.pumpLocation.lat.toFixed(4)}
+                  {formatUtm(layout.pumpLocation.lat, layout.pumpLocation.lng)}
                 </div>
                 {layout.pumpLocation.elevation !== undefined && (
                   <span className="font-mono text-[11px] text-ink-3 inline-flex items-center gap-1 mt-0.5">
