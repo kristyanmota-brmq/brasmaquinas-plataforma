@@ -258,10 +258,11 @@ describe("T53-22 (v12) — Setor com inlets afastados misturados: perpendiculari
     expect(Math.abs(dotVec(spineDir, lateralDir))).toBeLessThan(1e-3);
   });
 
-  it("todos ribs com lengthM > 0.5m (sem ribs degenerados)", () => {
+  it("TASK-057: ribs conectam no ponto mais próximo da lateral (0 = tê no cruzamento; nunca grampo 180°)", () => {
     const ribs = secs.filter((s) => s.kind === "rib");
     for (const rib of ribs) {
-      expect(rib.lengthM).toBeGreaterThan(0.5);
+      expect(rib.lengthM).toBeGreaterThanOrEqual(0);
+      expect(Number.isFinite(rib.lengthM)).toBe(true);
     }
   });
 });
@@ -298,10 +299,10 @@ describe("T53-23 (v12) — Setor 0 Projeto A: 3 rentes (gap≈0) + 2 afastados (
     expect(secs.filter((s) => s.kind === undefined)).toHaveLength(0);
   });
 
-  it("nenhum rib com lengthM === 0 (fix da causa raiz v6)", () => {
+  it("TASK-057: spine que cruza a lateral gera rib de comprimento 0 (tê no cruzamento, não grampo)", () => {
     const ribs = secs.filter((s) => s.kind === "rib");
     for (const rib of ribs) {
-      expect(rib.lengthM).toBeGreaterThan(0);
+      expect(rib.lengthM).toBeGreaterThanOrEqual(0);
     }
   });
 });
@@ -345,11 +346,12 @@ describe("T53-24 (v12) — Todos inlets coincidem com principal: fallback MIN_HE
     expect(offsetM).toBeLessThan(3.5);
   });
 
-  it("ribs todos com lengthM ≈ 3m (rib alcança inlet do spine a 3m)", () => {
+  it("TASK-057: spine a 3m DENTRO do vão da lateral → ribs viram tê no cruzamento (lengthM 0)", () => {
+    // Antes da TASK-057 o rib descia 3 m por cima da lateral até o inlet (grampo 180°).
+    // Com o clamp, o spine cruza a lateral e a conexão é tê direto no cruzamento.
     const ribs = secs.filter((s) => s.kind === "rib");
     for (const rib of ribs) {
-      expect(rib.lengthM).toBeGreaterThan(2.5);
-      expect(rib.lengthM).toBeLessThan(3.5);
+      expect(rib.lengthM).toBeLessThan(0.01);
     }
   });
 });
@@ -530,10 +532,11 @@ describe("T53-29 (v12) — fieldSideSign via centroid: nunca colapsa para zero",
     expect(offsetM).toBeLessThan(3.5);
   });
 
-  it("ribs todos com lengthM > 0 (espinha NÃO degenera apesar de gap=0)", () => {
+  it("TASK-057: gap=0 → spine cruza laterais → ribs de comprimento 0 (tê), sem grampo", () => {
     const ribs = secs.filter((s) => s.kind === "rib");
     for (const rib of ribs) {
-      expect(rib.lengthM).toBeGreaterThan(0);
+      expect(rib.lengthM).toBeGreaterThanOrEqual(0);
+      expect(rib.lengthM).toBeLessThan(3.5); // nunca maior que o headland — sem retrocesso
     }
   });
 });
@@ -863,5 +866,70 @@ describe("T53-B03 — Grid 59° + lateral alinhada ao grid: rib→lateral em 0°
     // Spine entre -200 e -100 (faixa de inlets); NÃO acima de 0 (lado oposto).
     expect(spineYLocal).toBeLessThan(0);
     expect(spineYLocal).toBeGreaterThan(-200);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T57 (TASK-057) — Regressão da anomalia B-03: spine DENTRO do vão das laterais
+// Reprodução sintética do caso real "Fazenda do Paulo": laterais longas
+// (vão ~130 m) com principal na borda; o midpoint formula coloca o spine
+// dentro do vão → antes da TASK-057, ribs desciam por cima das laterais até
+// a ponta (deflexão 180°, "grampo de cabelo") gerando blockers angulares falsos.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T57 — spine dentro do vão da lateral: tê no cruzamento, sem grampo 180°", () => {
+  const CENTROID_57 = { lng: -45.0, lat: -12.0 };
+  const M_LAT = 111320;
+  const mLng = M_LAT * Math.cos((CENTROID_57.lat * Math.PI) / 180);
+  const ll = (xM: number, yM: number): [number, number] =>
+    [CENTROID_57.lng + xM / mLng, CENTROID_57.lat + yM / M_LAT];
+
+  // 3 laterais verticais longas (y de -130 a 0), principal na borda inferior (y=-132).
+  // Mistura de inlets: 1 rente + 2 afastados → midpoint do spine cai DENTRO do vão.
+  const colsT57 = [
+    makeCol("t57-c1", ll(0, -130), ll(0, 0), 0),
+    makeCol("t57-c2", ll(12, -100), ll(12, 0), 1),
+    makeCol("t57-c3", ll(24, -70), ll(24, 0), 2),
+  ];
+  const principalT57: [number, number][] = [ll(-20, -132), ll(40, -132)];
+  const opSegsT57: OperationalSegment[] = [
+    makeOpSeg("t57-c1", 1), makeOpSeg("t57-c2", 1), makeOpSeg("t57-c3", 1),
+  ];
+
+  const secsT57 = generateSecondaries(colsT57, principalT57, CENTROID_57, 0.5, {
+    operationalSegments: opSegsT57,
+    gridAngleDegrees: 0,
+  });
+
+  it("topologia v12 gerada (1 spine + 1 entry + 3 ribs)", () => {
+    expect(secsT57.filter((s) => s.kind === "spine")).toHaveLength(1);
+    expect(secsT57.filter((s) => s.kind === "rib")).toHaveLength(3);
+  });
+
+  it("nenhum rib retrocede além do vão da lateral (toCoord dentro do span Y da coluna)", () => {
+    const ribs = secsT57.filter((s) => s.kind === "rib");
+    const colById = new Map(colsT57.map((c) => [c.id, c]));
+    for (const rib of ribs) {
+      const col = colById.get(rib.physicalColumnId)!;
+      const yTo = (rib.toCoord[1] - CENTROID_57.lat) * M_LAT;
+      const ys = [
+        (col.startLngLat[1] - CENTROID_57.lat) * M_LAT,
+        (col.endLngLat[1] - CENTROID_57.lat) * M_LAT,
+      ].sort((a, b) => a - b);
+      expect(yTo).toBeGreaterThanOrEqual(ys[0] - 0.01);
+      expect(yTo).toBeLessThanOrEqual(ys[1] + 0.01);
+    }
+  });
+
+  it("validação angular: ZERO junções rib→lateral com deflexão 180° (B-03 eliminada)", () => {
+    const report = detectNetworkAngleIssues({
+      physicalColumns: colsT57,
+      secondaries: secsT57,
+      principalCoords: principalT57,
+      adutoraCoords: [],
+      centroid: CENTROID_57,
+    });
+    const lateralIssues = report.issues.filter((i) => i.elementType === "lateral");
+    expect(lateralIssues).toHaveLength(0);
   });
 });

@@ -691,19 +691,42 @@ export function routeEspinhaDePeixe(
   const spineEntryLengthM = dist2D(spineEntryBottomLocalProjected, spineEntryTopLocal);
 
   // ── 10. Ribs: 1 por coluna, perpendicular ao spine (= paralelo ao eixo Y local) ──
-  // Cada rib conecta o inlet à spine na mesma X local do inlet (perpendicular geométrica).
-  // Direção do rib = paralelo aos laterais (Y local) → junção rib↔lateral em 0° (luva).
+  // Cada rib conecta o spine ao PONTO MAIS PRÓXIMO da lateral física na mesma X local.
+  //
+  // TASK-057 (causa raiz da anomalia B-03): a versão anterior conectava SEMPRE no
+  // inlet (extremo mais próximo da principal). Quando a fórmula do midpoint coloca
+  // o spine DENTRO do vão Y da lateral (campo irregular/paralelogramo — caso real
+  // "Fazenda do Paulo": spine em y=-76 com laterais indo de -130 a +1,6), o rib
+  // descia por cima da lateral até a ponta → deflexão 180° ("grampo de cabelo")
+  // → 10 blockers angulares falso-construtivos.
+  //
+  // Regra corrigida — clamp de spineY ao vão [yMin, yMax] da lateral:
+  //   - spine ABAIXO do vão  → conecta no extremo inferior (comportamento anterior; luva 0°)
+  //   - spine ACIMA do vão   → conecta no extremo superior (luva 0°)
+  //   - spine CRUZA a lateral → rib de comprimento 0: tê spine→lateral direto no
+  //     cruzamento (junção 90° garantida por construção; validação angular pula
+  //     ribs de comprimento ~0 e a BOM TASK-054 já conta 1 tê por rib)
   const ribs = cols.map((col, idx) => {
     const inletLngLat = inletsLngLat[idx];
     const inletLocal = inletsLocal[idx];
+
+    const colStartLocal = toLocal(col.startLngLat);
+    const colEndLocal = toLocal(col.endLngLat);
+    const colYMin = Math.min(colStartLocal[1], colEndLocal[1]);
+    const colYMax = Math.max(colStartLocal[1], colEndLocal[1]);
+    const targetY = Math.min(Math.max(spineYLocal, colYMin), colYMax);
+
     const ribTopLocal: [number, number] = [inletLocal[0], spineYLocal];
+    const ribBottomLocal: [number, number] = [inletLocal[0], targetY];
     const ribTopLngLat = fromLocal(ribTopLocal);
-    const ribLengthM = dist2D(ribTopLocal, inletLocal);
+    const ribBottomLngLat =
+      targetY === inletLocal[1] ? inletLngLat : fromLocal(ribBottomLocal);
+    const ribLengthM = dist2D(ribTopLocal, ribBottomLocal);
     return {
       colId: col.id,
       fromCoord: ribTopLngLat,
-      toCoord: inletLngLat,
-      coords: [ribTopLngLat, inletLngLat] as [number, number][],
+      toCoord: ribBottomLngLat,
+      coords: [ribTopLngLat, ribBottomLngLat] as [number, number][],
       lengthM: ribLengthM,
     };
   });
