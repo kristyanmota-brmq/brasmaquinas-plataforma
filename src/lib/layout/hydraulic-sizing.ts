@@ -604,7 +604,9 @@ export function sizeHydraulics(
       if (lateral) {
         const latIntMm = internoMm(lateral.selecao.tubo);
         const F = christiansenF(lateral.sprinklerCount);
-        hfLat = headLoss(lateral.vazaoM3h, lateral.comprimentoM, latIntMm, lateral.selecao.tubo.coefC) * F;
+        // TASK-074: lateral telescopada (75→50) usa a hf da decomposição
+        hfLat = lateral.selecao.telescopia?.hfTotalMca
+          ?? headLoss(lateral.vazaoM3h, lateral.comprimentoM, latIntMm, lateral.selecao.tubo.coefC) * F;
         const latVel = velocity(lateral.vazaoM3h, latIntMm);
         sLatSegs.push({
           id: `lateral-${seg.id}`,

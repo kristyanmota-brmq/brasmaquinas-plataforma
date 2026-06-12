@@ -419,6 +419,19 @@ arquitetural**.
 
 ---
 
+## Telescopia de laterais (TASK-074)
+
+### Cascata de DN 75→50 — regra RT
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `computeTelescopia75para50` (laterais.ts): maior cauda DN50 com hf_telescopada ≤ 20%×Ps e v ≤ máx; F global nas 3 parcelas |
+| **Decisão RT (Kristyan Mota, 2026-06-12)** | **"Não cascatearei as laterais para tubos menor que 50mm. A economia não compensa o custo da personalização."** — DN50 é o piso absoluto da cascata |
+| **Validação** | Caso histórico 12,7 ha: BOM −18,2%; mix de laterais converge ao padrão real |
+| **Status** | `APROVADO_RT` (decisão explícita do RT humano no chat) |
+
+---
+
 ## Histórico de revisões
 
 | Data | Autor | O que mudou |

@@ -76,7 +76,10 @@ describe("selectLateralTube — gate de velocidade com diâmetro interno", () =>
     const F = christiansenF(n);
     const hfComDint    = headLoss(col.vazaoM3h, comprimentoM, 69, DN75.coefC) * F;
     const hfComNominal = headLoss(col.vazaoM3h, comprimentoM, 75, DN75.coefC) * F;
-    expect(col.selecao.perdaCargaM).toBeCloseTo(hfComDint, 4);
+    // TASK-074: com telescopia, perdaCargaM = hf da decomposição (que usa Dint em
+    // todas as parcelas por construção); sem telescopia, igual ao cálculo Dint puro.
+    const esperado = col.selecao.telescopia?.hfTotalMca ?? hfComDint;
+    expect(col.selecao.perdaCargaM).toBeCloseTo(esperado, 4);
     expect(col.selecao.perdaCargaM).not.toBeCloseTo(hfComNominal, 3);
   });
 

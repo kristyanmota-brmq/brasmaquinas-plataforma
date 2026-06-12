@@ -364,3 +364,67 @@ describe("T70/T73 — PN60 e margem", () => {
     expect(meta.margemBrutaR$).toBeGreaterThan(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-074 — Telescopia de lateral 75→50 (decisão RT: nunca abaixo de DN50)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T74 — telescopia 75→50", () => {
+  it("T74-1: lateral longa DN75 ganha cauda DN50 com hf ≤ limite e contagens coerentes", async () => {
+    const { generatePhysicalColumns } = await import("@/lib/layout/laterais");
+    const { ASPERSOR_PADRAO, TUBOS_PVC_LF } = await import("@/lib/catalog/aspersores");
+    const M = 111320, C = { lng: -45.0, lat: -12.0 };
+    const mLng = M * Math.cos((C.lat * Math.PI) / 180);
+    // 1 coluna de 20 aspersores @12 m (228 m) — vazão 30 m³/h → DN75 com cauda 50
+    const positions: [number, number][] = Array.from({ length: 20 }, (_, i) =>
+      [C.lng, C.lat + (i * 12) / M] as [number, number]);
+    const cols = generatePhysicalColumns(positions, 0, C, 12,
+      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: 30 }, TUBOS_PVC_LF);
+    expect(cols).toHaveLength(1);
+    const sel = cols[0].selecao;
+    expect(sel.tubo.diametroMm).toBe(75);
+    expect(sel.telescopia).toBeDefined();
+    const t = sel.telescopia!;
+    expect(t.tuboCauda.diametroMm).toBe(50); // nunca < 50 (decisão RT)
+    expect(t.sprinklersCabeceira + t.sprinklersCauda).toBe(20);
+    expect(t.sprinklersCauda).toBeGreaterThanOrEqual(2);
+    expect(t.comprimentoCabeceiraM + t.comprimentoCaudaM).toBeCloseTo(cols[0].comprimentoM, 6);
+    expect(t.hfTotalMca).toBeLessThanOrEqual(30 * 0.2 + 1e-9);
+    expect(sel.perdaCargaM).toBeCloseTo(t.hfTotalMca, 9);
+  });
+
+  it("T74-2: lateral curta (DN50 integral) NÃO telescopa; BOM divide tubos + 1 tê de redução", async () => {
+    const { generatePhysicalColumns } = await import("@/lib/layout/laterais");
+    const { ASPERSOR_PADRAO, TUBOS_PVC_LF } = await import("@/lib/catalog/aspersores");
+    const { buildBOM } = await import("@/lib/bom");
+    const M = 111320, C = { lng: -45.0, lat: -12.0 };
+    // curta: 4 aspersores → DN50 direto, sem telescopia
+    const shortPos: [number, number][] = Array.from({ length: 4 }, (_, i) =>
+      [C.lng, C.lat + (i * 12) / M] as [number, number]);
+    const colsShort = generatePhysicalColumns(shortPos, 0, C, 12,
+      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: 30 }, TUBOS_PVC_LF);
+    expect(colsShort[0].selecao.tubo.diametroMm).toBe(50);
+    expect(colsShort[0].selecao.telescopia).toBeUndefined();
+
+    // longa: 20 aspersores → BOM com DN75 (cabeceira) + DN50 (cauda) + tê 75×50
+    const longPos: [number, number][] = Array.from({ length: 20 }, (_, i) =>
+      [C.lng, C.lat + (i * 12) / M] as [number, number]);
+    const colsLong = generatePhysicalColumns(longPos, 0, C, 12,
+      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: 30 }, TUBOS_PVC_LF);
+    const bom = buildBOM({
+      sprinklers: { count: 20, vazaoProjetoM3PorHora: 30, espacamentoM: 12 },
+      sectorization: { setoresCount: 1, sectorIndices: new Array(20).fill(0), vazaoPorSetorM3PorHora: 30 },
+      mainPipeline: { lengthMeters: 12, segments: 1 },
+      physicalColumns: colsLong,
+      laterais: [],
+      secondaries: [],
+      constructability: { controlPoints: [], columnDiagnostics: [], controlPointsCount: 0, pendingControlPointsCount: 0, independentFeedRequiredCount: 0, constructabilityStatus: "ok" },
+    } as never);
+    expect(bom.meta.colunasTelescopadasCount).toBe(1);
+    const skus = bom.itens.filter((i) => i.categoria === "TUBO").map((i) => i.sku);
+    expect(skus).toContain("TIGRE_LF_75_PN40");
+    expect(skus).toContain("TIGRE_LF_50_PN40");
+    const te = bom.itens.find((i) => i.sku === "2090612");
+    expect(te?.quantidade).toBe(1);
+  });
+});

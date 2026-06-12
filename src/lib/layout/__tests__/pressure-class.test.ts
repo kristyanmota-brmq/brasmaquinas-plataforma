@@ -299,6 +299,7 @@ function makeMinimalBOM(): BOMResult {
       conexoesFishbonePendentesCount: 0,
       custoTotalAquisicaoR$: 0,
       margemBrutaR$: 0,
+      colunasTelescopadasCount: 0,
     },
   };
 }

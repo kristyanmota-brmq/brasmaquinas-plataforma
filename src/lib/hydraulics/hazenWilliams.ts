@@ -25,6 +25,22 @@ export interface SelecaoTubo {
   perdaCargaM: number;
   velocidadeMs: number;
   perdaCargaPercentual: number;
+  /**
+   * TASK-074: cascata de DN na lateral (telescopia 75→50 — decisão RT 2026-06-12:
+   * nunca cascatear abaixo de DN50). Presente quando a cauda da lateral pode rodar
+   * em DN50 mantendo hf combinada ≤ limite e velocidade ≤ máx. `tubo` continua sendo
+   * o da CABECEIRA (DN75) — consumidores que ignoram telescopia permanecem corretos
+   * (conservadores).
+   */
+  telescopia?: {
+    tuboCauda: TuboCandidato;
+    comprimentoCabeceiraM: number;
+    comprimentoCaudaM: number;
+    sprinklersCabeceira: number;
+    sprinklersCauda: number;
+    /** hf da lateral telescopada (decomposição: hf75(total) − hf75(cauda) + hf50(cauda)). */
+    hfTotalMca: number;
+  };
 }
 
 export function headLoss(

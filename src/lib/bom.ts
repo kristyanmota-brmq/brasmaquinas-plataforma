@@ -8,6 +8,7 @@ import {
   CURVAS_90_RIGIDAS,
   TES,
   TES_DERIVACAO_LATERAL,
+  TE_REDUCAO_TELESCOPIA_75_50,
   selectTubo,
   selectCurva,
   selectTe,
@@ -160,6 +161,8 @@ export interface BOMResult {
     custoTotalAquisicaoR$: number;
     /** TASK-073 (E08): margem bruta = totalGeral − custo (uso interno). */
     margemBrutaR$: number;
+    /** TASK-074: colunas com lateral telescopada 75→50. */
+    colunasTelescopadasCount: number;
   };
 }
 
@@ -318,13 +321,38 @@ export function buildBOM(input: BOMInput): BOMResult {
   // ── Laterais — comprimento por coluna FÍSICA (não por trecho operacional) ──
   type TuboLFEntry = (typeof TUBOS_PVC_LF)[number];
   const lateraisPorSku = new Map<string, { tubo: TuboLFEntry; comprimentoTotal: number }>();
-  for (const col of physicalColumns) {
-    const sku = col.selecao.tubo.sku;
+  // TASK-074: telescopia 75→50 — cabeceira e cauda agrupadas em SKUs próprios;
+  // 1 tê de redução soldável 75×50 por coluna telescopada (na quebra).
+  let colunasTelescopadasCount = 0;
+  const addLateralLen = (sku: string, lenM: number) => {
     const tuboCat = TUBOS_PVC_LF.find((t) => t.sku === sku);
-    if (!tuboCat) continue;
+    if (!tuboCat) return;
     const entry = lateraisPorSku.get(sku) ?? { tubo: tuboCat, comprimentoTotal: 0 };
-    entry.comprimentoTotal += col.comprimentoM;
+    entry.comprimentoTotal += lenM;
     lateraisPorSku.set(sku, entry);
+  };
+  for (const col of physicalColumns) {
+    const tel = col.selecao.telescopia;
+    if (tel) {
+      colunasTelescopadasCount++;
+      addLateralLen(col.selecao.tubo.sku, tel.comprimentoCabeceiraM);
+      addLateralLen(tel.tuboCauda.sku, tel.comprimentoCaudaM);
+    } else {
+      addLateralLen(col.selecao.tubo.sku, col.comprimentoM);
+    }
+  }
+  if (colunasTelescopadasCount > 0) {
+    itens.push({
+      sku: TE_REDUCAO_TELESCOPIA_75_50.sku,
+      descricao: `${TE_REDUCAO_TELESCOPIA_75_50.descricao} (transição da lateral telescopada)`,
+      marca: TE_REDUCAO_TELESCOPIA_75_50.marca,
+      unidade: TE_REDUCAO_TELESCOPIA_75_50.unidade,
+      quantidade: colunasTelescopadasCount,
+      precoUnitario: TE_REDUCAO_TELESCOPIA_75_50.precoVenda,
+      custoUnitario: TE_REDUCAO_TELESCOPIA_75_50.custo,
+      total: colunasTelescopadasCount * TE_REDUCAO_TELESCOPIA_75_50.precoVenda,
+      categoria: "CONEXAO",
+    });
   }
 
   let comprimentoLateraisM = 0;
@@ -818,18 +846,29 @@ export function buildBOM(input: BOMInput): BOMResult {
   let kitAspersorDnNaoHomologadoCount = 0;
   const kitBySku = new Map<string, { item: KitAspersor5022Item; quantidade: number }>();
 
-  for (const col of physicalColumns) {
-    const dn = col.selecao.tubo.diametroMm;
+  // TASK-074: coluna telescopada divide o kit por DN (cabeceira DN75 / cauda DN50 —
+  // o tee de derivação do riser acompanha o DN do trecho onde o aspersor está).
+  const addKit = (dn: number, count: number) => {
+    if (count <= 0) return;
     const kit = selectKitAspersor5022(dn);
     if (kit) {
-      kitAspersorResolvCount += col.sprinklerCount;
+      kitAspersorResolvCount += count;
       for (const item of kit) {
         const entry = kitBySku.get(item.sku);
-        if (entry) entry.quantidade += col.sprinklerCount;
-        else kitBySku.set(item.sku, { item, quantidade: col.sprinklerCount });
+        if (entry) entry.quantidade += count;
+        else kitBySku.set(item.sku, { item, quantidade: count });
       }
     } else {
-      kitAspersorDnNaoHomologadoCount += col.sprinklerCount;
+      kitAspersorDnNaoHomologadoCount += count;
+    }
+  };
+  for (const col of physicalColumns) {
+    const tel = col.selecao.telescopia;
+    if (tel) {
+      addKit(col.selecao.tubo.diametroMm, tel.sprinklersCabeceira);
+      addKit(tel.tuboCauda.diametroMm, tel.sprinklersCauda);
+    } else {
+      addKit(col.selecao.tubo.diametroMm, col.sprinklerCount);
     }
   }
 
@@ -908,6 +947,7 @@ export function buildBOM(input: BOMInput): BOMResult {
       conexoesFishbonePendentesCount,
       custoTotalAquisicaoR$: custoTotalAquisicao,
       margemBrutaR$: totalGeral - custoTotalAquisicao,
+      colunasTelescopadasCount,
     },
   };
 }

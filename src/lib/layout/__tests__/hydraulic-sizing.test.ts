@@ -159,12 +159,21 @@ describe("TAREFA 3+8 — benchmarks e testes mandatórios", () => {
     expect(headLoss(30, 6, 125, 145)).toBeCloseTo(0.0225, 3);
   });
 
-  it("T8-2: lateral do caminho crítico tem headLossM < rawHW (Christiansen F < 1)", () => {
-    const report = sizeHydraulics(completeResultL())!;
+  it("T8-2: hf da lateral crítica — Christiansen < raw (uniforme) ou ≤ 20%×Ps (telescopada TASK-074)", () => {
+    const result = completeResultL();
+    const report = sizeHydraulics(result)!;
     const critLat = report.criticalPath.criticalPathSegments.find((s) => s.type === "lateral")!;
     expect(critLat).toBeDefined();
-    const rawHf = headLoss(critLat.flowM3h, critLat.lengthM, critLat.diametroMm, critLat.coefC);
-    expect(critLat.headLossM).toBeLessThan(rawHf);
+    const latObj = result.distribution!.laterais.find((l) => `lateral-${l.physicalColumnId}` === critLat.id.replace(/^lateral-/, "lateral-"))
+      ?? result.distribution!.laterais[0];
+    if (latObj.selecao.telescopia) {
+      // TASK-074: lateral telescopada — hf vem da decomposição 75→50, com teto absoluto
+      expect(critLat.headLossM).toBeCloseTo(latObj.selecao.telescopia.hfTotalMca, 6);
+      expect(critLat.headLossM).toBeLessThanOrEqual(30 * 0.2 + 1e-6);
+    } else {
+      const rawHf = headLoss(critLat.flowM3h, critLat.lengthM, critLat.diametroMm, critLat.coefC);
+      expect(critLat.headLossM).toBeLessThan(rawHf);
+    }
   });
 
   it("T8-3: adutora dimensionada para ~1/nSetores do total (one_sector_at_a_time)", () => {

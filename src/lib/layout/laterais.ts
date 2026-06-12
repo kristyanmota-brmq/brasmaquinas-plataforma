@@ -66,15 +66,69 @@ export interface LateralCapacityInfo {
  * `lateralCapacity` é propagado para `PhysicalColumn`/`Lateral` e consumido por
  * `detectLateralCapacityViolations` para gerar blocker técnico no diagnóstico.
  */
+/**
+ * TASK-074 — Telescopia 75→50 da lateral (decisão RT 2026-06-12: nunca abaixo de DN50).
+ *
+ * Quando a lateral selecionou DN75, procura a MAIOR cauda (k aspersores a partir da
+ * ponta) que pode rodar em DN50 mantendo:
+ *   hf_telescopada = hf75(Ltot,Qtot) − hf75(Lcauda,Qcauda) + hf50(Lcauda,Qcauda) ≤ limite
+ *   velocidade da cauda em DN50 ≤ MAX_VELOCITY_LATERAL_MS
+ * F de Christiansen global aplicado às três parcelas (aproximação consistente com o
+ * seletor; documentada na premissa TASK-074). Cauda mínima: 2 aspersores; cabeceira ≥ 1.
+ */
+function computeTelescopia75para50(
+  selecionado: TuboCandidato,
+  vazaoM3h: number,
+  comprimentoM: number,
+  nSprinklers: number,
+  catOrdenado: TuboCandidato[],
+  limitePerda: number,
+  F: number,
+): SelecaoTubo["telescopia"] {
+  if (selecionado.diametroMm !== 75 || nSprinklers < 3) return undefined;
+  const dn50 = catOrdenado.find((t) => t.diametroMm === 50);
+  if (!dn50) return undefined;
+
+  const d75 = selecionado.diametroInternoMm ?? selecionado.diametroMm;
+  const d50 = dn50.diametroInternoMm ?? dn50.diametroMm;
+  const hfTotal75 = headLoss(vazaoM3h, comprimentoM, d75, selecionado.coefC) * F;
+  const espacamentoM = comprimentoM / Math.max(nSprinklers - 1, 1);
+  const vazaoPorAspersor = vazaoM3h / nSprinklers;
+
+  // maior cauda possível: k aspersores a partir da ponta (k de n−1 até 2)
+  for (let k = nSprinklers - 1; k >= 2; k--) {
+    const lCauda = k * espacamentoM;
+    const qCauda = k * vazaoPorAspersor;
+    if (velocity(qCauda, d50) > MAX_VELOCITY_LATERAL_MS) continue;
+    const hfTel =
+      hfTotal75 -
+      headLoss(qCauda, lCauda, d75, selecionado.coefC) * F +
+      headLoss(qCauda, lCauda, d50, dn50.coefC) * F;
+    if (hfTel <= limitePerda) {
+      return {
+        tuboCauda: dn50,
+        comprimentoCabeceiraM: comprimentoM - lCauda,
+        comprimentoCaudaM: lCauda,
+        sprinklersCabeceira: nSprinklers - k,
+        sprinklersCauda: k,
+        hfTotalMca: hfTel,
+      };
+    }
+  }
+  return undefined;
+}
 function selectLateralTube({
   vazaoM3h,
   comprimentoM,
+  nSprinklers,
   tubos,
   limitePerda,
   F,
 }: {
   vazaoM3h: number;
   comprimentoM: number;
+  /** TASK-074: necessário para a telescopia discreta (split de cauda por aspersor). */
+  nSprinklers: number;
   tubos: TuboCandidato[];
   limitePerda: number;
   F: number;
@@ -82,6 +136,7 @@ function selectLateralTube({
   selecionado: TuboCandidato;
   hfFinal: number;
   lateralCapacity: LateralCapacityInfo;
+  telescopia?: SelecaoTubo["telescopia"];
 } {
   const catOrdenado = [...tubos].sort((a, b) => a.diametroMm - b.diametroMm);
 
@@ -94,6 +149,7 @@ function selectLateralTube({
         selecionado: tubo,
         hfFinal: hf,
         lateralCapacity: { ok: true, hfM: hf, velMs: vel },
+        telescopia: computeTelescopia75para50(tubo, vazaoM3h, comprimentoM, nSprinklers, catOrdenado, limitePerda, F),
       };
     }
   }
@@ -126,13 +182,15 @@ function buildLateralSelecao(
   hfFinal: number,
   vazaoM3h: number,
   pressaoServico: number,
+  telescopia?: SelecaoTubo["telescopia"],
 ): SelecaoTubo {
   const dIntMm = selecionado.diametroInternoMm ?? selecionado.diametroMm;
   return {
     tubo: selecionado,
-    perdaCargaM: hfFinal,
+    perdaCargaM: telescopia?.hfTotalMca ?? hfFinal,
     velocidadeMs: velocity(vazaoM3h, dIntMm),
-    perdaCargaPercentual: hfFinal / pressaoServico,
+    perdaCargaPercentual: (telescopia?.hfTotalMca ?? hfFinal) / pressaoServico,
+    telescopia,
   };
 }
 
@@ -453,10 +511,10 @@ export function generatePhysicalColumns(
     const comprimentoM = routeLengthM + 0.5;
     const vazaoM3h = n * aspersor.vazao;
     const F = christiansenF(n);
-    const { selecionado, hfFinal, lateralCapacity } = selectLateralTube({
-      vazaoM3h, comprimentoM, tubos: [...catalogoLF], limitePerda, F,
+    const { selecionado, hfFinal, lateralCapacity, telescopia } = selectLateralTube({
+      vazaoM3h, comprimentoM, nSprinklers: n, tubos: [...catalogoLF], limitePerda, F,
     });
-    const selecao = buildLateralSelecao(selecionado, hfFinal, vazaoM3h, aspersor.pressaoServico);
+    const selecao = buildLateralSelecao(selecionado, hfFinal, vazaoM3h, aspersor.pressaoServico, telescopia);
     const startLngLat = routeCoords[0];
     const endLngLat = routeCoords[routeCoords.length - 1];
     return {
@@ -623,7 +681,7 @@ export function generateLateraisLegacyForDebug(
       const F = christiansenF(n);
 
       const { selecionado, hfFinal, lateralCapacity } = selectLateralTube({
-        vazaoM3h, comprimentoM, tubos: [...catalogoLF], limitePerda, F,
+        vazaoM3h, comprimentoM, nSprinklers: n, tubos: [...catalogoLF], limitePerda, F,
       });
       const selecao = buildLateralSelecao(selecionado, hfFinal, vazaoM3h, aspersor.pressaoServico);
 
@@ -744,10 +802,10 @@ export function deriveLateraisFromNetwork(
     const vazaoM3h = seg.vazaoM3h;
     const F = christiansenF(n);
 
-    const { selecionado, hfFinal, lateralCapacity } = selectLateralTube({
-      vazaoM3h, comprimentoM, tubos: [...catalogoLF], limitePerda, F,
+    const { selecionado, hfFinal, lateralCapacity, telescopia } = selectLateralTube({
+      vazaoM3h, comprimentoM, nSprinklers: n, tubos: [...catalogoLF], limitePerda, F,
     });
-    const selecao = buildLateralSelecao(selecionado, hfFinal, vazaoM3h, aspersor.pressaoServico);
+    const selecao = buildLateralSelecao(selecionado, hfFinal, vazaoM3h, aspersor.pressaoServico, telescopia);
 
     // Invariante TASK-028 ajuste 3: endpoints derivados da rota real.
     const startLngLat = routeCoords[0];

@@ -331,6 +331,19 @@ export const BOMBAS_HOMOLOGADAS: BombaCatalogo[] = [
   },
 ];
 
+// TASK-074 — Transição da lateral telescopada (75→50): tê de redução soldável
+// na posição do aspersor de quebra. Custo/venda REAIS (lista mestra, aba VIQUA).
+export const TE_REDUCAO_TELESCOPIA_75_50: Conexao = {
+  sku: "2090612",
+  descricao: "Te redução soldável 75 x 50 - VIQUA",
+  marca: "VIQUA",
+  unidade: "UN",
+  custo: 13.65,
+  precoVenda: 22.8,
+  diametroMm: 75,
+  tipo: "reducao",
+};
+
 // Adesivo PVC consumível
 export const ADESIVO_PVC: Produto = {
   sku: "1569000",

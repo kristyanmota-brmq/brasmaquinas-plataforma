@@ -196,6 +196,7 @@ function makeMinimalBOM(valvulasCount: number, valvulasResolvidasCount = 0): BOM
       conexoesFishbonePendentesCount: 0,
       custoTotalAquisicaoR$: 0,
       margemBrutaR$: 0,
+      colunasTelescopadasCount: 0,
     },
   };
 }
