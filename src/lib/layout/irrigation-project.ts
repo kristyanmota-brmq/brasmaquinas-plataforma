@@ -17,7 +17,7 @@
  *  9. Gerar diagnósticos
  */
 
-import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
+import { ASPERSOR_PADRAO, getAspersorBySku } from "@/lib/catalog/aspersores";
 import {
   generatePhysicalColumns,
   deriveLateraisFromNetwork,
@@ -267,7 +267,7 @@ export function calculateIrrigationProject(
     sprinklers.gridAngleDegrees,
     centroid,
     sprinklers.espacamentoM,
-    { vazao: vazaoPorAspersorM3h, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
+    { vazao: vazaoPorAspersorM3h, pressaoServico: getAspersorBySku(sprinklers.aspersorId).pressaoServicoMca },
     getCatalogoLateraisHomologadas5022(),
     sectorIndices.length > 0 ? sectorIndices : undefined,
   );
@@ -318,7 +318,7 @@ export function calculateIrrigationProject(
     operationalSegments,
     sprinklers.positions,
     sprinklers.espacamentoM,
-    { vazao: vazaoPorAspersorM3h, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
+    { vazao: vazaoPorAspersorM3h, pressaoServico: getAspersorBySku(sprinklers.aspersorId).pressaoServicoMca },
     getCatalogoLateraisHomologadas5022(),
     sprinklers.gridAngleDegrees,
     centroid,
@@ -411,6 +411,7 @@ export function calculateIrrigationProject(
       count: sprinklers.count,
       vazaoProjetoM3PorHora: sprinklers.vazaoProjetoM3PorHora,
       espacamentoM: sprinklers.espacamentoM,
+      aspersorSku: sprinklers.aspersorId,
     },
     sectorization: {
       setoresCount: sectorization.setoresCount,

@@ -15,7 +15,7 @@
  */
 
 import { headLoss, velocity } from "@/lib/hydraulics/hazenWilliams";
-import { ASPERSOR_PADRAO, TUBOS_PVC_RIGIDO } from "@/lib/catalog/aspersores";
+import { ASPERSOR_PADRAO, TUBOS_PVC_RIGIDO, getAspersorBySku } from "@/lib/catalog/aspersores";
 import { christiansenF } from "@/lib/layout/laterais";
 import { sizeAllSecondaries, type SizedSecondaryPipe } from "@/lib/layout/secondary-sizing";
 import type { IrrigationProjectResult } from "@/lib/layout/irrigation-project";
@@ -397,6 +397,8 @@ export function sizeHydraulics(
 ): HydraulicSizingReport | null {
   const { isComplete, operational, physical, distribution, hydraulic, input } = result;
   if (!isComplete || !operational || !physical || !distribution || !hydraulic || !input) return null;
+  // TASK-064: pressão de serviço do aspersor do projeto (fallback 5022 — legado byte-idêntico)
+  const pressaoServicoAspersorMca = getAspersorBySku(result.layout.sprinklers?.aspersorId).pressaoServicoMca;
   if (distribution.laterais.length === 0) return null;
 
   const { operationalSegments, vazaoPorSetor, nSetores } = operational;
@@ -585,7 +587,7 @@ export function sizeHydraulics(
           headLossM: hfSec,
           velocityMs: velSec,
           velocityExceeds: velSec > MAX_VEL_SECONDARY_MS,
-          secondaryLossExceeds: hfSec > ASPERSOR_PADRAO.pressaoServicoMca * MAX_SECONDARY_LOSS_FRACTION,
+          secondaryLossExceeds: hfSec > pressaoServicoAspersorMca * MAX_SECONDARY_LOSS_FRACTION,
           pressaoNominalMca: secPressaoNominalMca,
           // TASK-004B: dados de derivação para pressão real (ver annotatePressureClass)
           cumPrincipalHfM,
@@ -614,7 +616,7 @@ export function sizeHydraulics(
           headLossM: hfLat,
           velocityMs: latVel,
           velocityExceeds: latVel > MAX_VEL_LATERAL_MS,
-          lateralLossExceeds: hfLat > ASPERSOR_PADRAO.pressaoServicoMca * MAX_LATERAL_LOSS_FRACTION,
+          lateralLossExceeds: hfLat > pressaoServicoAspersorMca * MAX_LATERAL_LOSS_FRACTION,
           pressaoNominalMca: lateral.selecao.tubo.pressaoMca,
           // TASK-004B: dados de derivação para pressão real (ver annotatePressureClass)
           cumPrincipalHfM,
@@ -734,17 +736,17 @@ export function sizeHydraulics(
   }
 
   const rawDesnivel = noElevationData ? 0 : elevationDeltaM;
-  const rawTotal    = ASPERSOR_PADRAO.pressaoServicoMca + distribHf + localLossesM + rawDesnivel + safetyMarginMca;
+  const rawTotal    = pressaoServicoAspersorMca + distribHf + localLossesM + rawDesnivel + safetyMarginMca;
   // Piso: desnível favorável não pode reduzir HMT abaixo de pressão + perdas locais + margem
-  const hmtFloor    = ASPERSOR_PADRAO.pressaoServicoMca + localLossesM + safetyMarginMca;
+  const hmtFloor    = pressaoServicoAspersorMca + localLossesM + safetyMarginMca;
   const totalHMT    = Math.max(rawTotal, hmtFloor);
   // desnível efetivo: quando sem dados = 0; quando com dados, back-derivado do totalHMT real
   const desnivelM   = noElevationData
     ? 0
-    : totalHMT - ASPERSOR_PADRAO.pressaoServicoMca - distribHf - localLossesM - safetyMarginMca;
+    : totalHMT - pressaoServicoAspersorMca - distribHf - localLossesM - safetyMarginMca;
 
   const hmt: HMTBreakdown = {
-    pressaoServicoMca: ASPERSOR_PADRAO.pressaoServicoMca,
+    pressaoServicoMca: pressaoServicoAspersorMca,
     hfAdutoraM: hfAdutora,
     hfPrincipalToDerivationM: hfPrincipal,
     hfSecondaryM: hfSec,

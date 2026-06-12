@@ -51,7 +51,7 @@ import {
   saveProjectLayout,
   type ProjectLayout,
 } from "@/app/projetos/[id]/actions";
-import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
+import { ASPERSOR_PADRAO, ASPERSORES, getAspersorBySku } from "@/lib/catalog/aspersores";
 import type { BOMResult } from "@/lib/bom";
 import type { Lateral, PhysicalColumn } from "@/lib/layout/laterais";
 import { resolveSectorLabelAnchor } from "@/lib/layout/sector-label-anchor";
@@ -180,6 +180,12 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
   // TASK-061: resultado da seleção arquitetural A0/A2/A3 do último traçado auto
   // (transparência — null quando o traçado é manual ou ainda não gerado).
   const [archSelection, setArchSelection] = useState<ArchitectureSelectionResult | null>(null);
+  // TASK-064: aspersor do projeto — pré-seleção antes da malha existir; depois,
+  // a fonte de verdade é layout.sprinklers.aspersorId. Fallback: 5022 (padrão).
+  const [aspersorSkuSelecionado, setAspersorSkuSelecionado] = useState<string>(
+    initialLayout?.sprinklers?.aspersorId ?? ASPERSOR_PADRAO.sku,
+  );
+  const aspersorAtivo = getAspersorBySku(layout.sprinklers?.aspersorId ?? aspersorSkuSelecionado);
   const [showSearch, setShowSearch] = useState(false);
   const [searchMarker, setSearchMarker] = useState<{ lng: number; lat: number } | null>(null);
   const [optimizerState, setOptimizerState] = useState<OptimizerState>({ status: "idle" });
@@ -231,8 +237,8 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
 
   const intensidadeMmPorHora = useMemo(
     () =>
-      (1000 * ASPERSOR_PADRAO.vazaoM3PorHora) /
-      (ASPERSOR_PADRAO.espacamentoPadraoM * ASPERSOR_PADRAO.espacamentoPadraoM),
+      (1000 * aspersorAtivo.vazaoM3PorHora) /
+      (aspersorAtivo.espacamentoPadraoM * aspersorAtivo.espacamentoPadraoM),
     []
   );
 
@@ -274,7 +280,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
     if (!layout.sprinklers || !showCoverage) return null;
     const features = layout.sprinklers.positions
       .map(([lng, lat]) =>
-        turf.buffer(turf.point([lng, lat]), ASPERSOR_PADRAO.raioMolhadoM, {
+        turf.buffer(turf.point([lng, lat]), aspersorAtivo.raioMolhadoM, {
           units: "meters",
         })
       )
@@ -741,18 +747,18 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
     if (!layout.area || !layout.centroid) return;
     const positions = generateRotatedSprinklerGrid(
       layout.area,
-      ASPERSOR_PADRAO.espacamentoPadraoM,
+      aspersorAtivo.espacamentoPadraoM,
       optimalAngle
     );
-    const vazaoProjeto = positions.length * ASPERSOR_PADRAO.vazaoM3PorHora;
+    const vazaoProjeto = positions.length * aspersorAtivo.vazaoM3PorHora;
     setLayout((l) => ({
       ...l,
       sprinklers: {
-        aspersorId: ASPERSOR_PADRAO.sku,
+        aspersorId: aspersorAtivo.sku,
         positions,
         count: positions.length,
         vazaoProjetoM3PorHora: vazaoProjeto,
-        espacamentoM: ASPERSOR_PADRAO.espacamentoPadraoM,
+        espacamentoM: aspersorAtivo.espacamentoPadraoM,
         gridAngleDegrees: optimalAngle,
         angleMode: "auto",
       },
@@ -760,23 +766,50 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
     }));
   }, [layout.area, layout.centroid, optimalAngle]);
 
+  // TASK-064: troca de aspersor — regenera a malha com o espaçamento do modelo
+  // selecionado (18×18 para 5035; 12×12 para 5022) e limpa a setorização.
+  const applyAspersor = useCallback((sku: string) => {
+    setAspersorSkuSelecionado(sku);
+    const asp = getAspersorBySku(sku);
+    setLayout((l) => {
+      if (!l.sprinklers || !l.area) return l; // sem malha ainda: só pré-seleciona
+      const positions = generateRotatedSprinklerGrid(
+        l.area,
+        asp.espacamentoPadraoM,
+        l.sprinklers.gridAngleDegrees,
+      );
+      return {
+        ...l,
+        sprinklers: {
+          ...l.sprinklers,
+          aspersorId: asp.sku,
+          positions,
+          count: positions.length,
+          vazaoProjetoM3PorHora: positions.length * asp.vazaoM3PorHora,
+          espacamentoM: asp.espacamentoPadraoM,
+        },
+        sectorization: undefined,
+      };
+    });
+  }, []);
+
   const updateGridAngle = useCallback(
     (newAngle: number, mode: "auto" | "manual") => {
       if (!layout.area) return;
       const positions = generateRotatedSprinklerGrid(
         layout.area,
-        ASPERSOR_PADRAO.espacamentoPadraoM,
+        aspersorAtivo.espacamentoPadraoM,
         newAngle
       );
-      const vazaoProjeto = positions.length * ASPERSOR_PADRAO.vazaoM3PorHora;
+      const vazaoProjeto = positions.length * aspersorAtivo.vazaoM3PorHora;
       setLayout((l) => ({
         ...l,
         sprinklers: {
-          aspersorId: ASPERSOR_PADRAO.sku,
+          aspersorId: aspersorAtivo.sku,
           positions,
           count: positions.length,
           vazaoProjetoM3PorHora: vazaoProjeto,
-          espacamentoM: ASPERSOR_PADRAO.espacamentoPadraoM,
+          espacamentoM: aspersorAtivo.espacamentoPadraoM,
           gridAngleDegrees: newAngle,
           angleMode: mode,
         },
@@ -822,7 +855,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
             : null;
         const result = findBestSprinklerLayout(
           layout.area!,
-          ASPERSOR_PADRAO.espacamentoPadraoM,
+          aspersorAtivo.espacamentoPadraoM,
           nSetores,
           ws,
         );
@@ -841,9 +874,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
     if (optimizerState.status !== "ready") return;
     const sprinklers = candidateToSprinklers(
       optimizerState.result.best,
-      ASPERSOR_PADRAO.sku,
-      ASPERSOR_PADRAO.espacamentoPadraoM,
-      ASPERSOR_PADRAO.vazaoM3PorHora,
+      aspersorAtivo.sku,
+      aspersorAtivo.espacamentoPadraoM,
+      aspersorAtivo.vazaoM3PorHora,
     );
     setLayout((l) => ({ ...l, sprinklers, sectorization: undefined }));
     setOptimizerState({ status: "idle" });
@@ -873,7 +906,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
         const pump = layout.pump ?? null;
         const validated = runTopKHydraulicValidation(currentResult, {
           polygon: layout.area!,
-          spacingMeters: ASPERSOR_PADRAO.espacamentoPadraoM,
+          spacingMeters: aspersorAtivo.espacamentoPadraoM,
           waterSource: ws,
           pump,
           geodetic: layout.geodetic,
@@ -897,7 +930,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
         physicalColumns,
         jornada,
         layout.sprinklers.positions.length,
-        ASPERSOR_PADRAO.vazaoM3PorHora,
+        aspersorAtivo.vazaoM3PorHora,
         tempoPorSetorMinutos,
         // TASK-060: preserva lâmina/cultura informadas ao trocar de jornada
         layout.sectorization?.laminaMm ?? 10,
@@ -1034,7 +1067,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
     }
     const indices = layout.sectorization.sectorIndices;
     const count = indices.filter((s) => s === selectedSector).length;
-    const vazao = count * ASPERSOR_PADRAO.vazaoM3PorHora;
+    const vazao = count * aspersorAtivo.vazaoM3PorHora;
     return {
       number: selectedSector + 1,
       total: layout.sectorization.setoresCount,
@@ -2285,18 +2318,34 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
             Aspersores
           </h3>
 
+          {/* TASK-064: seletor de aspersor — troca regenera a malha com o espaçamento do modelo */}
+          <label className="block mb-3 text-[11px] uppercase tracking-[0.1em] text-ink-3">
+            Modelo do aspersor
+            <select
+              value={aspersorAtivo.sku}
+              onChange={(e) => applyAspersor(e.target.value)}
+              className="mt-1 w-full px-2 py-2 rounded-sm border border-border bg-background text-sm text-ink normal-case tracking-normal focus:outline-none focus:border-border-strong"
+            >
+              {ASPERSORES.map((a) => (
+                <option key={a.sku} value={a.sku}>
+                  {a.modelo} · {a.bocal} · {a.vazaoM3PorHora} m³/h · {a.espacamentoPadraoM}×{a.espacamentoPadraoM} m
+                </option>
+              ))}
+            </select>
+          </label>
+
           <div className="bg-background border border-border rounded-sm p-3 mb-3">
             <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 mb-1">
               Modelo selecionado
             </div>
             <div className="text-sm text-ink font-medium mb-2">
-              {ASPERSOR_PADRAO.modelo}
+              {aspersorAtivo.modelo}
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-ink-3">
-              <span>Bocal · {ASPERSOR_PADRAO.bocal}</span>
-              <span>P · {ASPERSOR_PADRAO.pressaoServicoMca} mca</span>
-              <span>Q · {ASPERSOR_PADRAO.vazaoM3PorHora} m³/h</span>
-              <span>R · {ASPERSOR_PADRAO.raioMolhadoM} m</span>
+              <span>Bocal · {aspersorAtivo.bocal}</span>
+              <span>P · {aspersorAtivo.pressaoServicoMca} mca</span>
+              <span>Q · {aspersorAtivo.vazaoM3PorHora} m³/h</span>
+              <span>R · {aspersorAtivo.raioMolhadoM} m</span>
             </div>
           </div>
 
@@ -2307,8 +2356,8 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
               className="w-full px-4 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-sm text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Sparkles className="w-4 h-4" />
-              Posicionar grade {ASPERSOR_PADRAO.espacamentoPadraoM}×
-              {ASPERSOR_PADRAO.espacamentoPadraoM} m
+              Posicionar grade {aspersorAtivo.espacamentoPadraoM}×
+              {aspersorAtivo.espacamentoPadraoM} m
             </button>
           ) : (
             <div className="space-y-3">
@@ -2405,7 +2454,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                   ) : (
                     <EyeOff className="w-3.5 h-3.5" />
                   )}
-                  Cobertura · raio {ASPERSOR_PADRAO.raioMolhadoM} m
+                  Cobertura · raio {aspersorAtivo.raioMolhadoM} m
                 </span>
                 <span
                   className={clsx(

@@ -1,5 +1,6 @@
 import {
   ASPERSOR_PADRAO,
+  getAspersorBySku,
   ADESIVO_PVC,
   TUBOS_PVC_LF,
   TUBOS_PVC_RIGIDO,
@@ -168,6 +169,8 @@ export interface BOMInput {
     count: number;
     vazaoProjetoM3PorHora: number;
     espacamentoM: number;
+    /** TASK-064: SKU do aspersor do projeto. Ausente → ASPERSOR_PADRAO (5022). */
+    aspersorSku?: string;
   };
   sectorization: {
     setoresCount: number;
@@ -289,14 +292,16 @@ export function buildBOM(input: BOMInput): BOMResult {
   const vazaoPorAspersorM3h = sprinklers.vazaoProjetoM3PorHora / sprinklers.count;
 
   // ── Aspersores ─────────────────────────────────────────────────────────────
+  // TASK-064: aspersor do projeto (fallback 5022 preserva legado)
+  const aspersorDoProjeto = getAspersorBySku(sprinklers.aspersorSku);
   itens.push({
-    sku: ASPERSOR_PADRAO.sku,
-    descricao: ASPERSOR_PADRAO.descricao,
-    marca: ASPERSOR_PADRAO.marca,
-    unidade: ASPERSOR_PADRAO.unidade,
+    sku: aspersorDoProjeto.sku,
+    descricao: aspersorDoProjeto.descricao,
+    marca: aspersorDoProjeto.marca,
+    unidade: aspersorDoProjeto.unidade,
     quantidade: sprinklers.count,
-    precoUnitario: ASPERSOR_PADRAO.precoVenda,
-    total: sprinklers.count * ASPERSOR_PADRAO.precoVenda,
+    precoUnitario: aspersorDoProjeto.precoVenda,
+    total: sprinklers.count * aspersorDoProjeto.precoVenda,
     categoria: "ASPERSOR",
   });
 
