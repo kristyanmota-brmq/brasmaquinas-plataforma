@@ -448,6 +448,9 @@ export function buildBOM(input: BOMInput): BOMResult {
         precoVenda: number; metrosPorBarra: number; comprimentoTotal: number;
       }>();
       for (const sec of sizedSecondaries) {
+        // TASK-075: rib de 0 m (spine na mediana cruza a lateral → tê direto) não é
+        // material — sem este skip a BOM emitia item de tubo com quantidade 0.
+        if (sec.lengthM < 0.01) continue;
         const sku = sec.selectedTube.sku;
         const tuboCat = TUBOS_PVC_RIGIDO.find((t) => t.sku === sku);
         if (!tuboCat) continue;

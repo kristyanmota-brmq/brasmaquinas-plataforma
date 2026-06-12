@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { calculateIrrigationProject } from "@/lib/layout/irrigation-project";
 import { sizeHydraulics } from "@/lib/layout/hydraulic-sizing";
 import { headLoss } from "@/lib/hydraulics/hazenWilliams";
-import { makeLayoutL, makeLayoutP } from "./fixtures";
+import { makeLayoutL, makeLayoutP, makeLayoutRampa } from "./fixtures";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -196,12 +196,39 @@ describe("TAREFA 3+8 — benchmarks e testes mandatórios", () => {
     }
   });
 
-  it("T8-5: Projeto P tem ramais (secondary) e caminho crítico passa por um", () => {
-    const report = sizeHydraulics(completeResultP())!;
+  it("T8-5: campo escalonado (rampa) tem ramais (secondary) e caminho crítico passa por um", () => {
+    // TASK-075: com o spine na MEDIANA dos inlets, campos retangulares (P) viram
+    // manifold clássico (ribs 0 m = tê direto → sem segmento hidráulico de ramal
+    // no caminho por coluna). O invariante "caminho crítico passa por secondary"
+    // continua coberto pelo campo em RAMPA (inlets escalonados → ribs > 0 nas
+    // colunas acima da mediana do setor).
+    const report = sizeHydraulics(calculateIrrigationProject(makeLayoutRampa()))!;
     const secs = report.allSegments.filter((s) => s.type === "secondary");
     expect(secs.length).toBeGreaterThan(0);
     const critTypes = report.criticalPath.criticalPathSegments.map((s) => s.type);
     expect(critTypes).toContain("secondary");
+  });
+
+  it("T8-5b (TASK-075): Projeto P (inlets uniformes) vira manifold — fishbone com spine/entry > 0 e ribs 0 (tê direto)", () => {
+    const result = completeResultP();
+    const fishbone = result.hydraulic!.secondaries;
+    // A rede de secundárias EXISTE (spine + spine_entry com comprimento real)…
+    expect(fishbone.length).toBeGreaterThan(0);
+    const spineLen = fishbone
+      .filter((s) => s.kind === "spine" || s.kind === "spine_entry")
+      .reduce((t, s) => t + s.lengthM, 0);
+    expect(spineLen).toBeGreaterThan(0);
+    // …mas os ribs degeneram para tê direto (0 m) porque os inlets do retângulo
+    // são uniformes — spine NA linha dos inlets (mediana). Nenhum segmento
+    // hidráulico de 0 m entra no caminho crítico (hf de tubo de 0 m é 0).
+    for (const rib of fishbone.filter((s) => s.kind === "rib")) {
+      expect(rib.lengthM).toBeLessThan(0.01);
+    }
+    const report = sizeHydraulics(result)!;
+    const critTypes = report.criticalPath.criticalPathSegments.map((s) => s.type);
+    expect(critTypes).toContain("adutora");
+    expect(critTypes).toContain("principal");
+    expect(critTypes).toContain("lateral");
   });
 
   it("T8-6: pump.hmtMca < requiredHMT → pump_insufficient_head + hydraulicSolverStatus=blocked", () => {

@@ -560,10 +560,16 @@ export function routeSubColetorStairStep(
  *   - N `ribs`: 1 por coluna; perpendicular ao spine, conectando spine ao inlet da coluna.
  *     Direção naturalmente paralela aos laterais (junção rib↔lateral em 0° = luva).
  *
- * Spine Y position formula (v12):
- *   spineYLocal = (principalYLocal + farthestInletYLocal) / 2
+ * Spine Y position formula (TASK-075, substitui o midpoint v12):
+ *   spineYLocal = MEDIANA(inletYsLocal)
  *
- * Fallback offset mínimo (v12) — quando todos inlets coincidem com principal (gap ≈ 0):
+ * A mediana minimiza Σ|inletY − spineY| (propriedade L1) → menor soma de comprimentos
+ * dos ribs. Com inlets uniformes (mesma distância da principal), o spine cai NA linha
+ * dos inlets e os ribs degeneram para 0 m (tê direto spine→lateral) — o manifold
+ * clássico das propostas reais. Motivação RT 2026-06-12: "a principal está fazendo
+ * usar muito mais tubulação nas secundárias" (midpoint dobrava cada rib sem função).
+ *
+ * Fallback offset mínimo (v12, preservado) — quando todos inlets coincidem com principal (gap ≈ 0):
  *   se |spineYLocal − principalYLocal| < MIN_HEADLAND_M, força
  *   spineYLocal = principalYLocal + fieldSideSign * MIN_HEADLAND_M.
  *
@@ -651,12 +657,15 @@ export function routeEspinhaDePeixe(
   let fieldSideSign = Math.sign(centroidLocal[1] - principalYLocal);
   if (fieldSideSign === 0) fieldSideSign = 1; // safety hardcode (caso degenerado extremo)
 
-  // ── 5. yMaxInletsLocal = inlet mais distante da principal (no sentido fieldSideSign) ──
-  // Para fieldSideSign > 0: farthest é max(ys); para fieldSideSign < 0: farthest é min(ys).
-  const farthestInletY = fieldSideSign > 0 ? Math.max(...ysLocal) : Math.min(...ysLocal);
-
-  // ── 6. spineYLocal via midpoint formula (v12) ──
-  let spineYLocal = (principalYLocal + farthestInletY) / 2;
+  // ── 5+6. spineYLocal via MEDIANA dos inlets (TASK-075; substitui midpoint v12) ──
+  // Mediana minimiza Σ|inletY − spineY| (L1) → menor soma de ribs. Inlets uniformes →
+  // spine na linha dos inlets (ribs 0 m = tê direto; validação angular pula ribs < 1e-3 m
+  // e a BOM TASK-054 já conta 1 tê por rib). Clamp do passo 7 preserva o caso degenerado.
+  const ysSorted = [...ysLocal].sort((a, b) => a - b);
+  const midY = Math.floor(ysSorted.length / 2);
+  let spineYLocal = ysSorted.length % 2 === 0
+    ? (ysSorted[midY - 1] + ysSorted[midY]) / 2
+    : ysSorted[midY];
 
   // ── 7. Fallback offset mínimo (v12) ──
   // Quando |spineYLocal − principalYLocal| < MIN_HEADLAND_M, força offset construtivo.

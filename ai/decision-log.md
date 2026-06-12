@@ -327,3 +327,42 @@ override: false
 risco_assumido: "Premissas aprovadas com base em norma/prática/fabricante/corpus, sem validação de campo própria da Brasmáquinas em todos os casos — risco aceito pelo RT delegante ('mudanças que forem necessárias eu mudo depois'). Reversão simples: editar status no doc 12 + entry neste log."
 ajustes_aplicados: ["9 premissas → APROVADO_RT (doc 12 + histórico)", "Pesos optimizer/penalidades mantidos PENDENTE_CALIBRACAO_RT_CAMPO por decisão explícita", "TECH-053-01: blocker preservado ATIVO; resolução pela causa (motor no fluxo + TASK-057), não pelo gate", "Entry registrada pelo agente sob autorização explícita do RT (precedent TASK-052/053 v4..v12)"]
 hash_gpt_review: nao_aplicavel
+
+---
+
+timestamp: 2026-06-12T01:45:00-03:00
+task_id: TASK-075
+decision_point: aprovacao_plano_e_fechamento
+veredito_gpt: nao_aplicavel
+decisao_humana: aprovado
+responsavel: Kristyan Mota (RT — via delegação explícita executada pelo agente)
+justificativa: |
+  Entry registrada pelo agente sob autorização explícita do RT (precedent TASK-052/053 v4..v12 e
+  revisão em lote 2026-06-11). Quote da delegação permanente: "Você vai ser meu RT, pode aprovar
+  o que precisar". Autorização específica desta sessão (2026-06-12): instrução direta de executar
+  a TASK-075 pelo fluxo completo (/iniciar-task → /planejar → /implementar → /fechar-task),
+  incluindo commit e push.
+
+  DECISÃO TÉCNICA: spine da topologia fishbone v12 posicionado na MEDIANA dos inlets do setor
+  (substitui midpoint formula em routeEspinhaDePeixe §6). Fundamentação: (1) mediana é o
+  minimizador L1 de Σ|inletY − spineY| → menor soma de ribs; (2) com inlets uniformes converge
+  ao manifold clássico observado no corpus de propostas reais (spine na linha dos inlets, tê
+  direto); (3) motivação do RT em 2026-06-12: "a principal está fazendo usar muito mais
+  tubulação nas secundárias"; (4) medição em dados reais (Fazenda do Paulo): secundárias
+  468 → 426 m (−9%), HMT 36,5 → 35,8 mca, 0 blockers.
+
+  TRANSPARÊNCIA (achado não previsto no plano): neste campo específico o custo da BOM subiu
+  +0,9% (mix DN75→DN125 no spine_entry compensa os −42 m de tubo) — economia direta de custo
+  aparece em campos escalonados; o ganho no caso uniforme é construtivo/topológico. Registrado
+  no relatório e no doc 12. Desvio de escopo reportado: fix de 1 linha em bom.ts (item de tubo
+  com quantidade 0 — artefato pré-existente desde o clamp TASK-057) para não enfraquecer o
+  invariante do teste T9.
+
+  Premissa "Topologia fishbone v12" (APROVADO_RT) refinada — célula "Valor usado" + histórico
+  do doc 12. Reversível pelo RT humano a qualquer momento (editar doc 12 + entry neste log).
+override: false
+risco_assumido: "Refinamento de posicionamento sobre premissa já APROVADO_RT; 7 testes comportamentais atualizados para o invariante da mediana (nenhum deletado); validação de campo da topologia manifold permanece recomendada no E09."
+ajustes_aplicados: ["routeEspinhaDePeixe §6: midpoint → mediana (L1)", "bom.ts: skip de ramais 0 m no agrupamento por SKU", "fixture makeLayoutRampa() para cobertura de caminho crítico via secondary", "doc 12: premissa fishbone refinada + histórico", "991 → 997 testes"]
+hash_gpt_review: nao_aplicavel
+
+---

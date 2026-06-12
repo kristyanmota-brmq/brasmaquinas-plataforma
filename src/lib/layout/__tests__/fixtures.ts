@@ -147,6 +147,87 @@ export function makeLayoutL(): ProjectLayout {
 // Total: 784 - 16 = 768 aspersores (mais próximo de 736)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Fixture: Projeto RAMPA — paralelogramo com inlets escalonados (TASK-075)
+//
+// Cada coluna é deslocada +6 m em Y vs a anterior (campo em rampa / borda
+// inferior inclinada). Com o spine na MEDIANA dos inlets (TASK-075), setores
+// deste campo têm ribs > 0 nas colunas acima da mediana — garante que o caminho
+// crítico do solver continua passando por um segmento `secondary` (cobertura que
+// os campos retangulares L/P perderam: inlets uniformes → ribs 0 = tê direto).
+// 12 colunas × 8 linhas = 96 aspersores, 3 setores.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const CENTROID_RAMPA = { lng: -47.0, lat: -13.0 };
+export const N_SECTORS_RAMPA = 3;
+
+export function makeLayoutRampa(): ProjectLayout {
+  const cols = 12;
+  const rows = 8;
+  const shiftM = 6; // deslocamento vertical por coluna (escalonamento)
+  const centroid = CENTROID_RAMPA;
+  const mpl = mPerLng(centroid.lat);
+
+  const positions: [number, number][] = [];
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      const xM = (c - (cols - 1) / 2) * SPACING;
+      const yM = (r - (rows - 1) / 2) * SPACING + c * shiftM;
+      positions.push([centroid.lng + xM / mpl, centroid.lat + yM / M_PER_DEG_LAT]);
+    }
+  }
+  const n = positions.length;
+  const sectorIndices = makeSectorIndicesFromPhysicalCols(positions, centroid, N_SECTORS_RAMPA);
+
+  const yPrincipalM = -(rows / 2) * SPACING - 12; // abaixo do inlet mais baixo
+  const principalStart: [number, number] = [
+    centroid.lng - (8 * SPACING) / mpl,
+    centroid.lat + yPrincipalM / M_PER_DEG_LAT,
+  ];
+  const principalEnd: [number, number] = [
+    centroid.lng + (8 * SPACING) / mpl,
+    centroid.lat + yPrincipalM / M_PER_DEG_LAT,
+  ];
+  const waterSource = {
+    lng: centroid.lng - (10 * SPACING) / mpl,
+    lat: centroid.lat + (yPrincipalM - 24) / M_PER_DEG_LAT,
+  };
+
+  return {
+    schemaVersion: "1",
+    centroid,
+    waterSource,
+    sprinklers: {
+      aspersorId: ASPERSOR_PADRAO.sku,
+      positions,
+      count: n,
+      vazaoProjetoM3PorHora: n * VAZ,
+      espacamentoM: SPACING,
+      gridAngleDegrees: 0,
+      angleMode: "auto",
+    },
+    sectorization: {
+      jornadaHoras: 14,
+      laminaMm: 10,
+      setoresCount: N_SECTORS_RAMPA,
+      tempoPorSetorMinutos: Math.round((60 * 14) / N_SECTORS_RAMPA),
+      aspersoresPorSetor: Math.round(n / N_SECTORS_RAMPA),
+      vazaoPorSetorM3PorHora: Math.round(n / N_SECTORS_RAMPA) * VAZ,
+      sectorIndices,
+    },
+    mainPipeline: {
+      coordinates: [principalStart, principalEnd],
+      adutora: [
+        [waterSource.lng, waterSource.lat],
+        [principalStart[0], principalStart[1]],
+      ],
+      lengthMeters: 16 * SPACING,
+      segments: 16,
+      source: "auto",
+    },
+  };
+}
+
 export const CENTROID_P = { lng: -47.2, lat: -13.1 };
 export const N_SECTORS_P = 14;
 

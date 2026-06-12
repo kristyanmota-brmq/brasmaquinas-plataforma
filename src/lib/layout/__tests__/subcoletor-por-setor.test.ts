@@ -357,9 +357,11 @@ describe("T53-24 (v12) — Todos inlets coincidem com principal: fallback MIN_HE
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T53-25 (v12) — Todos afastados (gap > MIN_HEADLAND): formula natural sem fallback
+// T53-25 (v12 + TASK-075) — Todos afastados (gap > MIN_HEADLAND): spine na MEDIANA
+// dos inlets (substitui o midpoint v12). Inlets uniformes → spine NA linha dos
+// inlets, ribs 0 m (tê direto) — o manifold clássico das propostas reais.
 // ─────────────────────────────────────────────────────────────────────────────
-describe("T53-25 (v12) — Todos afastados (gap=12m): formula midpoint sem fallback", () => {
+describe("T53-25 (v12+T75) — Todos afastados (gap=12m): spine na mediana dos inlets", () => {
   const c1 = colAtGap("c1", -46.005, 12, 0);
   const c2 = colAtGap("c2", -46.000, 12, 1);
   const c3 = colAtGap("c3", -45.995, 12, 2);
@@ -375,21 +377,28 @@ describe("T53-25 (v12) — Todos afastados (gap=12m): formula midpoint sem fallb
     { operationalSegments: opSegs, gridAngleDegrees: 0 },
   );
 
-  it("spine no midpoint entre principal e inlets (gap=12m → offset=6m)", () => {
+  it("spine na linha dos inlets (gap=12m → offset≈12m; mediana de inlets uniformes)", () => {
     const spine = secs.find((s) => s.kind === "spine")!;
     const spineLat = spine.coords![0][1];
-    // Spine deve estar entre -12.01 (principal) e -12.01 + 12m/111320 (inlets)
+    // TASK-075: mediana de inlets uniformes = a própria linha dos inlets
+    // (midpoint v12 colocava o spine a 6m, dobrando cada rib sem função).
     const offsetM = (spineLat - (-12.01)) * 111320;
-    expect(offsetM).toBeGreaterThan(5);
-    expect(offsetM).toBeLessThan(7);
+    expect(offsetM).toBeGreaterThan(11);
+    expect(offsetM).toBeLessThan(13);
   });
 
-  it("ribs todos com lengthM ≈ 6m (inlets a 12m da principal; spine no midpoint)", () => {
+  it("ribs todos com lengthM ≈ 0 (tê direto spine→lateral — manifold clássico)", () => {
     const ribs = secs.filter((s) => s.kind === "rib");
+    expect(ribs).toHaveLength(3);
     for (const rib of ribs) {
-      expect(rib.lengthM).toBeGreaterThan(5);
-      expect(rib.lengthM).toBeLessThan(7);
+      expect(rib.lengthM).toBeLessThan(0.01);
     }
+  });
+
+  it("spine_entry absorve o gap inteiro (≈12m — único trecho principal→spine)", () => {
+    const spineEntry = secs.find((s) => s.kind === "spine_entry")!;
+    expect(spineEntry.lengthM).toBeGreaterThan(11);
+    expect(spineEntry.lengthM).toBeLessThan(13);
   });
 });
 
@@ -421,11 +430,14 @@ describe("T53-26 (v12) — 1 só coluna no setor: espinha degenerada (regra RT)"
     expect(spine.lengthM).toBeGreaterThanOrEqual(0);
   });
 
-  it("spine_entry e rib têm lengthM > 0", () => {
+  it("spine_entry absorve o gap (>0); rib degenera para tê (≈0 — mediana de 1 inlet é o próprio inlet)", () => {
+    // TASK-075: com 1 coluna, mediana = o único inlet → spine NA linha do inlet.
+    // O trecho principal→spine vira spine_entry (gap=10m); o rib é tê direto (0 m).
     const spineEntry = secs.find((s) => s.kind === "spine_entry")!;
     const rib = secs.find((s) => s.kind === "rib")!;
-    expect(spineEntry.lengthM).toBeGreaterThan(0);
-    expect(rib.lengthM).toBeGreaterThan(0);
+    expect(spineEntry.lengthM).toBeGreaterThan(9);
+    expect(spineEntry.lengthM).toBeLessThan(11);
+    expect(rib.lengthM).toBeLessThan(0.01);
   });
 });
 
@@ -450,9 +462,26 @@ describe("T53-27 (v12) — Sem operationalSegments → caminho legacy (kind:unde
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T53-28 (v12) — Blocker angular esperado em spine_entry→principal em grid não-cardinal
+// T53-28 (v12 + TASK-075) — Blocker angular esperado em spine_entry→principal
+// quando a junção cai fora de 0°/90°.
+//
+// Fixture atualizada na TASK-075: a versão anterior (grid 59° + colunas verticais
+// GLOBAIS + principal horizontal) dependia do midpoint para manter o spine_entry
+// curto; com a mediana, o probe de principalYLocal em frame rotacionado sobre
+// fixture não-alinhada ao grid produzia spine_entry de centenas de metros cujo
+// snap na principal o perpendicularizava (artefato da fixture sintética, não do
+// motor — colunas reais seguem o ângulo da grade). A fixture nova usa grid
+// CARDINAL (sem distorção de frame) com principal INCLINADA ~11°: spine_entry
+// paralelo ao eixo Y global encontra a principal a ~79° → fora de [0°±5°, 90°±5°]
+// → blocker. O invariante coberto é o MESMO: o validador kind-aware detecta
+// junção spine_entry→principal fora de 0/90.
 // ─────────────────────────────────────────────────────────────────────────────
-describe("T53-28 (v12) — Grid 59° + principal horizontal: blocker angular em spine_entry esperado", () => {
+describe("T53-28 (v12+T75) — Principal inclinada ~11° + grid cardinal: blocker angular em spine_entry esperado", () => {
+  // Principal inclinada: sobe 0.008° de lat (~890 m) ao longo de 0.04° de lng (~4,4 km) ≈ 11,4°
+  const PRINCIPAL_INCLINADA: [number, number][] = [
+    [-46.02, -12.014],
+    [-45.98, -12.006],
+  ];
   const c1 = colAtGap("c1", -46.005, 10, 0);
   const c2 = colAtGap("c2", -46.000, 10, 1);
   const c3 = colAtGap("c3", -45.995, 10, 2);
@@ -462,10 +491,10 @@ describe("T53-28 (v12) — Grid 59° + principal horizontal: blocker angular em 
 
   const secs = generateSecondaries(
     [c1, c2, c3],
-    PRINCIPAL_SOUTH,
+    PRINCIPAL_INCLINADA,
     CENTROID,
     0.5,
-    { operationalSegments: opSegs, gridAngleDegrees: 59 },
+    { operationalSegments: opSegs, gridAngleDegrees: 0 },
   );
 
   it("topologia gerada corretamente (3 ribs + 1 spine + 1 spine_entry)", () => {
@@ -476,16 +505,12 @@ describe("T53-28 (v12) — Grid 59° + principal horizontal: blocker angular em 
     const report = detectNetworkAngleIssues({
       physicalColumns: [c1, c2, c3],
       secondaries: secs,
-      principalCoords: PRINCIPAL_SOUTH,
+      principalCoords: PRINCIPAL_INCLINADA,
       adutoraCoords: [],
       centroid: CENTROID,
     });
-    // Em grid não-cardinal: spine_entry→principal cai em ângulo arbitrário (não 0°/90°)
-    // → blocker esperado.
-    // Nota: rib→lateral também gera blockers neste teste porque a FIXTURE makeCol
-    // gera colunas verticais (Y global) independente do gridAngleDegrees — em uso real,
-    // colunas seguem o ângulo da grade e rib→lateral fica em 0° (luva). Cobertura
-    // detalhada da junção 0° está em T53-20 (grid cardinal).
+    // spine_entry vertical (eixo Y do grid cardinal) × principal a ~11° da horizontal
+    // → junção ≈ 79°, fora de 0°/90°±5° → blocker esperado geométrico.
     const spineEntryId = secs.find((s) => s.kind === "spine_entry")!.id;
     const spineEntryIssues = report.issues.filter((iss) =>
       iss.elementId.includes(spineEntryId)
@@ -775,12 +800,15 @@ describe("T53-B03 — Grid 59° + lateral alinhada ao grid: rib→lateral em 0°
   }
 
   // Setor 1 do Projeto A simplificado: 3 colunas a xLocal = 0, 12, 24 m;
-  // laterais de yLocal = -180m (inlet) a yLocal = -100m (extremo).
+  // c1/c2 com inlet em yLocal = -180m; c3 ESCALONADA com inlet em -140m (TASK-075:
+  // com a mediana, inlets uniformes produzem ribs 0 m — o escalonamento de c3
+  // mantém ≥1 rib > 0 exercitando direção e junção rib→lateral).
+  // Mediana de (-180, -180, -140) = -180 → spine na linha de c1/c2; rib de c3 = 40 m.
   // Centroid acima da principal (yLocal=0 > yLocal=-200), então fieldSideSign = +1.
   const PRINCIPAL_LOCAL = principalAtLocalY(-200, -50, 100);
   const c1 = colInLocalFrame("c1", 0, -180, -100, 0);
   const c2 = colInLocalFrame("c2", 12, -180, -100, 1);
-  const c3 = colInLocalFrame("c3", 24, -180, -100, 2);
+  const c3 = colInLocalFrame("c3", 24, -140, -100, 2);
   const opSegs: OperationalSegment[] = [
     makeOpSeg("c1", 1), makeOpSeg("c2", 1), makeOpSeg("c3", 1),
   ];
@@ -800,11 +828,16 @@ describe("T53-B03 — Grid 59° + lateral alinhada ao grid: rib→lateral em 0°
     expect(secs.filter((s) => s.kind === "rib")).toHaveLength(3);
   });
 
-  it("rib direction = eixo Y local (paralela à lateral)", () => {
+  it("rib direction = eixo Y local (paralela à lateral) — ribs 0 m são tê (sem direção)", () => {
     const ribs = secs.filter((s) => s.kind === "rib");
+    // TASK-075: ribs de comprimento ~0 (spine na linha do inlet) são tê direto e não
+    // têm direção definida — pulados (mesma regra da validação angular, < 1e-3 m).
+    // O escalonamento de c3 garante ≥1 rib > 0 para o assert não ficar vazio.
+    const ribsComCorpo = ribs.filter((r) => r.lengthM >= 0.01);
+    expect(ribsComCorpo.length).toBeGreaterThan(0);
     // Eixo Y local em coords globais: (-sin(GRID), cos(GRID))
     const yLocalGlobal: [number, number] = [-Math.sin((GRID * Math.PI) / 180), Math.cos((GRID * Math.PI) / 180)];
-    for (const rib of ribs) {
+    for (const rib of ribsComCorpo) {
       const ribDir = unitVecLngLat(rib.fromCoord, rib.toCoord, CENTROID_B03.lat);
       // dot(ribDir, yLocalGlobal) ≈ ±1 (paralelo ou antiparalelo)
       const cosTheta = dotVec(ribDir, yLocalGlobal);
@@ -850,9 +883,9 @@ describe("T53-B03 — Grid 59° + lateral alinhada ao grid: rib→lateral em 0°
   });
 
   it("anti-regressão: fieldSideSign não inverte (spine ABAIXO do centroid e ACIMA da principal)", () => {
-    // Em frame local, centroid está em yLocal=0 e principal em yLocal=-200. Inlets em yLocal≈-180.
-    // fieldSideSign deve ser +1 (centroid > principal). Spine deve estar entre principal e inlets:
-    // spineYLocal = (principalYLocal + farthestInletYLocal) / 2 ≈ (-200 + -180) / 2 = -190.
+    // Em frame local, centroid está em yLocal=0 e principal em yLocal=-200. Inlets em -180/-180/-140.
+    // fieldSideSign deve ser +1 (centroid > principal). Spine na MEDIANA dos inlets (TASK-075):
+    // spineYLocal = mediana(-180, -180, -140) = -180.
     // Em global, isso significa que o spine NÃO está do lado oposto do centroid relativo à principal.
     const spine = secs.find((s) => s.kind === "spine")!;
     // Projeta o ponto médio do spine no frame local e verifica que yLocal < 0 (mesmo lado da principal)
@@ -931,5 +964,80 @@ describe("T57 — spine dentro do vão da lateral: tê no cruzamento, sem grampo
     });
     const lateralIssues = report.issues.filter((i) => i.elementType === "lateral");
     expect(lateralIssues).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T75 (TASK-075) — Spine na MEDIANA dos inlets (L1-ótima)
+//
+// Substitui o midpoint v12: spineYLocal = mediana(inletYsLocal). A mediana
+// minimiza Σ|inletY − spineY| → menor soma de comprimentos dos ribs (motivação
+// RT 2026-06-12: "a principal está fazendo usar muito mais tubulação nas
+// secundárias"). Validação sintética da economia exigida pela task (item d)
+// quando o banco real não está disponível.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T75 (TASK-075) — spine na mediana dos inlets", () => {
+  it("T75-1: inlets escalonados (6/12/30 m) → spine na mediana (12 m), não no midpoint (15 m)", () => {
+    const c1 = colAtGap("c1", -46.005, 6, 0);
+    const c2 = colAtGap("c2", -46.000, 12, 1);
+    const c3 = colAtGap("c3", -45.995, 30, 2);
+    const secs = generateSecondaries(
+      [c1, c2, c3], PRINCIPAL_SOUTH, CENTROID, 0.5,
+      { operationalSegments: [makeOpSeg("c1", 0), makeOpSeg("c2", 0), makeOpSeg("c3", 0)], gridAngleDegrees: 0 },
+    );
+    const spine = secs.find((s) => s.kind === "spine")!;
+    const offsetM = (spine.coords![0][1] - (-12.01)) * 111320;
+    expect(offsetM).toBeGreaterThan(11); // mediana = 12 m
+    expect(offsetM).toBeLessThan(13);    // midpoint seria (0+30)/2 = 15 m
+  });
+
+  it("T75-2: Σ ribs com mediana < Σ ribs que o midpoint produziria (propriedade L1)", () => {
+    // Inlets a 6/6/60 m. Mediana = 6 → Σ ribs = 0 + 0 + 54 = 54 m.
+    // Midpoint v12 = (0+60)/2 = 30 → Σ ribs = 24 + 24 + 30 = 78 m.
+    const c1 = colAtGap("c1", -46.005, 6, 0);
+    const c2 = colAtGap("c2", -46.000, 6, 1);
+    const c3 = colAtGap("c3", -45.995, 60, 2);
+    const secs = generateSecondaries(
+      [c1, c2, c3], PRINCIPAL_SOUTH, CENTROID, 0.5,
+      { operationalSegments: [makeOpSeg("c1", 0), makeOpSeg("c2", 0), makeOpSeg("c3", 0)], gridAngleDegrees: 0 },
+    );
+    const sumRibsM = secs
+      .filter((s) => s.kind === "rib")
+      .reduce((t, s) => t + s.lengthM, 0);
+    const sumRibsMidpointM = 78; // analítico para esta fixture (ver acima)
+    expect(sumRibsM).toBeGreaterThan(53);
+    expect(sumRibsM).toBeLessThan(55);
+    expect(sumRibsM).toBeLessThan(sumRibsMidpointM - 1);
+  });
+
+  it("T75-3: inlets uniformes (18 m) → manifold clássico: spine_entry = gap, ribs 0, spine na linha dos inlets", () => {
+    const c1 = colAtGap("c1", -46.005, 18, 0);
+    const c2 = colAtGap("c2", -46.000, 18, 1);
+    const c3 = colAtGap("c3", -45.995, 18, 2);
+    const secs = generateSecondaries(
+      [c1, c2, c3], PRINCIPAL_SOUTH, CENTROID, 0.5,
+      { operationalSegments: [makeOpSeg("c1", 0), makeOpSeg("c2", 0), makeOpSeg("c3", 0)], gridAngleDegrees: 0 },
+    );
+    const spineEntry = secs.find((s) => s.kind === "spine_entry")!;
+    expect(spineEntry.lengthM).toBeGreaterThan(17);
+    expect(spineEntry.lengthM).toBeLessThan(19);
+    for (const rib of secs.filter((s) => s.kind === "rib")) {
+      expect(rib.lengthM).toBeLessThan(0.01);
+    }
+  });
+
+  it("T75-4: caso degenerado (inlets a 1 m da principal) → clamp MIN_HEADLAND_M = 3 m preservado (v12)", () => {
+    const c1 = colAtGap("c1", -46.005, 1, 0);
+    const c2 = colAtGap("c2", -46.000, 1, 1);
+    const secs = generateSecondaries(
+      [c1, c2], PRINCIPAL_SOUTH, CENTROID, 0.5,
+      { operationalSegments: [makeOpSeg("c1", 0), makeOpSeg("c2", 0)], gridAngleDegrees: 0 },
+    );
+    const spine = secs.find((s) => s.kind === "spine")!;
+    const offsetM = (spine.coords![0][1] - (-12.01)) * 111320;
+    // Mediana seria 1 m (< MIN_HEADLAND_M) → passo 7 força offset construtivo de 3 m.
+    expect(offsetM).toBeGreaterThan(2.5);
+    expect(offsetM).toBeLessThan(3.5);
   });
 });
