@@ -1100,7 +1100,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
   const applyJornada = useCallback(
     (jornada: Jornada, modeOverride?: "jornada" | "agronomico") => {
       if (!layout.sprinklers || !layout.centroid) return;
-      const lamina = layout.sectorization?.laminaMm ?? 10;
+      const lamina = layout.sectorization?.laminaMm ?? 8; // TASK-085R (RT): default 8 mm/dia
       const cultura = layout.sectorization?.cultura;
       const mode = modeOverride ?? layout.sectorization?.setoresMode ?? "jornada";
       // TASK-067: critério agronômico derivado (corpus) ou legado (setores = jornada)

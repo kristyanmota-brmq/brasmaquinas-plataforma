@@ -523,23 +523,32 @@ export function selectKitAspersor5022(dnMm: number): KitAspersor5022Item[] | nul
 // ============================================================
 // SELEÇÃO DE TUBO POR DIÂMETRO MÍNIMO (Hazen-Williams V = 1.5 m/s)
 // ============================================================
-export function selectTubo(vazaoM3PorHora: number): (typeof TUBOS_PVC_RIGIDO)[number] {
+export function selectTubo(
+  vazaoM3PorHora: number,
+  /**
+   * TASK-085R (RT rev.2): "a classe de pressão da principal/adutora precisa
+   * ser CALCULADA". Quando informada, seleciona a MENOR classe (PN) que cobre
+   * a pressão operacional requerida (mca) — sem superdimensionar. Sem o
+   * parâmetro, preserva o comportamento histórico (PN80).
+   */
+  pressaoRequeridaMca?: number,
+): (typeof TUBOS_PVC_RIGIDO)[number] {
   const Q_m3s = vazaoM3PorHora / 3600;
   const V = 1.5;
   // D_mm é o diâmetro interno mínimo que garante v ≤ 1,5 m/s.
-  // Comparamos com diametroInternoMm (real) e não com o nominal.
   const D_mm = Math.sqrt((4 * Q_m3s) / (Math.PI * V)) * 1000;
 
-  // TASK-070: a principal não tem filtro de classe por trecho na seleção — manter
-  // apenas PN80 aqui (comportamento histórico); PN60 entra nas secundárias via
-  // selectSecondaryPipe, que aplica pressureClassRequirement explicitamente.
-  const ordenados = [...TUBOS_PVC_RIGIDO]
-    .filter((t) => t.pressaoMca >= 80)
-    .sort((a, b) => a.diametroMm - b.diametroMm);
-  return (
-    ordenados.find((t) => t.diametroInternoMm >= D_mm) ??
-    ordenados[ordenados.length - 1]
-  );
+  const classeMinima = pressaoRequeridaMca ?? 80;
+  // Candidatos: classe suficiente para a pressão; entre os que atendem o
+  // diâmetro, vence o de MENOR custo (classe menor = mais barato).
+  const candidatos = [...TUBOS_PVC_RIGIDO]
+    .filter((t) => t.pressaoMca >= classeMinima)
+    .sort((a, b) => a.diametroMm - b.diametroMm || a.precoVenda - b.precoVenda);
+  const atende = candidatos.filter((t) => t.diametroInternoMm >= D_mm);
+  if (atende.length > 0) {
+    return atende.reduce((melhor, t) => (t.precoVenda < melhor.precoVenda ? t : melhor), atende[0]);
+  }
+  return candidatos[candidatos.length - 1] ?? TUBOS_PVC_RIGIDO[TUBOS_PVC_RIGIDO.length - 1];
 }
 
 export function selectCurva(diametroMm: number): Conexao {

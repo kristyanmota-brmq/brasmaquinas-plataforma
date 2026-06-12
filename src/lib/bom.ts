@@ -199,6 +199,11 @@ export interface BOMInput {
   constructability: ConstructabilityReport;
   /** TASK-022: necessário para calcular dobras na adutora. Opcional — sem centroid, adutora é ignorada. */
   centroid?: { lat: number; lng: number };
+  /**
+   * TASK-085R (RT rev.2): HMT requerida (mca) — quando presente, a classe de
+   * pressão da principal/adutora é CALCULADA (menor classe que cobre a HMT).
+   */
+  hmtMca?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -397,7 +402,7 @@ export function buildBOM(input: BOMInput): BOMResult {
 
   // ── Tubulação principal ────────────────────────────────────────────────────
   const diametroCalc = calculatePipelineDiameterMm(sectorization.vazaoPorSetorM3PorHora);
-  const tubo = selectTubo(sectorization.vazaoPorSetorM3PorHora);
+  const tubo = selectTubo(sectorization.vazaoPorSetorM3PorHora, input.hmtMca);
 
   const comprimentoPrincipalM = mainPipeline.lengthMeters;
   const barrasPrincipal = Math.ceil(comprimentoPrincipalM / tubo.metrosPorBarra);

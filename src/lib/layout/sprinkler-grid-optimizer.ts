@@ -941,7 +941,7 @@ export function runTopKHydraulicValidation(
           setoresCount: effectiveN,
           // Placeholders — campos obrigatórios pelo schema; não usados pelo solver hidráulico.
           jornadaHoras: 9,
-          laminaMm: 10,
+          laminaMm: 8, // TASK-085R (RT): default 8 mm/dia
           tempoPorSetorMinutos: 0,
           aspersoresPorSetor,
           vazaoPorSetorM3PorHora,

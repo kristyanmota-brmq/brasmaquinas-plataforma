@@ -222,6 +222,15 @@ Testes na base: **887/887** vitest · TypeScript: 0 erros · **37/37 testes tool
 
 ---
 
+### TASK-085R — Revisão RT nº 2 do dossiê (HMT, classe calculada, política resolver)
+
+**Status:** `concluída` · 2026-06-12 · **1038/1038 testes** · 0 tsc · 37/37 tooling
+**Arquivo/relatório:** registrados no doc 12 (entry 085R) e doc 14 (rev.2 no cabeçalho)
+
+> Perdas localizadas = 5 mca FIXOS (margem de segurança removida — inclusa); HMT = Ps + distribuídas + 5 + desnível; classe da principal/adutora CALCULADA pela HMT (selectTubo v2 + BOM final com hmtMca do solver); η = 0,70 ("maior rendimento"); lâmina default 8 mm/dia; **política "RESOLVER, NÃO BLOQUEAR"** (doc 14 §11: resolvedores ativos + fila); §12.1/12.2 didáticas (limiar de declividade; pesos do otimizador).
+
+---
+
 ### TASK-084 — Revisão RT nº 1 do dossiê (6 correções ditadas em sessão)
 
 **Status:** `concluída` · 2026-06-12 · **1038/1038 testes** · 0 tsc · 37/37 tooling

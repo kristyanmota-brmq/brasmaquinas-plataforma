@@ -30,7 +30,14 @@ const MAX_VEL_SECONDARY_MS = 1.5;
 const MAX_VEL_LATERAL_MS = 2.5;
 const MAX_LATERAL_LOSS_FRACTION = 0.20;
 const MAX_SECONDARY_LOSS_FRACTION = 0.10;
-const DEFAULT_SAFETY_MARGIN_MCA = 2.0;
+// TASK-085R (RT rev.2, 2026-06-12): margem de segurança REMOVIDA como parcela
+// própria — "já está inclusa nas perdas localizadas". Mantida na assinatura
+// (default 0) para compat do breakdown.
+const DEFAULT_SAFETY_MARGIN_MCA = 0;
+
+// TASK-085R (RT rev.2): perdas localizadas FIXAS em 5 mca (substitui o modelo
+// percentual de 10% das distribuídas).
+export const PERDAS_LOCALIZADAS_FIXAS_MCA = 5;
 const DEFAULT_LOCAL_LOSS_FACTOR_PERCENT = 10;
 
 /** Limites hidráulicos usados pelo solver — exportados para diagnósticos externos. */
@@ -723,7 +730,10 @@ export function sizeHydraulics(
   const distribHf  = hfAdutora + hfPrincipal + hfSec + hfLat;
 
   // Perdas locais (T6)
-  const localLossesM = distribHf * localLossFactorPercent / 100;
+  // TASK-085R (RT rev.2): valor FIXO de 5 mca (inclui a antiga margem de
+  // segurança). O parâmetro percentual permanece só para o modo "neglected" (0).
+  const localLossesM =
+    localLossFactorPercent === 0 ? 0 : PERDAS_LOCALIZADAS_FIXAS_MCA;
   if (localLossFactorPercent === 0) {
     warnings.push(
       "Fator de perdas locais = 0 %. Recomenda-se acrescentar 10–15 % da perda distribuída " +

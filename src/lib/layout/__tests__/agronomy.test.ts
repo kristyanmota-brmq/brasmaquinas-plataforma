@@ -176,7 +176,7 @@ describe("T60 — catálogo 5035 SD (homologação provisória) × agronomia", (
 });
 
 describe("T60 — lâmina como input em buildSectorizationForJornada", () => {
-  it("T60-5: default preserva comportamento legado (laminaMm = 10, cultura ausente)", async () => {
+  it("T60-5: default oficial do RT (laminaMm = 8, cultura ausente)", async () => {
     const { buildSectorizationForJornada } = await import("@/lib/layout/layout-use-cases");
     const layout = makeLayoutL();
     const { generatePhysicalColumns } = await import("@/lib/layout/laterais");
@@ -188,7 +188,7 @@ describe("T60 — lâmina como input em buildSectorizationForJornada", () => {
       TUBOS_PVC_LF,
     );
     const sec = buildSectorizationForJornada(cols, 9, layout.sprinklers!.positions.length, 1.5, 60);
-    expect(sec.laminaMm).toBe(10);
+    expect(sec.laminaMm).toBe(8);
     expect(sec.cultura).toBeUndefined();
   });
 

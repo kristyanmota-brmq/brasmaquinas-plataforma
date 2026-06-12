@@ -302,11 +302,10 @@ describe("TAREFA 9 — diâmetro interno, caminho exaustivo, perdas locais, desn
     expect(report.hmt.localLossesM).toBeGreaterThan(0);
   });
 
-  it("T9-4: localLossesM ≈ 10 % das perdas distribuídas (adutora + principal + ramal + lateral)", () => {
+  it("T9-4 (TASK-085R): localLossesM = 5 mca FIXOS (inclui a antiga margem de segurança — RT rev.2)", () => {
     const report = sizeHydraulics(completeResultL())!;
-    const { hmt } = report;
-    const distribHf = hmt.hfAdutoraM + hmt.hfPrincipalToDerivationM + hmt.hfSecondaryM + hmt.hfLateralM;
-    expect(hmt.localLossesM).toBeCloseTo(distribHf * 0.10, 6);
+    expect(report.hmt.localLossesM).toBe(5);
+    expect(report.hmt.safetyMarginM).toBe(0); // margem removida como parcela própria
   });
 
   it("T9-5: modelLimitations.localLossesModel = 'percent_estimate' (fator > 0)", () => {

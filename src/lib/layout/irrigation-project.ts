@@ -484,6 +484,9 @@ export function calculateIrrigationProject(
   const bom = buildBOM({
     ...bomInput,
     sizedSecondaries: hydraulics?.sizedSecondaries,
+    // TASK-085R (RT rev.2): classe de pressão da principal/adutora calculada
+    // pela HMT do solver (menor classe que cobre; menor custo entre as que cobrem).
+    hmtMca: hydraulics?.hmt.totalHMT,
   });
 
   // ── Diagnósticos (recebe BOM final + solver hidráulico) ──────────────────

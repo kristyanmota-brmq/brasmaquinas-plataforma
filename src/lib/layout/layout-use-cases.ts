@@ -21,7 +21,8 @@ import {
 import type { PhysicalColumn, Lateral } from "./laterais";
 import type { ProjectLayout } from "@/app/projetos/[id]/layout-schema";
 
-const LAMINA_MM = 10 as const;
+// TASK-085R (RT rev.2, 2026-06-12): lâmina default 8 mm/dia (era 10).
+const LAMINA_MM = 8 as const;
 
 const M_PER_DEG_LAT = 111320;
 

@@ -1,6 +1,6 @@
 # 14 — Fundamentos Técnicos do Motor de Projetos (dossiê para validação do RT)
 
-**Emitido em:** 2026-06-12 · **Para:** RT da Brasmáquinas · **Status da base:** 1038 testes automatizados, 0 erros de tipo · **Revisão RT nº 1 incorporada em 2026-06-12** (itens 1, 2, 3.1, 4 e 8)
+**Emitido em:** 2026-06-12 · **Para:** RT da Brasmáquinas · **Status da base:** 1038 testes automatizados, 0 erros de tipo · **Revisões RT nº 1 e nº 2 incorporadas em 2026-06-12**
 **Escopo:** TODAS as regras, fórmulas e limites que o software usa para gerar um projeto de irrigação por aspersão convencional — da área desenhada à proposta. Cada item traz valor vigente, fundamento, status de homologação e onde vive no código. O detalhe vivo de cada premissa está no doc 12 (`12-premissas-provisorias-e-revisao-rt.md`); a arquitetura de rede, no doc 13.
 
 > **Como ler o status:** `APROVADO_RT` = homologado (por revisão ou ordem direta em sessão); `CALIBRÁVEL` = valor de praxe adotado, aguardando dado de campo/decisão fina do RT. Nenhum item CALIBRÁVEL bloqueia emissão — mas está listado para auditoria.
@@ -85,32 +85,52 @@ Gate de eixo: todo aspersor a ≤ **0,10 m** do eixo da lateral (APROVADO_RT; bl
 - **Hazen-Williams**, **C = 140** (PVC — corrigido pelo RT em 2026-06-12), sempre com **diâmetro interno real** de catálogo: `hf = 10,67 · L · (Q/C)^1,852 / D^4,87`.
 - Laterais: F de Christiansen; caminho crítico **exaustivo** (todos os setores × todos os trechos).
 - **Limites (corrigidos pelo RT em 2026-06-12):** **secundária** (nomenclatura oficial — não mais "ramal") v ≤ **2,5 m/s** e hf ≤ **3,0 mca**; lateral v ≤ 2,5 m/s e hf ≤ 20%·Ps; classe de pressão (PN) conferida POR TRECHO com pressão real por derivação (`HMT − hf acumulado`) — violação confirmada é blocker.
-- **Perdas localizadas: +10%** das distribuídas (CALIBRÁVEL). **HMT = pressão de serviço + Σ perdas + desnível geodético + margem de segurança**.
-- **Classes (RT, 2026-06-12): TODA a rede secundária e lateral em PN40** (família LF: DN50 lateral; DN50/75/100 secundárias); principal/adutora PN80. O gate de pressão por derivação garante que nenhum trecho PN40 veja mais de 40 mca — violação confirmada bloqueia. `hydraulic-sizing.ts`, `hazenWilliams.ts`.
+- **Perdas localizadas: 5 mca FIXOS** (RT rev.2 — já INCLUEM a margem de segurança; não existe parcela de margem separada). **HMT = pressão de serviço + Σ perdas distribuídas + 5 mca + desnível geodético**.
+- **Classes (RT rev.2): laterais LF PN40 DN50 (único); secundárias LF PN40 (DN50/75/100); principal/adutora com CLASSE CALCULADA** — a menor classe que cobre a HMT do projeto, escolhida por custo entre as que cobrem (hoje, com os preços de lista, o PN80 segue vencedor nos DN 100–150; a infraestrutura escolhe automaticamente quando classes menores ficarem mais baratas/catalogadas). O gate de pressão por derivação garante que nenhum trecho veja pressão acima da classe. `hydraulic-sizing.ts`, `hazenWilliams.ts`.
 
 ## 9. Conjunto moto-bomba
 
-- Validação por **ponto nominal** (vazão do setor crítico + HMT ≤ placa); curva Q-H multiponto é trilho futuro.
+- Validação por **ponto nominal** (vazão do setor crítico + HMT ≤ dados da bomba); curva Q-H multiponto é trilho futuro. *(Confirmado pelo RT na rev.2.)*
 - **Seleção automática: menor folga** que atende o ponto (não superdimensiona); catálogo homologado (IMBIL/EBARA do corpus — PENDENTE confirmação fina de placa). Sem bomba que atenda → campo fica vazio e o gate avisa; nunca inventa.
 
 ## 10. Coordenadas e apresentação
 
 - **Toda coordenada exibida em UTM (SIRGAS 2000)** — "E … m · N … m · fuso" (RT, 2026-06-12). Conversão Transversa de Mercator (Krüger), ida-e-volta < 1 mm. Interno em lng/lat (mapa). `utm.ts`.
 
-## 11. Governança de emissão
+## 11. Governança de emissão — política "RESOLVER, NÃO BLOQUEAR" (RT rev.2)
 
-- Proposta (PDF) **bloqueada com qualquer blocker ativo** (HTTP 422): gates hidráulicos, PN confirmado, construtibilidade angular, eixo do aspersor, BOM com pendência de SKU, cálculo incompleto. Blockers separados em "corrigível pelo projetista" vs "aguarda decisão do RT". Override apenas humano, registrado em log permanente (`ai/decision-log.md`).
+Diretriz do RT (2026-06-12): *"não quero que você bloqueie o que estiver errado — quero que você resolva."* O bloqueio passa a ser o ÚLTIMO recurso, nunca a primeira resposta:
+
+1. **O motor resolve sozinho tudo que tem solução determinística** (já ativo): vazão de setor acima do limite → re-setoriza; nenhum candidato de principal válido → re-avalia com mais setores; lateral que não cabe → divide a coluna; bomba ausente → seleciona do catálogo pela menor folga; classe da principal → calculada pela HMT; rede vazia → candidato descartado na origem.
+2. **Fila de resolvedores em construção** (próximos): ângulo de junção fora de 0/90 → re-traçado automático pelo motor; conexão sem SKU → sugestão de homologação com item equivalente; pressão acima da classe na lateral → modelagem da regulagem no registro de seção (TASK-053-valves).
+3. **Só bloqueia o que não tem solução determinística** — e quando bloquear, diz exatamente o que falta e de quem é a decisão (projetista × RT). Override humano registrado em log permanente (`ai/decision-log.md`).
 
 ## 12. Itens CALIBRÁVEIS aguardando o RT (não bloqueiam)
 
-| Item | Valor de praxe | Onde decidir |
+| Item | Valor vigente | Status (rev.2) |
 |---|---|---|
-| η do conjunto moto-bomba | 0,55 | placa dos conjuntos reais |
-| Limiar de declividade (altimetria comanda) | 2% | prática da casa / cultura |
-| Perdas localizadas | +10% | levantamento de conexões típicas |
-| Margem de segurança da HMT | valor vigente no solver | política da casa |
-| Lâmina default | 10 mm/dia | agrônomo / cultura |
-| Pesos do otimizador de candidatos | exploratórios | dados de campo (E09) |
+| η do conjunto moto-bomba | **0,70** | DEFINIDO pelo RT ("maior rendimento possível") |
+| Limiar de declividade (altimetria comanda) | 2% | CALIBRÁVEL — ver explicação na §12.1 |
+| Perdas localizadas | **5 mca fixos** | DEFINIDO pelo RT (inclui a margem) |
+| Margem de segurança da HMT | **removida** (inclusa nos 5 mca) | DEFINIDO pelo RT |
+| Lâmina default | **8 mm/dia** | DEFINIDO pelo RT |
+| Pesos do otimizador de candidatos | exploratórios | CALIBRÁVEL — ver explicação na §12.2 |
+
+### 12.1 O que é o "limiar de declividade" (explicação solicitada)
+
+É o ponto de corte que decide QUEM manda na orientação da grade: o morro ou a cerca. O software mede a declividade média do talhão (ajuste de plano sobre as cotas do terreno). Se ela for **maior ou igual ao limiar (hoje 2%)**, o terreno é considerado "inclinado de verdade" e a **altimetria assume o comando** — laterais em nível. Se for menor, o talhão é tratado como plano e a **planimetria decide** (divisa).
+
+*Por que 2%?* É o ponto onde o desnível de uma lateral típica começa a competir com o atrito: lateral de 216 m a 2% = 4,3 m de desnível ≈ orçamento inteiro dos 20% (5 mca no 5022). Abaixo disso, o desnível é menor que o próprio ruído do atrito e girar a grade por causa dele só atrapalharia a operação. *O que significa calibrar:* se a prática da casa preferir proteger mais a uniformidade (ex.: culturas sensíveis), baixa-se para 1,5%; se a operação tolerar mais variação, sobe-se para 3%. É um número só, trocado em um lugar só — a decisão é de vocês, com dado de campo.
+
+### 12.2 O que são os "pesos do otimizador de candidatos" (explicação solicitada)
+
+Quando o software compara os traçados possíveis da principal (A0 borda próxima · A2 borda oposta · A3 central), cada candidato recebe uma **nota = custo de material estimado + penalidades operacionais**. As penalidades convertem incômodos de CAMPO em R$ para a comparação ser justa:
+
+- **P2 — desconexão**: metros de sub-coletor "viajando" longe das laterais (hoje R$ 35/m) — rede espalhada custa vala, manutenção e tempo de montagem;
+- **P3 — quebras de rota**: cada cotovelo/desvio do traçado (hoje R$ 100/un) — cada quebra é conexão, perda localizada e ponto de vazamento;
+- **P1/P4** (cruzamentos da principal; dispersão de válvulas): medidos e exibidos, mas com peso ZERO por decisão metodológica — ativá-los sem dado de campo transformaria boa prática em regra absoluta.
+
+*Por que "exploratórios"?* Os R$ 35/m e R$ 100/un são ordens de grandeza razoáveis, não medições da SUA operação. **Calibrar via E09** significa: nos primeiros projetos montados, cronometrar/custear o que uma quebra de rota e um metro de vala extra realmente custam para a equipe da Brasmáquinas e substituir os números. Importante: os pesos NUNCA aprovam rede que viole limite técnico — eles só desempatam entre redes VÁLIDAS.
 
 ## 13. Referências
 

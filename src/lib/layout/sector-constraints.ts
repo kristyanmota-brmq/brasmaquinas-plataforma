@@ -21,8 +21,13 @@ export interface RestricoesLocal {
   potenciaDisponivelCv?: number;
 }
 
-/** Eficiência global de praxe do conjunto moto-bomba (premissa calibrável). */
-export const EFICIENCIA_CONJUNTO_PADRAO = 0.55;
+/**
+ * Eficiência global do conjunto moto-bomba.
+ * TASK-085R (RT rev.2): "dimensionar pelo maior rendimento possível
+ * encontrado" — η = 0,70 (bomba centrífuga de alto rendimento ~0,75 × motor
+ * elétrico ~0,93). Recalibrável com dado de placa dos conjuntos reais.
+ */
+export const EFICIENCIA_CONJUNTO_PADRAO = 0.70;
 
 /** Vazão máxima bombeável (m³/h) com a potência disponível na HMT dada. */
 export function vazaoMaxPorPotenciaM3h(

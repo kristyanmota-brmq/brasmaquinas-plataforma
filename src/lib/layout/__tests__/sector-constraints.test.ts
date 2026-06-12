@@ -28,13 +28,13 @@ describe("T82 — mínimo de setores pelas restrições", () => {
   });
 
   it("T82-4: potência domina quando mais restritiva que a vazão", () => {
-    // 743 m³/h · 25 cv @ 50 mca → Qmax = 25·270·0,55/50 = 74,25 → 11 setores
+    // TASK-085R (η=0,70): 743 m³/h · 25 cv @ 50 mca → Qmax = 25·270·0,70/50 = 94,5 → 8 setores
     const r = minSetoresPorRestricoes(
       743,
       { vazaoDisponivelM3h: 150, potenciaDisponivelCv: 25 },
       50,
     );
-    expect(r.nMinSetores).toBe(Math.ceil(743 / 74.25));
+    expect(r.nMinSetores).toBe(Math.ceil(743 / 94.5));
     expect(r.motivos.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -51,8 +51,8 @@ describe("T82 — mínimo de setores pelas restrições", () => {
     expect(minSetoresPorRestricoes(743, { vazaoDisponivelM3h: -5 }).nMinSetores).toBe(1);
   });
 
-  it("T82-7: η de praxe documentado (0,55) usado como default", () => {
-    expect(EFICIENCIA_CONJUNTO_PADRAO).toBe(0.55);
-    expect(vazaoMaxPorPotenciaM3h(30, 60)).toBeCloseTo(74.25, 1);
+  it("T82-7: η oficial do RT (0,70 — maior rendimento) usado como default", () => {
+    expect(EFICIENCIA_CONJUNTO_PADRAO).toBe(0.70);
+    expect(vazaoMaxPorPotenciaM3h(30, 60)).toBeCloseTo(94.5, 1);
   });
 });
