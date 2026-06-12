@@ -61,6 +61,7 @@ import {
   buildMainPipelineUpdate,
   buildSectorizationForJornada,
 } from "@/lib/layout/layout-use-cases";
+import type { ArchitectureSelectionResult } from "@/lib/layout/architecture-selector";
 import { MemorialPanel } from "@/components/map/MemorialPanel";
 import { partitionBlockers } from "@/components/map/blocker-classification";
 
@@ -176,6 +177,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
     | { kind: "technical" }
     | null
   >(null);
+  // TASK-061: resultado da seleção arquitetural A0/A2/A3 do último traçado auto
+  // (transparência — null quando o traçado é manual ou ainda não gerado).
+  const [archSelection, setArchSelection] = useState<ArchitectureSelectionResult | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchMarker, setSearchMarker] = useState<{ lng: number; lat: number } | null>(null);
   const [optimizerState, setOptimizerState] = useState<OptimizerState>({ status: "idle" });
@@ -299,13 +303,17 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
     if (layout.mainPipeline?.source === "manual") return;
     if (!layout.centroid) return;
 
-    const { principal, adutora, lengthMeters } = buildSelectedPipelineCoords(
+    const { principal, adutora, lengthMeters, architectureSelection } = buildSelectedPipelineCoords(
       layout.waterSource,
       physicalColumns,
       layout.centroid,
       layout.sprinklers?.gridAngleDegrees ?? 0,
       laterais,
+      // TASK-061: completa o wiring da TASK-056 — candidatos avaliados com a
+      // topologia v12 real (espinha de peixe) quando há setorização.
+      projectResult.operational?.operationalSegments,
     );
+    setArchSelection(architectureSelection);
 
     // Adutora conecta sempre ao endpoint mais próximo da captação (nearest, via principal.ts).
     // O desnível é registrado em elevationDeltaM para dimensionamento da bomba — não muda o traçado.
@@ -538,6 +546,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
         source: "manual",
       },
     }));
+    setArchSelection(null); // TASK-061: traçado manual — seleção do motor não se aplica
     setDrawingPipeline([]);
     setMode("view");
   }, [drawingPipeline, queryElevation]);
@@ -554,13 +563,15 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
   const resetToAutoPipeline = useCallback(() => {
     if (!layout.waterSource || !layout.centroid) return;
 
-    const { principal, adutora, lengthMeters } = buildSelectedPipelineCoords(
+    const { principal, adutora, lengthMeters, architectureSelection } = buildSelectedPipelineCoords(
       layout.waterSource,
       physicalColumns,
       layout.centroid,
       layout.sprinklers?.gridAngleDegrees ?? 0,
       laterais,
+      projectResult.operational?.operationalSegments,
     );
+    setArchSelection(architectureSelection);
 
     const elevationStartM = queryElevation(principal[0][0], principal[0][1]);
     const elevationEndM = queryElevation(
@@ -572,7 +583,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
       ...l,
       mainPipeline: buildMainPipelineUpdate(principal, adutora, lengthMeters, elevationStartM, elevationEndM),
     }));
-  }, [layout.waterSource, layout.centroid, layout.sprinklers, physicalColumns, laterais, queryElevation]);
+  }, [layout.waterSource, layout.centroid, layout.sprinklers, physicalColumns, laterais, queryElevation, projectResult.operational]);
 
   const clearPipeline = useCallback(() => {
     setLayout((l) => {
@@ -2113,6 +2124,18 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                     Auto
                   </button>
                 )}
+                {/* TASK-061: caminho de volta manual → motor (resolve a causa de
+                    ângulos não-construtíveis em traçados manuais diagonais) */}
+                {layout.mainPipeline.source === "manual" && (
+                  <button
+                    onClick={resetToAutoPipeline}
+                    title="Substituir o traçado manual pela sugestão do motor de arquitetura (A0/A2/A3)"
+                    className="text-[11px] text-sky-700 hover:text-sky-900 inline-flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Usar traçado do motor
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                 <div>
@@ -2146,6 +2169,45 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                         {secondaries.length} ramal{secondaries.length > 1 ? "is" : ""}
                       </span>
                     </div>
+                  </div>
+                )}
+                {/* TASK-061: transparência da seleção arquitetural A0/A2/A3 —
+                    antes o vencedor era aplicado silenciosamente e o resultado descartado */}
+                {archSelection && layout.mainPipeline.source === "auto" && (
+                  <div className="col-span-2 bg-background border border-border rounded-sm p-2">
+                    <div className="text-[10px] uppercase tracking-[0.1em] text-ink-3 mb-1">
+                      Arquitetura da rede (motor A0/A2/A3)
+                    </div>
+                    <div className="text-xs text-ink mb-1">
+                      <span className="font-semibold">{archSelection.winner}</span>
+                      {" — "}
+                      <span className="text-ink-2">{archSelection.winnerCandidate.description}</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {archSelection.evaluations.map((ev) => (
+                        <div
+                          key={ev.candidate.id}
+                          className={clsx(
+                            "flex items-center justify-between text-[11px] font-mono",
+                            ev.candidate.id === archSelection.winner ? "text-ink font-semibold" : "text-ink-3",
+                          )}
+                        >
+                          <span>
+                            {ev.candidate.id === archSelection.winner ? "● " : "· "}
+                            {ev.candidate.id}
+                            {!ev.isValid && " (inválido)"}
+                          </span>
+                          <span>
+                            {ev.isValid
+                              ? `score R$ ${ev.scoreFinal.toFixed(0)}`
+                              : ev.invalidReason?.slice(0, 28) ?? "—"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {archSelection.winnerCandidate ? (
+                      <p className="text-[10px] text-ink-3 mt-1 leading-snug">{archSelection.reason}</p>
+                    ) : null}
                   </div>
                 )}
                 {connectivityReport && connectivityReport.disconnectedColumnsCount > 0 && (

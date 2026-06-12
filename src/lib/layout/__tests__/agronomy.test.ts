@@ -206,3 +206,43 @@ describe("T60 — lâmina como input em buildSectorizationForJornada", () => {
     expect(result.agronomy!.tempoPorSetorH).toBeCloseTo(6.5 / 10.4167, 3);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-061 — Wiring operationalSegments no fluxo de seleção arquitetural
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T61 — buildSelectedPipelineCoords com operationalSegments (topologia v12)", () => {
+  it("T61-1: seleção avalia os 3 candidatos e retorna vencedor com segments fornecidos", async () => {
+    const { buildSelectedPipelineCoords } = await import("@/lib/layout/layout-use-cases");
+    const layout = makeLayoutL();
+    const full = calculateIrrigationProject(layout);
+    expect(full.isComplete).toBe(true);
+    const result = buildSelectedPipelineCoords(
+      layout.waterSource!,
+      full.physical!.physicalColumns,
+      layout.centroid!,
+      layout.sprinklers!.gridAngleDegrees,
+      full.distribution!.laterais,
+      full.operational!.operationalSegments,
+    );
+    expect(result.architectureSelection).not.toBeNull();
+    expect(result.architectureSelection!.evaluations).toHaveLength(3);
+    expect(["A0", "A2", "A3"]).toContain(result.architectureSelection!.winner);
+    expect(result.principal.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("T61-2: retrocompat — sem operationalSegments continua funcionando (caminho legado)", async () => {
+    const { buildSelectedPipelineCoords } = await import("@/lib/layout/layout-use-cases");
+    const layout = makeLayoutL();
+    const full = calculateIrrigationProject(layout);
+    const result = buildSelectedPipelineCoords(
+      layout.waterSource!,
+      full.physical!.physicalColumns,
+      layout.centroid!,
+      layout.sprinklers!.gridAngleDegrees,
+      full.distribution!.laterais,
+    );
+    expect(result.architectureSelection).not.toBeNull();
+    expect(result.lengthMeters).toBeGreaterThan(0);
+  });
+});
