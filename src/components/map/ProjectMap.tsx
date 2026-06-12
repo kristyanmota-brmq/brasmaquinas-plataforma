@@ -23,6 +23,7 @@ import {
   type LayoutSelectionResult,
 } from "@/lib/layout/sprinkler-grid-optimizer";
 import { candidateToSprinklers } from "@/lib/layout/optimizer-integration";
+import { selectBombaAutomatica } from "@/lib/layout/pump-auto-select";
 import {
   MousePointer2,
   Hexagon,
@@ -759,6 +760,19 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
       return { ...l, pump: { hmtMca: b.hmtMca, vazaoMaxM3h: b.vazaoMaxM3h, modelo: b.modelo } };
     });
   }, []);
+
+  // TASK-077: bomba AUTOMÁTICA — quando nenhum conjunto foi escolhido e a
+  // hidráulica está calculada, aplica a bomba homologada de menor folga que
+  // atende vazão do setor + HMT. Override manual em "Configurações e ajustes".
+  // O gate de bomba insuficiente do solver permanece o guardião (T65-3).
+  const hmtReqAuto = projectResult.hydraulics?.hmt.totalHMT;
+  const flowReqAuto = layout.sectorization?.vazaoPorSetorM3PorHora;
+  const pumpMissing = !layout.pump;
+  useEffect(() => {
+    if (!pumpMissing || !hmtReqAuto || !flowReqAuto) return;
+    const b = selectBombaAutomatica(BOMBAS_HOMOLOGADAS, flowReqAuto, hmtReqAuto);
+    if (b) applyBomba(b.modelo);
+  }, [pumpMissing, hmtReqAuto, flowReqAuto, applyBomba]);
 
   const positionSprinklers = useCallback(() => {
     if (!layout.area || !layout.centroid) return;
@@ -1989,12 +2003,12 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
 
         {/* ── Warnings (derivados de projectResult.diagnostics) ── */}
         {(projectResult.diagnostics?.warnings.length ?? 0) > 0 && (
-          <div className="mb-5 bg-amber-50 border border-amber-200 border-l-4 border-l-amber-500 rounded-md p-3">
-            <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-[0.08em] mb-2 flex items-center gap-1.5">
+          <details className="mb-5 bg-amber-50 border border-amber-200 border-l-4 border-l-amber-500 rounded-md p-3">
+            <summary className="cursor-pointer select-none list-none text-[11px] font-semibold text-amber-700 uppercase tracking-[0.08em] flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" />
-              Avisos
-            </p>
-            <ul className="space-y-1">
+              Avisos ({projectResult.diagnostics!.warnings.length}) · ver detalhes
+            </summary>
+            <ul className="space-y-1 mt-2">
               {projectResult.diagnostics!.warnings.map((w, i) => (
                 <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
                   <span className="flex-shrink-0 mt-0.5">·</span>
@@ -2002,8 +2016,90 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                 </li>
               ))}
             </ul>
-          </div>
+          </details>
         )}
+
+        {/* ── TASK-077: Resumo essencial (tudo automático) ──────── */}
+        <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-3">
+          Resumo do projeto
+        </h3>
+        <div className="bg-surface border border-border rounded-lg p-4 grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
+          <Row
+            label="Área irrigada"
+            value={layout.areaHectares ? `${layout.areaHectares.toFixed(2)} ha` : "—"}
+          />
+          <Row
+            label="Aspersores"
+            value={
+              layout.sprinklers
+                ? `${layout.sprinklers.count} · ${aspersorAtivo.modelo}`
+                : "—"
+            }
+          />
+          <Row
+            label="Setores"
+            value={
+              layout.sectorization ? String(layout.sectorization.setoresCount) : "—"
+            }
+          />
+          <Row
+            label="Vazão por setor"
+            value={
+              layout.sectorization
+                ? `${layout.sectorization.vazaoPorSetorM3PorHora.toFixed(1)} m³/h`
+                : "—"
+            }
+            mono
+          />
+          <Row
+            label="HMT requerida"
+            value={
+              projectResult.hydraulics
+                ? `${projectResult.hydraulics.hmt.totalHMT.toFixed(1)} mca`
+                : "—"
+            }
+            mono
+          />
+          <Row
+            label="Bomba (automática)"
+            value={layout.pump?.modelo ?? "aguardando hidráulica"}
+          />
+          {bom && (
+            <Row
+              span={2}
+              label="Investimento estimado"
+              value={`R$ ${bom.totalGeral.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            />
+          )}
+          {bom && bom.meta.custoTotalAquisicaoR$ > 0 && (
+            <div className="col-span-2 -mt-1 text-[10px] font-mono text-emerald-700">
+              margem interna R${" "}
+              {bom.meta.margemBrutaR$.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}{" "}
+              ({((bom.meta.margemBrutaR$ / Math.max(bom.totalGeral, 1)) * 100).toFixed(1)}%)
+            </div>
+          )}
+        </div>
+        <button
+          onClick={handleExportPDF}
+          disabled={!bom || pdfLoading}
+          className="w-full mb-5 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-md font-semibold text-sm bg-brand hover:bg-brand-hover text-white shadow-card transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          title={bom ? "Exportar proposta em PDF" : "Conclua área, captação e tubulação para gerar a proposta"}
+        >
+          {pdfLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <FileDown className="w-4 h-4" />
+          )}
+          {pdfLoading ? "Gerando proposta…" : "Gerar proposta (PDF)"}
+        </button>
+
+        {/* ── TASK-077: tudo manual/técnico recolhido por padrão ── */}
+        <details className="-mx-2 border-t border-border pt-2">
+          <summary className="cursor-pointer select-none list-none flex items-center justify-between px-2 py-2.5 rounded-md hover:bg-surface text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] transition-colors">
+            <span>Configurações e ajustes técnicos</span>
+            <span className="text-ink-4">▾</span>
+          </summary>
+          <div className="px-2 pt-3">
 
         {/* ── Layout do projeto ─────────────────────────────────── */}
         <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-5">
@@ -3073,6 +3169,8 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
             </li>
           </ol>
         </div>
+          </div>
+        </details>
       </aside>
     </div>
   );
