@@ -405,6 +405,20 @@ arquitetural**.
 
 ---
 
+## Custos de aquisição (TASK-066)
+
+### Custo estimado por fator de markup
+
+| Campo | Valor |
+|-------|-------|
+| **Parâmetro** | `custo = precoVenda ÷ 1,5456` nos 28 itens sem custo de fornecedor (marcados `T066` no catálogo) |
+| **Origem** | Fator EXATO e uniforme observado na aba TIGRE TUBOS da lista mestra 25.08.2025 (política de precificação da casa) |
+| **Risco** | Fornecedores não-Tigre têm fator próprio (VIQUA = 1,67) — margem real pode divergir ±8% nesses itens |
+| **Responsável futuro** | Comercial/RT — substituir por custo real de fornecedor; definir processo de atualização (Sankhya) |
+| **Status** | `PENDENTE_CONFERENCIA` (autorizado "por enquanto" pelo usuário em 2026-06-12) |
+
+---
+
 ## Histórico de revisões
 
 | Data | Autor | O que mudou |

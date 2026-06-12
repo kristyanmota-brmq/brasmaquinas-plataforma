@@ -275,3 +275,23 @@ describe("T65 — bombas homologadas validam contra o projeto", () => {
     expect(result.hydraulics?.pumpValidation.status).toMatch(/pump_insufficient/);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-066 — Custos de aquisição no catálogo (margem habilitada)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T66 — catálogo sem custo zero nas famílias core", () => {
+  it("T66-1: tubos, conexões e kit têm custo > 0 e custo < precoVenda", async () => {
+    const cat = await import("@/lib/catalog/aspersores");
+    const familias = [
+      ...cat.TUBOS_PVC, ...cat.TUBOS_PVC_LF, ...cat.TUBOS_PVC_RIGIDO,
+      ...cat.CURVAS_90, ...cat.CURVAS_90_RIGIDAS, ...cat.TES,
+      ...cat.TES_DERIVACAO_LATERAL, ...cat.ASPERSORES, ...cat.REGISTROS_SECAO_MANUAL,
+    ];
+    expect(familias.length).toBeGreaterThan(30);
+    for (const item of familias) {
+      expect(item.custo, `custo zero em ${item.sku}`).toBeGreaterThan(0);
+      expect(item.custo, `custo ≥ venda em ${item.sku}`).toBeLessThan(item.precoVenda);
+    }
+  });
+});

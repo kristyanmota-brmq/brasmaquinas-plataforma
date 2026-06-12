@@ -132,7 +132,7 @@ export const TUBOS_PVC: TuboPVC[] = [
     descricao: "TUBO LF PN40 35MM - TIGRE",
     marca: "TIGRE",
     unidade: "BARRA 6m",
-    custo: 0,
+    custo: 15.73 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 24.31,
     diametroNominalMm: 35,
     pn: 40,
@@ -143,7 +143,7 @@ export const TUBOS_PVC: TuboPVC[] = [
     descricao: "TUBO LF PN40 50MM - TIGRE",
     marca: "TIGRE",
     unidade: "BARRA 6m",
-    custo: 0,
+    custo: 20.06 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 31.0,
     diametroNominalMm: 50,
     pn: 40,
@@ -154,7 +154,7 @@ export const TUBOS_PVC: TuboPVC[] = [
     descricao: "TUBO LF PN40 75MM - TIGRE",
     marca: "TIGRE",
     unidade: "BARRA 6m",
-    custo: 0,
+    custo: 40.21 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 62.15,
     diametroNominalMm: 75,
     pn: 40,
@@ -165,7 +165,7 @@ export const TUBOS_PVC: TuboPVC[] = [
     descricao: "TUBO LF PN40 100MM - TIGRE",
     marca: "TIGRE",
     unidade: "BARRA 6m",
-    custo: 0,
+    custo: 73.76 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 114.0,
     diametroNominalMm: 100,
     pn: 40,
@@ -176,7 +176,7 @@ export const TUBOS_PVC: TuboPVC[] = [
     descricao: "TUBO LF PN40 125MM - TIGRE",
     marca: "TIGRE",
     unidade: "BARRA 6m",
-    custo: 0,
+    custo: 114.34 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 176.73,
     diametroNominalMm: 125,
     pn: 40,
@@ -187,7 +187,7 @@ export const TUBOS_PVC: TuboPVC[] = [
     descricao: "TUBO LF PN40 150MM - TIGRE",
     marca: "TIGRE",
     unidade: "BARRA 6m",
-    custo: 0,
+    custo: 161.75 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 250.0,
     diametroNominalMm: 150,
     pn: 40,
@@ -198,7 +198,7 @@ export const TUBOS_PVC: TuboPVC[] = [
     descricao: "TUBO LF PN60 150MM - TIGRE",
     marca: "TIGRE",
     unidade: "BARRA 6m",
-    custo: 0,
+    custo: 205.75 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 318.0,
     diametroNominalMm: 150,
     pn: 60,
@@ -215,7 +215,7 @@ export const CURVAS_90: Conexao[] = [
     descricao: "CURVA 90 PTA/BSA SOLD IRRIGA-LF 75 CB - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 12.94 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 20.0,
     diametroMm: 75,
     tipo: "curva90",
@@ -225,7 +225,7 @@ export const CURVAS_90: Conexao[] = [
     descricao: "CURVA 90 PTA/BSA SOLD IRRIGA-LF 100 CB - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 31.06 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 48.0,
     diametroMm: 100,
     tipo: "curva90",
@@ -235,7 +235,7 @@ export const CURVAS_90: Conexao[] = [
     descricao: "CURVA 90 PTA/BSA IRRIGA-LF PN80 125MM - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 75.25 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 116.3,
     diametroMm: 125,
     tipo: "curva90",
@@ -245,7 +245,7 @@ export const CURVAS_90: Conexao[] = [
     descricao: "CURVA 90 PTA/BSA IRRIGA-LF PN80 150MM - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 84.11 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 130.0,
     diametroMm: 150,
     tipo: "curva90",
@@ -258,7 +258,7 @@ export const TES: Conexao[] = [
     descricao: "TE PVC SOLD. IRRIG 75MM - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 20.06 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 31.0,
     diametroMm: 75,
     tipo: "te",
@@ -268,7 +268,7 @@ export const TES: Conexao[] = [
     descricao: "TE PVC SOLD. IRRIG 100MM - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 37.72 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 58.3,
     diametroMm: 100,
     tipo: "te",
@@ -278,7 +278,7 @@ export const TES: Conexao[] = [
     descricao: "TE PVC SOLD. IRRIG PN80 125MM - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 167.09 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 258.25,
     diametroMm: 125,
     tipo: "te",
@@ -288,7 +288,7 @@ export const TES: Conexao[] = [
     descricao: "TE PVC SOLD. IRRIG PN80 150MM - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 252.98 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 391.0,
     diametroMm: 150,
     tipo: "te",
@@ -337,7 +337,7 @@ export const ADESIVO_PVC: Produto = {
   descricao: "ADESIVO PLASTICO PVC 175G - PLASTUBOS",
   marca: "PLASTUBOS",
   unidade: "FR",
-  custo: 0,
+  custo: 7.51 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
   precoVenda: 11.6,
 };
 
@@ -350,7 +350,7 @@ export const ADESIVO_PVC: Produto = {
 //
 // Notas de dado:
 //   - precoVenda: homologado pelo RT (2026-05-21)
-//   - custo: 0 — custo de aquisição não informado; NÃO usar para margem real
+//   - custo: estimado pela TASK-066 (precoVenda ÷ 1,5456) quando o fornecedor não informou — conferir antes de margem final
 //   - marca: "" para SKUs 1819000, 1000843, 1000354 — pendente do RT
 // ============================================================
 
@@ -361,7 +361,8 @@ export interface KitAspersor5022Item {
   marca: string;
   unidade: string;
   /** Custo de aquisição não informado — não usar para análise de margem. */
-  custo: 0;
+  /** TASK-066: custo de aquisição (estimado ÷1,5456 quando sem dado de fornecedor). */
+  custo: number;
   precoVenda: number;
 }
 
@@ -369,18 +370,18 @@ export const KIT_ASPERSOR_5022: { dnMm: number; itens: KitAspersor5022Item[] }[]
   {
     dnMm: 50,
     itens: [
-      { sku: "1819000", descricao: 'Luva PVC BR 3/4"',                      marca: "",      unidade: "unid", custo: 0, precoVenda:  6.00 },
-      { sku: "1000843", descricao: 'Tubo de Subida PVC BR 3/4" x 3,0 m',   marca: "",      unidade: "unid", custo: 0, precoVenda: 30.25 },
-      { sku: "1000354", descricao: 'Tee de derivação roscável 50 mm x 3/4"', marca: "",    unidade: "unid", custo: 0, precoVenda: 15.00 },
+      { sku: "1819000", descricao: 'Luva PVC BR 3/4"',                      marca: "",      unidade: "unid", custo: 3.88 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */, precoVenda:  6.00 },
+      { sku: "1000843", descricao: 'Tubo de Subida PVC BR 3/4" x 3,0 m',   marca: "",      unidade: "unid", custo: 19.57 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */, precoVenda: 30.25 },
+      { sku: "1000354", descricao: 'Tee de derivação roscável 50 mm x 3/4"', marca: "",    unidade: "unid", custo: 9.7 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */, precoVenda: 15.00 },
     ],
   },
   {
     dnMm: 75,
     itens: [
-      { sku: "1819000", descricao: 'Luva PVC BR 3/4"',                      marca: "",      unidade: "unid", custo: 0, precoVenda:  6.00 },
-      { sku: "1000843", descricao: 'Tubo de Subida PVC BR 3/4" x 3,0 m',   marca: "",      unidade: "unid", custo: 0, precoVenda: 30.25 },
-      { sku: "132789",  descricao: 'TE SOLD IRR PN80 DN75 X 1" - PTI',      marca: "PTI",   unidade: "unid", custo: 0, precoVenda: 36.75 },
-      { sku: "1464000", descricao: 'BUCHA RED. ROSC. 1" X 3/4" - TIGRE',    marca: "TIGRE", unidade: "unid", custo: 0, precoVenda:  5.70 },
+      { sku: "1819000", descricao: 'Luva PVC BR 3/4"',                      marca: "",      unidade: "unid", custo: 3.88 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */, precoVenda:  6.00 },
+      { sku: "1000843", descricao: 'Tubo de Subida PVC BR 3/4" x 3,0 m',   marca: "",      unidade: "unid", custo: 19.57 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */, precoVenda: 30.25 },
+      { sku: "132789",  descricao: 'TE SOLD IRR PN80 DN75 X 1" - PTI',      marca: "PTI",   unidade: "unid", custo: 23.78 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */, precoVenda: 36.75 },
+      { sku: "1464000", descricao: 'BUCHA RED. ROSC. 1" X 3/4" - TIGRE',    marca: "TIGRE", unidade: "unid", custo: 3.69 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */, precoVenda:  5.70 },
     ],
   },
 ];
@@ -492,7 +493,7 @@ export const CURVAS_90_RIGIDAS: Conexao[] = [
     descricao: "Curva 90 PVC rígido sold. Ø50mm PN80 - Tigre", // TODO: confirmar preço
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 14.23 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 22.0,
     diametroMm: 50,
     tipo: "curva90",
@@ -502,7 +503,7 @@ export const CURVAS_90_RIGIDAS: Conexao[] = [
     descricao: "Curva 90 PVC rígido sold. Ø75mm PN80 - Tigre", // TODO: confirmar preço
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 24.59 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 38.0,
     diametroMm: 75,
     tipo: "curva90",
@@ -512,7 +513,7 @@ export const CURVAS_90_RIGIDAS: Conexao[] = [
     descricao: "Curva 90 PVC rígido sold. Ø100mm PN80 - Tigre", // TODO: confirmar preço
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 44.0 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 68.0,
     diametroMm: 100,
     tipo: "curva90",
@@ -522,7 +523,7 @@ export const CURVAS_90_RIGIDAS: Conexao[] = [
     descricao: "CURVA 90 PTA/BSA IRRIGA-LF PN80 125MM - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 75.25 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 116.3,
     diametroMm: 125,
     tipo: "curva90",
@@ -532,7 +533,7 @@ export const CURVAS_90_RIGIDAS: Conexao[] = [
     descricao: "CURVA 90 PTA/BSA IRRIGA-LF PN80 150MM - TIGRE",
     marca: "TIGRE",
     unidade: "UN",
-    custo: 0,
+    custo: 84.11 /* T066: custo estimado ÷1,5456 — PENDENTE_CONFERENCIA */,
     precoVenda: 130.0,
     diametroMm: 150,
     tipo: "curva90",
