@@ -8,9 +8,9 @@
  *
  * Hazen-Williams (SI):
  *   hf [m] = 10,67 × Q[m³/s]^1,852 / (C^1,852 × D_interno[m]^4,871) × L[m]
- *   C = 145 (PVC, V0.5-RC §14); D = diâmetro interno real.
+ *   C = 140 (PVC, RT rev.1 TASK-084); D = diâmetro interno real.
  *
- * Perdas locais: localLossFactorPercent % das perdas distribuídas (padrão 10 %).
+ * Perdas locais: 5 mca fixos (RT rev.2 TASK-085R; inclui margem de segurança).
  * Desnível: layout.geodetic?.elevationDeltaMeters (positivo = captação abaixo da área).
  */
 
@@ -18,6 +18,7 @@ import { headLoss, velocity } from "@/lib/hydraulics/hazenWilliams";
 import { ASPERSOR_PADRAO, TUBOS_PVC_RIGIDO, getAspersorBySku } from "@/lib/catalog/aspersores";
 import { christiansenF } from "@/lib/layout/laterais";
 import { sizeAllSecondaries, type SizedSecondaryPipe } from "@/lib/layout/secondary-sizing";
+import { pumpHeadAtFlow, resolveCurvaByModelo, type CurvaQH } from "@/lib/layout/pump-curve";
 import type { IrrigationProjectResult } from "@/lib/layout/irrigation-project";
 
 export type { SizedSecondaryPipe };
@@ -70,7 +71,15 @@ export interface PumpValidation {
   /** Vazão de projeto = maior vazão de setor (m³/h). */
   designFlowM3h: number;
   requiredHMT: number;
-  pump?: { hmtMca: number; vazaoMaxM3h: number };
+  pump?: { hmtMca: number; vazaoMaxM3h: number; modelo?: string };
+  /**
+   * TASK-086: modelo de validação aplicado. `curve_interpolated` quando o
+   * modelo da bomba tem curva Q-H do fabricante transcrita; senão o caminho
+   * retangular legado (ponto nominal, TASK-065).
+   */
+  validationModel?: "nominal_rectangular" | "curve_interpolated";
+  /** TASK-086: altura disponível pela curva NA vazão de projeto (mca). */
+  availableHeadAtFlowMca?: number;
 }
 
 export interface HydraulicModelLimitations {
@@ -383,20 +392,56 @@ function selectPrincipalTube(
 }
 
 function validatePump(
-  pump: { hmtMca: number; vazaoMaxM3h: number } | undefined,
+  pump: { hmtMca: number; vazaoMaxM3h: number; modelo?: string } | undefined,
   maxSectorFlow: number,
   requiredHMT: number,
+  curva?: CurvaQH,
 ): PumpValidation {
   if (!pump) {
     return { status: "not_informed", designFlowM3h: maxSectorFlow, requiredHMT };
   }
+  // TASK-086 — curva Q-H multiponto: valida a altura DISPONÍVEL na vazão de
+  // projeto (interpolação linear na tabela do fabricante). Mais rigoroso que
+  // o retângulo nominal: nunca aprova o que o retângulo reprovaria; pode
+  // reprovar bomba cujo nominal "cabe" mas cuja curva entrega menos em q alto.
+  if (curva && curva.length > 0) {
+    const available = pumpHeadAtFlow(curva, maxSectorFlow);
+    if (available === null) {
+      return {
+        status: "pump_insufficient_flow",
+        designFlowM3h: maxSectorFlow,
+        requiredHMT,
+        pump,
+        validationModel: "curve_interpolated",
+      };
+    }
+    if (available < requiredHMT) {
+      return {
+        status: "pump_insufficient_head",
+        designFlowM3h: maxSectorFlow,
+        requiredHMT,
+        pump,
+        validationModel: "curve_interpolated",
+        availableHeadAtFlowMca: available,
+      };
+    }
+    return {
+      status: "ok",
+      designFlowM3h: maxSectorFlow,
+      requiredHMT,
+      pump,
+      validationModel: "curve_interpolated",
+      availableHeadAtFlowMca: available,
+    };
+  }
+  // Caminho retangular legado (TASK-065) — bombas sem curva transcrita.
   if (pump.vazaoMaxM3h < maxSectorFlow) {
-    return { status: "pump_insufficient_flow", designFlowM3h: maxSectorFlow, requiredHMT, pump };
+    return { status: "pump_insufficient_flow", designFlowM3h: maxSectorFlow, requiredHMT, pump, validationModel: "nominal_rectangular" };
   }
   if (pump.hmtMca < requiredHMT) {
-    return { status: "pump_insufficient_head", designFlowM3h: maxSectorFlow, requiredHMT, pump };
+    return { status: "pump_insufficient_head", designFlowM3h: maxSectorFlow, requiredHMT, pump, validationModel: "nominal_rectangular" };
   }
-  return { status: "ok", designFlowM3h: maxSectorFlow, requiredHMT, pump };
+  return { status: "ok", designFlowM3h: maxSectorFlow, requiredHMT, pump, validationModel: "nominal_rectangular" };
 }
 
 // ── Main orchestrator ──────────────────────────────────────────────────────────
@@ -849,7 +894,9 @@ export function sizeHydraulics(
 
   // ── 9. Validação da bomba ─────────────────────────────────────────────────────
 
-  const pumpValidation = validatePump(result.layout.pump, maxSectorFlow, hmt.totalHMT);
+  // TASK-086: curva Q-H do fabricante resolvida pelo modelo (read-only).
+  const curvaQH = resolveCurvaByModelo(result.layout.pump?.modelo);
+  const pumpValidation = validatePump(result.layout.pump, maxSectorFlow, hmt.totalHMT, curvaQH);
 
   if (pumpValidation.status === "pump_insufficient_flow") {
     warnings.push(
@@ -858,9 +905,13 @@ export function sizeHydraulics(
       `< setor crítico (${maxSectorFlow.toFixed(1)} m³/h).`,
     );
   } else if (pumpValidation.status === "pump_insufficient_head") {
+    const disponivel =
+      pumpValidation.validationModel === "curve_interpolated" &&
+      pumpValidation.availableHeadAtFlowMca !== undefined
+        ? `altura pela curva Q-H na vazão de projeto (${pumpValidation.availableHeadAtFlowMca.toFixed(1)} mca)`
+        : `HMT da bomba (${pumpValidation.pump!.hmtMca.toFixed(1)} mca)`;
     warnings.push(
-      `Bomba insuficiente: HMT da bomba ` +
-      `(${pumpValidation.pump!.hmtMca.toFixed(1)} mca) ` +
+      `Bomba insuficiente: ${disponivel} ` +
       `< HMT mínima requerida (${hmt.totalHMT.toFixed(1)} mca).`,
     );
   } else if (pumpValidation.status === "not_informed") {

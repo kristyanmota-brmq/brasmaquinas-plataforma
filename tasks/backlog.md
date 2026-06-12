@@ -208,6 +208,19 @@ Testes na base: **887/887** vitest · TypeScript: 0 erros · **37/37 testes tool
 
 ---
 
+### TASK-086 — Curva Q-H multiponto (catálogo + validação + seleção)
+
+**Status:** `concluída`
+**Concluída em:** 2026-06-12 · **1049/1049 testes vitest** (+11 T86) · 0 erros tsc
+**Prioridade:** P1-crítico · **Classe:** A — catálogo / motor hidráulico · **Área:** catálogo / hidráulica
+**Arquivo:** `tasks/TASK-086-curva-qh-multiponto.md`
+**Relatório:** `docs/relatorios/2026-06-12-TASK-086.md`
+**Autorização:** ordem direta do usuário ("Vamos para a Curva Q-H multiponto"); plano aprovado ("Prossiga")
+
+> Trilho futuro da TASK-065 entregue: 97 curvas Q-H completas do fabricante (725 pontos `[q,h]`) em `CURVAS_QH_BOMBAS`; `pumpHeadAtFlow` (interpolação linear, clamp à esquerda = cota inferior segura, `null` acima da faixa); `validatePump` valida a altura disponível NA vazão de projeto (`validationModel`/`availableHeadAtFlowMca` aditivos) e `selectBombaAutomatica` julga pela altura real em q — bombas do corpus sem curva (IMBIL, GSD MEGABLOC) seguem o retângulo TASK-065 intacto. **Gate nunca relaxado** (curva só endurece; T86-7 prova bomba com nominal "aprovável" reprovada pela curva). Invariante nominal-na-curva (97/97) detectou e corrigiu **4 erros de ±1 coluna do lote TASK-085** (40-200 r172, 50-160 r148, 50-125 r134, 65-160 r165 — verificação visual 500 dpi). Premissa nova no doc 12 (`PENDENTE_CONFIRMACAO_RT`). Fora do escopo: ponto de operação real (interseção curva×sistema), NPSH.
+
+---
+
 ### TASK-085 — Catálogo de bombas THEBE/EBARA por catálogo de fabricante
 
 **Status:** `concluída`
