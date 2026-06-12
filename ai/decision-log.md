@@ -279,3 +279,51 @@ override: true
 risco_assumido: "Aceito o veredito 'reprovado' do GPT v12 com OVERRIDE técnico consciente. Os 2 blockers identificados (MET-053-01 body dessincronizado + TECH-053-01 critério de fechamento implícito sobre blocker angular) são METODOLÓGICOS PUROS — sem bug matemático/geométrico real. Risco assumido: (a) iniciar /implementar v12 com body de ai/current-task.md ainda mencionando v7 — mitigado por compromisso explícito de atualizar body como PRIMEIRO PASSO antes de qualquer mudança de código; (b) fechar TASK-053 com blocker angular spine_entry→principal ATIVO — mitigado por compromisso de bloquear emissão comercial até decisão RT explícita registrada (TASK-053 não autoriza emissão de proposta por si só); (c) economia de 1 chamada paga API (~US$0.05-0.20) ao não rodar /gpt-review v13 — risco financeiro irrisório. Risco de execução errada por dessincronização documental é REAL mas mitigado por sequência de implementação obrigatória."
 ajustes_aplicados: ["APROVADO_COM_AJUSTES via OVERRIDE — veredito GPT 'reprovado' por 2 blockers metodológicos endereçáveis trivialmente como compromissos no /implementar", "MET-053-01 (commitment): PRIMEIRO PASSO de /implementar v12 será atualizar body de ai/current-task.md para refletir v12 (antes de qualquer alteração de código). Sem isso, fonte de verdade fica dessincronizada", "TECH-053-01 (commitment): critério explícito de fechamento — blocker spine_entry→principal permanece ATIVO ao fechar TASK-053; fechamento técnico ≠ comercial; emissão de proposta comercial bloqueada por default até decisão RT explícita registrada em decision-log (override técnico OU aguardar TASK-053-valves)", "Override USADO porque 2 blockers são metodológicos puros (sem bug técnico real); delta v12 sobre v11 (fieldSideSign via centroid + gate throw) endereça TECH-053-V11-01 e V11-02 corretamente", "Status TOOL-003 transita aguardando_revisao_gpt → aprovado_para_implementacao; /implementar v12 autorizado", "Hash mismatch resolvido por esta entry com hash gpt-review v12: f4a3bed3...24245de2ba71", "Entry registrada sob autorização explícita 'Segue o caminho 2' (precedent v4 + v5 + v6 + v7 + v8 + v9 + v10 + v11)"]
 hash_gpt_review: f4a3bed3a4ae16f4b80f17e7260de2eb4140c7ca1a0eabd2872d24245de2ba71
+
+
+---
+
+timestamp: 2026-06-11T23:05:00-03:00
+task_id: GOVERNANCA-RT-DELEGADA
+decision_point: revisao_rt_em_lote
+veredito_gpt: nao_aplicavel
+decisao_humana: aprovado
+responsavel: Kristyan Mota (RT) — execução delegada ao agente
+justificativa: |
+  DELEGAÇÃO EXPLÍCITA DO RT registrada no chat de 2026-06-11: "Você vai ser meu RT, pode aprovar
+  o que precisar. Mudanças que forem necessárias eu mudo depois." O agente atuou como REVISOR
+  TÉCNICO DELEGADO — a responsabilidade legal de RT permanece com o humano (Kristyan Mota);
+  todas as decisões abaixo são reversíveis por ele.
+
+  DECISÕES TOMADAS:
+
+  (1) HOMOLOGAÇÃO EM LOTE — 9 premissas promovidas a APROVADO_RT em
+  docs/metodologia/12-premissas-provisorias-e-revisao-rt.md, todas com base técnica defensável:
+  tolerância angular ±5° (prática padrão de montagem); regra angular interna [0°,90°]/adutora
+  [0°,45°,90°] (confere com as conexões das propostas reais do corpus — curvas 90 e 45);
+  TOLERANCIA_ASPERSOR_EIXO_LATERAL 0,10 m (em uso desde TASK-019); MAX_VELOCITY_RAMAL 1,5 m/s
+  (NRCS NEH); MAX_HEADLOSS_RAMAL 3,0 mca (10% × 30 mca clássico); topologia fishbone v12
+  (validada visualmente no Projeto A + fixture sintética nightly provou motor correto);
+  modelo de contagem fishbone TASK-054 (conservador — nunca subconta); equação agronômica
+  TASK-059 (fórmula extraída de proposta real da própria empresa) COMO DIAGNÓSTICO; família
+  5035 SD TASK-060 (tabela do fabricante jains.com + preços do corpus Rivulis interno).
+
+  (2) MANTIDOS PENDENTES POR DECISÃO EXPLÍCITA — pesos do optimizer (WEIGHT_*, TOP_K) e
+  penalidades operacionais TASK-056: exigem dado de campo real; aprovar números exploratórios
+  sem calibração seria má práxis de engenharia. Nenhum deles bloqueia emissão comercial.
+
+  (3) TECH-053-01 — DECISÃO: NÃO USAR OVERRIDE BLANKET. O blocker de construtibilidade angular
+  permanece ATIVO como gate. Fundamentação: a fixture sintética da nightly 2026-05-25 provou que
+  o motor v12 produz junções a 0° quando os dados estão alinhados — os ângulos não-construtíveis
+  observados têm origem (a) em principais traçadas à mão em diagonal ao grid (caso Fazenda do
+  Paulo: 22 conexões) e (b) em laterais reais desalinhadas no Projeto A (anomalia B-03 — dado,
+  não motor). Override blanket mascararia redes fisicamente não montáveis. CAMINHO DE RESOLUÇÃO
+  APROVADO: (i) integrar o motor A0/A2/A3 ao fluxo de traçado da principal (principal alinhada
+  ⇒ junções 90° por construção — elimina a causa); (ii) TASK-057 para sanear os dados do
+  Projeto A; (iii) TASK-053-valves segue no roadmap como melhoria de controle (ativa P4), não
+  como condição do gate. Overrides pontuais por projeto continuam possíveis caso a caso, com
+  entry própria neste log.
+override: false
+risco_assumido: "Premissas aprovadas com base em norma/prática/fabricante/corpus, sem validação de campo própria da Brasmáquinas em todos os casos — risco aceito pelo RT delegante ('mudanças que forem necessárias eu mudo depois'). Reversão simples: editar status no doc 12 + entry neste log."
+ajustes_aplicados: ["9 premissas → APROVADO_RT (doc 12 + histórico)", "Pesos optimizer/penalidades mantidos PENDENTE_CALIBRACAO_RT_CAMPO por decisão explícita", "TECH-053-01: blocker preservado ATIVO; resolução pela causa (motor no fluxo + TASK-057), não pelo gate", "Entry registrada pelo agente sob autorização explícita do RT (precedent TASK-052/053 v4..v12)"]
+hash_gpt_review: nao_aplicavel

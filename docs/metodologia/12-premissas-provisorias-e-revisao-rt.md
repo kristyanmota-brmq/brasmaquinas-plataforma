@@ -141,7 +141,7 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | **Origem** | Premissa provisória de engenharia. Valor 5° adotado como ponto de partida conservador sem dado calibrado de montagem de campo. |
 | **Risco** | Tolerância muito ampla pode aceitar ângulos estruturalmente problemáticos; muito estreita pode gerar falsos blockers em redes válidas. |
 | **Responsável futuro** | RT Brasmáquinas |
-| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+| **Status** | `APROVADO_RT (2026-06-11 — revisão técnica delegada autorizada pelo RT Kristyan Mota; ver ai/decision-log.md)` — tolerância ±5° é prática padrão de montagem de conexões soldáveis PVC |
 
 ---
 
@@ -158,7 +158,7 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | **Origem** | Regra confirmada pelo RT da Brasmáquinas antes do início da TASK-015. Não é premissa provisória — é a regra oficial. A tolerância angular ±5° (ver `TOLERANCIA_ANGULAR_CONSTRUTIBILIDADE`) permanece provisória. |
 | **Risco** | Projetos com geometria diagonal na principal (polígono inclinado) podem gerar blocker 45° mesmo quando o traçado é razoável. Nesses casos, o usuário deve ajustar o traçado ou o RT deve revisar a regra de ângulos para o caso específico. |
 | **Responsável futuro** | RT Brasmáquinas — revisão se houver necessidade de 45° em rede interna em casos especiais |
-| **Status** | Regra confirmada pelo RT. Tolerância angular ±5° → `PENDENTE_REVISAO_RT_BRASMAQUINAS` (ver `TOLERANCIA_ANGULAR_CONSTRUTIBILIDADE`) |
+| **Status** | Regra confirmada pelo RT. Tolerância angular ±5°: `APROVADO_RT (2026-06-11 — revisão técnica delegada autorizada pelo RT Kristyan Mota; ver ai/decision-log.md)` |
 
 ---
 
@@ -176,7 +176,7 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | **Origem** | Decisão operacional Brasmáquinas (regra confirmada). Valor 0,10 m é tolerância numérica provisória: para fazendas < 500 m, o erro de aproximação flat-earth é < 0,1 m. O valor cobre o ruído numérico com margem de segurança para projetos normais. |
 | **Risco** | Para projetos com fazendas > 500–700 m, o erro flat-earth pode aproximar-se de 0,10 m. Se o RT observar blockers espúrios em projetos geometricamente corretos, elevar o limiar para 0,20 m. |
 | **Responsável futuro** | RT Brasmáquinas — revisão do valor se houver blockers espúrios em projetos > 500 m |
-| **Status** | Regra: **APROVADO — decisão operacional Brasmáquinas** (não é premissa provisória). Valor 0,10 m: `PENDENTE_REVISAO_BRASMAQUINAS`. |
+| **Status** | Regra: **APROVADO — decisão operacional Brasmáquinas** (não é premissa provisória). Valor 0,10 m: `APROVADO_RT (2026-06-11 — revisão técnica delegada autorizada pelo RT Kristyan Mota; ver ai/decision-log.md)` — em uso desde TASK-019 sem regressão de campo reportada |
 
 ---
 
@@ -205,7 +205,7 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | **Origem** | **Referência técnica:** NRCS National Engineering Handbook (Sprinkler Irrigation) adota ≈ 5 ft/s (≈ 1,524 m/s) como limite típico para tubulação plástica enterrada em irrigação por aspersão convencional. O valor atual 1,5 m/s é conservador-equivalente. **Não foi identificada NBR brasileira específica** que defina limite de velocidade em ramais de irrigação por aspersão (NBR 13245 trata de fabricação/desempenho do tubo; NBR 12266 trata de classificação — nenhuma de critério de projeto). |
 | **Risco** | Valor conservador pode forçar DN maior (ex.: DN100 R PN80) onde DN75 atenderia operacionalmente. Valor relaxado pode introduzir perdas/golpes inaceitáveis em projetos reais. |
 | **Responsável futuro** | RT Brasmáquinas — pode citar NBR específica brasileira (se conhecer) ou trazer dados de campo para calibração; até lá, manter referência NRCS. |
-| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+| **Status** | `APROVADO_RT (2026-06-11 — revisão técnica delegada autorizada pelo RT Kristyan Mota; ver ai/decision-log.md)` — referência NRCS NEH; conservador e alinhado à prática |
 
 ---
 
@@ -220,7 +220,7 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | **Origem** | **Boa prática** da literatura de irrigação por aspersão: perda em ramal ≤ 10–15% da pressão de serviço para preservar uniformidade hidráulica entre laterais. Valor 10% (3,0 mca) é conservador dentro da faixa. |
 | **Risco** | Mais conservador que 15% (4,5 mca); pode forçar DN maior em ramais longos. Relaxar exige cuidado com perda agregada (principal + ramal + lateral) para que pressão real no aspersor permaneça ≥ 30 mca. |
 | **Responsável futuro** | RT Brasmáquinas |
-| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+| **Status** | `APROVADO_RT (2026-06-11 — revisão técnica delegada autorizada pelo RT Kristyan Mota; ver ai/decision-log.md)` — regra clássica 10% × 30 mca de pressão de serviço |
 
 ---
 
@@ -250,7 +250,7 @@ Estes parâmetros existem no código mas têm peso 0 — não influenciam o scor
 | **Risco — visual** | Em projetos com setores muito curtos (< 3 colunas), a espinha de peixe degenera: 2 cols → spine curto + 2 ribs paralelos; 1 col → fallback `routeSecondary` legado. RT deve validar no Projeto A após regenerar a principal via auto-pipeline. |
 | **Risco — BOM provisória** | A contagem atual de tês em `src/lib/bom.ts` (1 tê por `physicalColumnId`) pode estar IMPRECISA para a nova topologia (espinha de peixe tem 1 tê na principal para o spine_entry + N tês no spine para as ribs + 1 tê por coluna na lateral). Warning textual em `validateHydraulicConnectivity` (TASK-053 ajuste TECH-053-01) sinaliza a imprecisão até TASK-054 ajustar. **NÃO usar BOM gerada para uso comercial sem revisão técnica.** |
 | **Responsável futuro** | RT Brasmáquinas — validar visualmente no Projeto A; aprovar critério de agrupamento por setor; aprovar regra determinística para colunas multi-setor; liberar para TASK-054 ajustar BOM. |
-| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+| **Status** | `APROVADO_RT (2026-06-11 — revisão técnica delegada autorizada pelo RT Kristyan Mota; ver ai/decision-log.md)` — validação visual no Projeto A executada (TASK-056) + fixture sintética nightly 2026-05-25 provou motor v12 correto (anomalia B-03 tem origem em DADOS, não no motor); investigação de dados do Projeto A segue em TASK-057 |
 
 ---
 
@@ -354,7 +354,7 @@ arquitetural**.
 | **Origem** | Premissa provisória de engenharia. Simplificações conservadoras: (a) junção em EXTREMIDADE de spine seria curva 90° mas é contada como tê (preço tê ≥ curva → BOM conservadora); (b) rib e spine_entry no mesmo X local formariam cruzeta única mas são contados como 2 conexões; (c) DN da peça = DN do tubo derivado (convenção dos tês de derivação lateral). |
 | **Risco** | Sobre-contagem leve de custo em setores pequenos (1-3 colunas) onde extremidades dominam. Nunca subconta. |
 | **Responsável futuro** | RT Brasmáquinas — pode zerar a família "junção spine_entry→spine" ou exigir refinamento tê vs curva por posição |
-| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+| **Status** | `APROVADO_RT (2026-06-11 — revisão técnica delegada autorizada pelo RT Kristyan Mota; ver ai/decision-log.md)` — contagem conservadora (nunca subconta; tê ≥ curva em preço) |
 
 ---
 
@@ -371,7 +371,7 @@ arquitetural**.
 | **Insight registrado** | A regra legada `setores = jornada` coincide com a derivada APENAS no arranjo 5022-SD @ 12×12 com lâmina 10 (tempo/setor ≈ 0,96 h ≈ 1 h). Para qualquer outro emissor/espaçamento/lâmina, divergem — por isso o warning comparativo. |
 | **Risco** | Lâmina continua default 10 mm/dia (sem input do cliente); warnings podem divergir quando RT homologar novos emissores/espaçamentos sem substituir o critério de setorização. |
 | **Responsável futuro** | RT Brasmáquinas — decidir QUANDO o critério derivado substitui `setores = jornada` (mudança de comportamento de todos os layouts) e tornar lâmina/cultura inputs do usuário |
-| **Status** | `PENDENTE_REVISAO_RT_BRASMAQUINAS` |
+| **Status** | `APROVADO_RT (2026-06-11 — revisão técnica delegada autorizada pelo RT Kristyan Mota; ver ai/decision-log.md)` **como camada de diagnóstico** — a substituição do critério de setorização (`setores = jornada`) pelo derivado permanece decisão futura separada |
 
 ---
 
@@ -387,7 +387,7 @@ arquitetural**.
 | **Origem** | Corpus de propostas reais (2026-06-11) + catálogo oficial do fabricante. Sem validação de campo própria. |
 | **Risco** | Raio/vazão de tabela de fabricante podem divergir de bocais desgastados/pressões reais; preço Rivulis pode estar defasado |
 | **Responsável futuro** | RT Brasmáquinas — confirmar homologação (vira APROVADO_RT) e completar a família (demais bocais) se necessário |
-| **Status** | `PENDENTE_CONFIRMACAO_RT` |
+| **Status** | `APROVADO_RT (2026-06-11 — revisão técnica delegada autorizada pelo RT Kristyan Mota; ver ai/decision-log.md)` — homologação provisória confirmada (dados do fabricante jains.com + preços do corpus interno); validação de campo dos raios/vazões permanece recomendada |
 
 ---
 
@@ -415,3 +415,4 @@ arquitetural**.
 | 2026-06-11 | Claude Fable 5 (TASK-054) | **Nova premissa: "Modelo de contagem de conexões fishbone".** BOM passa a contabilizar conexões da topologia v12 (resolve B-02): 1 tê principal→spine_entry + 1 junção spine_entry→spine (spine não-degenerado) + 1 tê spine→rib por rib, DN do tubo derivado, contagem conservadora (extremidade contada como tê; cruzeta como 2 conexões). DN sem SKU exato → `BOMPendingConnection` (sem fallback silencioso). Status `PENDENTE_REVISAO_RT_BRASMAQUINAS`. Nenhuma premissa existente alterada. 939 → 951 testes. |
 | 2026-06-11 | Claude Fable 5 (TASK-059) | **Nova premissa: "Equação agronômica de setorização — diagnóstico-only".** Motor agronômico mínimo (`agronomy.ts`): intensidade mm/h, tempo/setor, setores recomendados derivados — fórmula de proposta real Brasmáquinas; warnings comparativos em diagnostics (nunca blockers); setorização vigente intocada. Lâmina default 10 mm/dia agora sinalizada como premissa em todo diagnóstico. 953 → 965 testes. |
 | 2026-06-11 | Claude Fable 5 (TASK-060) | **Nova premissa: "Aspersores NAAN 5035 SD no catálogo" (homologação provisória PENDENTE_CONFIRMACAO_RT).** 3 entradas aditivas (5,0×2,5 @3bar; 3,5×2,5; PC 4,5) com dados do fabricante (jains.com) + custo/preço do corpus Rivulis; espaçamento 18×18. `laminaMm` virou input (`number`, default 10) + `cultura?` no schema. ASPERSOR_PADRAO byte-idêntico. 965 → 971 testes. |
+| 2026-06-11 | Claude Fable 5 (revisão técnica delegada — autorização RT Kristyan Mota: "Você vai ser meu RT, pode aprovar o que precisar") | **Homologação em lote: 9 premissas promovidas a APROVADO_RT** — TOLERANCIA_ANGULAR ±5°; tolerância da regra angular interna; valor 0,10 m de TOLERANCIA_ASPERSOR_EIXO_LATERAL; MAX_VELOCITY_RAMAL 1,5 m/s (NRCS); MAX_HEADLOSS_RAMAL 3,0 mca (10%×30); topologia fishbone v12 (motor provado correto; B-03 é dado → TASK-057); modelo de contagem fishbone (conservador); equação agronômica (como diagnóstico); aspersores 5035 SD (fabricante+corpus, validação de campo recomendada). **Mantidos PENDENTE_CALIBRACAO_RT_CAMPO por decisão explícita**: todos os pesos do optimizer e penalidades TASK-056 (aprovar peso sem dado de campo seria má práxis; nenhum deles bloqueia emissão). Entry completa em ai/decision-log.md. Reversível pelo RT humano a qualquer momento. |
