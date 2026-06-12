@@ -236,8 +236,8 @@ const s = StyleSheet.create({
   colDN: { width: 58, textAlign: "center" },
   colLen: { width: 64, textAlign: "right" },
   colVel: { width: 60, textAlign: "right" },
-  colHf: { width: 56, textAlign: "right" },
-  colStatus: { flex: 1 },
+  colHf: { width: 56, textAlign: "right", paddingRight: 10 },
+  colStatus: { flex: 1, paddingLeft: 8 },
   statusBadgeOk: { fontSize: 7, color: C.ink3 },
   statusBadgeWarn: { fontSize: 7.5, color: "#92400E", fontFamily: "Helvetica-Bold" },
 });
@@ -342,6 +342,30 @@ export function PropostaPDF({ projectName, client, city, state, result, geradoEm
                 <Text style={s.summaryCellUnit}>m entre aspersores</Text>
               </View>
             </>
+          )}
+          {/* TASK-063: dados agronômicos no padrão das propostas reais (corpus 2026-06-11) */}
+          {sectorization && (
+            <View style={s.summaryCell}>
+              <Text style={s.summaryCellLabel}>Cultura</Text>
+              <Text style={s.summaryCellValue}>{sectorization.cultura ?? "—"}</Text>
+              <Text style={s.summaryCellUnit}>
+                {sectorization.cultura ? "informada pelo projetista" : "não informada"}
+              </Text>
+            </View>
+          )}
+          {sectorization && (
+            <View style={s.summaryCell}>
+              <Text style={s.summaryCellLabel}>Lâmina desejada</Text>
+              <Text style={s.summaryCellValue}>{fmtN(sectorization.laminaMm, 1)}</Text>
+              <Text style={s.summaryCellUnit}>mm/dia</Text>
+            </View>
+          )}
+          {result.agronomy && (
+            <View style={s.summaryCell}>
+              <Text style={s.summaryCellLabel}>Intensidade de aplicação</Text>
+              <Text style={s.summaryCellValue}>{fmtN(result.agronomy.intensidadeAplicacaoMmH, 2)}</Text>
+              <Text style={s.summaryCellUnit}>mm/h no arranjo atual</Text>
+            </View>
           )}
           {sectorization && (
             <>
@@ -539,7 +563,7 @@ export function PropostaPDF({ projectName, client, city, state, result, geradoEm
                   <Text style={[s.tableHeaderText, s.colTotal]}>Total</Text>
                 </View>
                 {itens.map((item, i) => (
-                  <View key={item.sku} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
+                  <View key={`${item.sku}-${i}`} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
                     <Text style={[s.tableCell, s.colDesc]}>{item.descricao}</Text>
                     <Text style={[s.tableCell, s.colMarca]}>{item.marca}</Text>
                     <Text style={[s.tableCell, s.colUn]}>{item.unidade}</Text>
@@ -557,6 +581,14 @@ export function PropostaPDF({ projectName, client, city, state, result, geradoEm
           <Text style={s.totalLabel}>TOTAL GERAL</Text>
           <Text style={s.totalValue}>R$ {fmt(bom.totalGeral)}</Text>
         </View>
+
+        {/* TASK-063: disclaimer comercial — mesma nota exibida na plataforma */}
+        <Text style={{ fontSize: 7, color: C.ink3, marginTop: 6, fontStyle: "italic" }}>
+          Valores estimados conforme catálogo Brasmáquinas. Conjunto moto-bomba, sucção,
+          materiais elétricos, filtragem, frete e instalação não inclusos nesta etapa.
+          Documento gerado automaticamente pela plataforma — sujeito a revisão técnica
+          e comercial antes da emissão final.
+        </Text>
 
         <View style={s.footer} fixed>
           <Text style={s.footerText}>Brasmáquinas — Proposta de Irrigação Convencional</Text>

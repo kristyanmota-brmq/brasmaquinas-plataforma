@@ -133,3 +133,15 @@ describe("secondary-rows — mapSizedSecondariesToRows (T47-6..T47-8)", () => {
     expect(original.map((s) => s.id)).toEqual(snapshot);
   });
 });
+
+describe("T63 — segmentos estruturais 0 m fora do memorial (TASK-063)", () => {
+  it("T63-1: rib/spine de comprimento 0 (tê de cruzamento TASK-057) não vira linha", () => {
+    const secs = [
+      makeSecondary({ id: "rib-s1-col-1", status: "ok" }),
+      { ...makeSecondary({ id: "rib-s2-col-5", status: "ok" }), lengthM: 0 },
+      { ...makeSecondary({ id: "spine-s3", status: "ok" }), lengthM: 0.001 },
+    ];
+    const rows = mapSizedSecondariesToRows(secs);
+    expect(rows.map((r) => r.id)).toEqual(["rib-s1-col-1"]);
+  });
+});

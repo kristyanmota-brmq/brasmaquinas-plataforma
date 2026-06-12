@@ -43,7 +43,11 @@ export function mapSizedSecondariesToRows(
 ): SecondaryDisplayRow[] {
   if (secondaries.length === 0) return [];
 
-  const sorted = [...secondaries].sort((a, b) =>
+  // TASK-063: segmentos estruturais de comprimento ~0 (tês de cruzamento da
+  // TASK-057 e spines degenerados) não são tubos — não entram no memorial.
+  const visiveis = secondaries.filter((s) => s.lengthM >= 0.01);
+
+  const sorted = [...visiveis].sort((a, b) =>
     a.id.localeCompare(b.id, "en", { numeric: true, sensitivity: "base" }),
   );
 
