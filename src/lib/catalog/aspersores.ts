@@ -404,7 +404,12 @@ export function selectTubo(vazaoM3PorHora: number): (typeof TUBOS_PVC_RIGIDO)[nu
   // Comparamos com diametroInternoMm (real) e não com o nominal.
   const D_mm = Math.sqrt((4 * Q_m3s) / (Math.PI * V)) * 1000;
 
-  const ordenados = [...TUBOS_PVC_RIGIDO].sort((a, b) => a.diametroMm - b.diametroMm);
+  // TASK-070: a principal não tem filtro de classe por trecho na seleção — manter
+  // apenas PN80 aqui (comportamento histórico); PN60 entra nas secundárias via
+  // selectSecondaryPipe, que aplica pressureClassRequirement explicitamente.
+  const ordenados = [...TUBOS_PVC_RIGIDO]
+    .filter((t) => t.pressaoMca >= 80)
+    .sort((a, b) => a.diametroMm - b.diametroMm);
   return (
     ordenados.find((t) => t.diametroInternoMm >= D_mm) ??
     ordenados[ordenados.length - 1]
@@ -479,8 +484,10 @@ export const TUBOS_PVC_LF = [
 export const TUBOS_PVC_RIGIDO = [
   { sku: "TIGRE_R_50_PN80",  descricao: "Tubo PVC rígido Ø50mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 50,  diametroNominalMm: 50,  diametroExternoMm: 50,  espessuraParedeMm: 3.0, diametroInternoMm: 44,  pressaoMca: 80, metrosPorBarra: 6, custo:  34.2, precoVenda:  62.0, coefC: 145 },
   { sku: "TIGRE_R_75_PN80",  descricao: "Tubo PVC rígido Ø75mm PN80 - barra 6m",  marca: "Tigre", unidade: "barra", diametroMm: 75,  diametroNominalMm: 75,  diametroExternoMm: 75,  espessuraParedeMm: 4.5, diametroInternoMm: 66,  pressaoMca: 80, metrosPorBarra: 6, custo:  72.1, precoVenda: 132.0, coefC: 145 },
+  { sku: "15293527", descricao: "Tubo PVC rígido Ø100mm PN60 DEFOFO - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroNominalMm: 100, diametroExternoMm: 100, espessuraParedeMm: 4.6, diametroInternoMm: 90.8, pressaoMca: 60, metrosPorBarra: 6, custo: 176.05, precoVenda: 272.10, coefC: 145 }, // TASK-070: lista mestra 25.08.2025 (custo/venda reais)
   { sku: "TIGRE_R_100_PN80", descricao: "Tubo PVC rígido Ø100mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 100, diametroNominalMm: 100, diametroExternoMm: 100, espessuraParedeMm: 6.0, diametroInternoMm: 88,  pressaoMca: 80, metrosPorBarra: 6, custo: 118.5, precoVenda: 215.0, coefC: 145 },
   { sku: "TIGRE_R_125_PN80", descricao: "Tubo PVC rígido Ø125mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 125, diametroNominalMm: 125, diametroExternoMm: 125, espessuraParedeMm: 7.0, diametroInternoMm: 111, pressaoMca: 80, metrosPorBarra: 6, custo: 178.4, precoVenda: 322.0, coefC: 145 },
+  { sku: "15293543", descricao: "Tubo PVC rígido Ø150mm PN60 DEFOFO - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, diametroExternoMm: 150, espessuraParedeMm: 6.9, diametroInternoMm: 136.2, pressaoMca: 60, metrosPorBarra: 6, custo: 390.30, precoVenda: 603.25, coefC: 145 }, // TASK-070: lista mestra 25.08.2025 (custo/venda reais)
   { sku: "TIGRE_R_150_PN80", descricao: "Tubo PVC rígido Ø150mm PN80 - barra 6m", marca: "Tigre", unidade: "barra", diametroMm: 150, diametroNominalMm: 150, diametroExternoMm: 150, espessuraParedeMm: 8.5, diametroInternoMm: 133, pressaoMca: 80, metrosPorBarra: 6, custo: 248.9, precoVenda: 448.0, coefC: 145 },
 ] as const;
 

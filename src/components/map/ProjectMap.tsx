@@ -2946,6 +2946,20 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
               </span>
             </div>
 
+            {/* TASK-073 (E08): margem bruta — visão INTERNA do vendedor; não vai ao PDF do cliente */}
+            {bom.meta.custoTotalAquisicaoR$ > 0 && (
+              <div className="mb-3 bg-emerald-50 border border-emerald-200 rounded-sm p-2 flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-[0.1em] text-emerald-800 font-semibold">
+                  Margem bruta (interno)
+                </span>
+                <span className="text-[11px] font-mono text-emerald-900">
+                  custo R$ {bom.meta.custoTotalAquisicaoR$.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+                  {" · "}margem R$ {bom.meta.margemBrutaR$.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+                  {" ("}{((bom.meta.margemBrutaR$ / Math.max(bom.totalGeral, 1)) * 100).toFixed(1)}%{")"}
+                </span>
+              </div>
+            )}
+
             <div className="bg-background border border-border rounded-sm overflow-hidden">
               {(["ASPERSOR", "TUBO", "CONEXAO", "ACESSORIO"] as const).map((cat) => {
                 const grupo = bom.itens.filter((it) => it.categoria === cat);

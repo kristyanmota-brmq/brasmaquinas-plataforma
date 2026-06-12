@@ -364,7 +364,11 @@ function selectPrincipalTube(
   flowM3h: number,
   maxVelMs: number = MAX_VEL_PRINCIPAL_MS,
 ): (typeof TUBOS_PVC_RIGIDO)[number] {
-  const sorted = [...TUBOS_PVC_RIGIDO].sort((a, b) => a.diametroMm - b.diametroMm);
+  // TASK-070: principal/adutora mantêm PN80 (sem filtro de classe por trecho na
+  // seleção); PN60 só entra nas secundárias via pressureClassRequirement explícito.
+  const sorted = [...TUBOS_PVC_RIGIDO]
+    .filter((t) => t.pressaoMca >= 80)
+    .sort((a, b) => a.diametroMm - b.diametroMm);
   for (const tube of sorted) {
     if (velocity(flowM3h, internoMm(tube)) <= maxVelMs) return tube;
   }

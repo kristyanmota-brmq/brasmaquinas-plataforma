@@ -297,6 +297,8 @@ function makeMinimalBOM(): BOMResult {
       juncoesSpineEntrySpineCount: 0,
       tesSpineRibCount: 0,
       conexoesFishbonePendentesCount: 0,
+      custoTotalAquisicaoR$: 0,
+      margemBrutaR$: 0,
     },
   };
 }

@@ -334,3 +334,33 @@ describe("T67 — buildSectorizationAgronomica (validação histórica 12,7 ha)"
     expect(sec.setoresMode).toBe("jornada");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-070/073 — PN60 no catálogo + margem bruta na BOM
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T70/T73 — PN60 e margem", () => {
+  it("T70-1: PN60 DN100/150 existem com custo real e são preferidos quando pressão ≤ 60", async () => {
+    const { TUBOS_PVC_RIGIDO } = await import("@/lib/catalog/aspersores");
+    const { selectSecondaryPipe } = await import("@/lib/layout/secondary-sizing");
+    const pn60 = TUBOS_PVC_RIGIDO.filter((t) => t.pressaoMca === 60);
+    expect(pn60.map((t) => t.diametroMm).sort()).toEqual([100, 150]);
+    for (const t of pn60) expect(t.custo).toBeGreaterThan(0);
+    // vazão que exige DN100: com requisito 50 mca → PN60 escolhido; com 70 mca → PN80
+    const sel60 = selectSecondaryPipe({ flowM3h: 60, lengthM: 50, candidatePipes: TUBOS_PVC_RIGIDO, maxVelocityMs: 3.0, pressureClassRequirement: 50 });
+    const sel80 = selectSecondaryPipe({ flowM3h: 60, lengthM: 50, candidatePipes: TUBOS_PVC_RIGIDO, maxVelocityMs: 3.0, pressureClassRequirement: 70 });
+    expect(sel60.selectedTube.pressaoMca).toBe(60);
+    expect(sel80.selectedTube.pressaoMca).toBeGreaterThanOrEqual(70);
+    // Nota T70: os preços PN80 atuais são placeholders ABAIXO da lista real
+    // (DEFOFO PN80 real: 209,35/323,57) — a vantagem econômica do PN60 se
+    // materializa quando a conferência TASK-066 atualizar os rígidos.
+  });
+
+  it("T73-1: BOM expõe custo total e margem bruta coerentes", async () => {
+    const result = calculateIrrigationProject(makeLayoutL());
+    const meta = result.bom!.meta;
+    expect(meta.custoTotalAquisicaoR$).toBeGreaterThan(0);
+    expect(meta.margemBrutaR$).toBeCloseTo(result.bom!.totalGeral - meta.custoTotalAquisicaoR$, 2);
+    expect(meta.margemBrutaR$).toBeGreaterThan(0);
+  });
+});

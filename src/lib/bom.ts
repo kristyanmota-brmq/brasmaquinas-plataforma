@@ -57,6 +57,8 @@ export interface BOMItem {
   unidade: string;
   quantidade: number;
   precoUnitario: number;
+  /** TASK-073: custo de aquisição unitário (uso interno — margem). */
+  custoUnitario?: number;
   total: number;
   categoria: "ASPERSOR" | "TUBO" | "CONEXAO" | "ACESSORIO";
 }
@@ -154,6 +156,10 @@ export interface BOMResult {
     tesSpineRibCount: number;
     /** TASK-054: conexões fishbone sem SKU/DN (subconjunto de conexoesFisicasPendentes). */
     conexoesFishbonePendentesCount: number;
+    /** TASK-073 (E08): custo total de aquisição (uso interno). */
+    custoTotalAquisicaoR$: number;
+    /** TASK-073 (E08): margem bruta = totalGeral − custo (uso interno). */
+    margemBrutaR$: number;
   };
 }
 
@@ -301,6 +307,7 @@ export function buildBOM(input: BOMInput): BOMResult {
     unidade: aspersorDoProjeto.unidade,
     quantidade: sprinklers.count,
     precoUnitario: aspersorDoProjeto.precoVenda,
+      custoUnitario: aspersorDoProjeto.custo,
     total: sprinklers.count * aspersorDoProjeto.precoVenda,
     categoria: "ASPERSOR",
   });
@@ -331,6 +338,7 @@ export function buildBOM(input: BOMInput): BOMResult {
       unidade: tubo.unidade,
       quantidade: barras,
       precoUnitario: tubo.precoVenda,
+      custoUnitario: tubo.custo,
       total: barras * tubo.precoVenda,
       categoria: "TUBO",
     });
@@ -353,6 +361,7 @@ export function buildBOM(input: BOMInput): BOMResult {
       unidade: teCat.unidade,
       quantidade: qtd,
       precoUnitario: teCat.precoVenda,
+      custoUnitario: teCat.custo,
       total: qtd * teCat.precoVenda,
       categoria: "CONEXAO",
     });
@@ -371,6 +380,7 @@ export function buildBOM(input: BOMInput): BOMResult {
     unidade: tubo.unidade,
     quantidade: barrasPrincipal,
     precoUnitario: tubo.precoVenda,
+      custoUnitario: tubo.custo,
     total: barrasPrincipal * tubo.precoVenda,
     categoria: "TUBO",
   });
@@ -394,6 +404,7 @@ export function buildBOM(input: BOMInput): BOMResult {
       unidade: tubo.unidade,
       quantidade: barrasAdutora,
       precoUnitario: tubo.precoVenda,
+      custoUnitario: tubo.custo,
       total: barrasAdutora * tubo.precoVenda,
       categoria: "TUBO",
     });
@@ -443,6 +454,7 @@ export function buildBOM(input: BOMInput): BOMResult {
         unidade: tubo.unidade,
         quantidade: barrasSecundarias,
         precoUnitario: tubo.precoVenda,
+      custoUnitario: tubo.custo,
         total: barrasSecundarias * tubo.precoVenda,
         categoria: "TUBO",
       });
@@ -460,6 +472,7 @@ export function buildBOM(input: BOMInput): BOMResult {
     unidade: curva.unidade,
     quantidade: nCurvas,
     precoUnitario: curva.precoVenda,
+      custoUnitario: curva.custo,
     total: nCurvas * curva.precoVenda,
     categoria: "CONEXAO",
   });
@@ -473,6 +486,7 @@ export function buildBOM(input: BOMInput): BOMResult {
     unidade: te.unidade,
     quantidade: nTesPrincipal,
     precoUnitario: te.precoVenda,
+      custoUnitario: te.custo,
     total: nTesPrincipal * te.precoVenda,
     categoria: "CONEXAO",
   });
@@ -487,6 +501,7 @@ export function buildBOM(input: BOMInput): BOMResult {
     unidade: ADESIVO_PVC.unidade,
     quantidade: nAdesivos,
     precoUnitario: ADESIVO_PVC.precoVenda,
+      custoUnitario: ADESIVO_PVC.custo,
     total: nAdesivos * ADESIVO_PVC.precoVenda,
     categoria: "ACESSORIO",
   });
@@ -563,6 +578,7 @@ export function buildBOM(input: BOMInput): BOMResult {
       unidade: registro.unidade,
       quantidade: qty,
       precoUnitario: registro.precoVenda,
+      custoUnitario: registro.custo,
       total: qty * registro.precoVenda,
       categoria: "CONEXAO",
     });
@@ -591,6 +607,7 @@ export function buildBOM(input: BOMInput): BOMResult {
         unidade: curva.unidade,
         quantidade: qty,
         precoUnitario: curva.precoVenda,
+      custoUnitario: curva.custo,
         total: qty * curva.precoVenda,
         categoria: "CONEXAO",
       });
@@ -654,6 +671,7 @@ export function buildBOM(input: BOMInput): BOMResult {
             unidade: teCat.unidade,
             quantidade: qty,
             precoUnitario: teCat.precoVenda,
+      custoUnitario: teCat.custo,
             total: qty * teCat.precoVenda,
             categoria: "CONEXAO",
           });
@@ -714,6 +732,7 @@ export function buildBOM(input: BOMInput): BOMResult {
           unidade: curva.unidade,
           quantidade: adutoraBends.curvas90Count,
           precoUnitario: curva.precoVenda,
+      custoUnitario: curva.custo,
           total: adutoraBends.curvas90Count * curva.precoVenda,
           categoria: "CONEXAO",
         });
@@ -765,6 +784,7 @@ export function buildBOM(input: BOMInput): BOMResult {
         unidade: curvaLF.unidade,
         quantidade: qty,
         precoUnitario: curvaLF.precoVenda,
+      custoUnitario: curvaLF.custo,
         total: qty * curvaLF.precoVenda,
         categoria: "CONEXAO",
       });
@@ -821,6 +841,7 @@ export function buildBOM(input: BOMInput): BOMResult {
       unidade: item.unidade,
       quantidade,
       precoUnitario: item.precoVenda,
+      custoUnitario: item.custo,
       total: quantidade * item.precoVenda,
       categoria: "CONEXAO",
     });
@@ -832,6 +853,9 @@ export function buildBOM(input: BOMInput): BOMResult {
   );
 
   const totalGeral = itens.reduce((sum, item) => sum + item.total, 0);
+  // TASK-073 (E08): custo total de aquisição e margem bruta — uso INTERNO
+  // (sidebar do vendedor); nunca renderizado no PDF do cliente.
+  const custoTotalAquisicao = itens.reduce((sum, item) => sum + (item.custoUnitario ?? 0) * item.quantidade, 0);
 
   return {
     itens,
@@ -882,6 +906,8 @@ export function buildBOM(input: BOMInput): BOMResult {
       juncoesSpineEntrySpineCount,
       tesSpineRibCount,
       conexoesFishbonePendentesCount,
+      custoTotalAquisicaoR$: custoTotalAquisicao,
+      margemBrutaR$: totalGeral - custoTotalAquisicao,
     },
   };
 }
