@@ -25,6 +25,7 @@ import {
 import { candidateToSprinklers } from "@/lib/layout/optimizer-integration";
 import { selectBombaAutomatica } from "@/lib/layout/pump-auto-select";
 import { tuneSectorizationForValidArchitecture } from "@/lib/layout/architecture-auto-tune";
+import { fitTerrainGradient, MIN_TERRAIN_SAMPLES, type TerrainGradient, type TerrainSample } from "@/lib/layout/terrain-gradient";
 import {
   MousePointer2,
   Hexagon,
@@ -217,9 +218,18 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
     setOptimizerState({ status: "idle" });
   }, [layout.area]);
 
+  // TASK-080: declarado antes do optimalAngle (amostragem no efeito mais abaixo)
+  const [terrainGradient, setTerrainGradient] = useState<TerrainGradient | null>(null);
+
   const optimalAngle = useMemo(
-    () => (layout.area ? findOptimalGridAngle(layout.area) : 0),
-    [layout.area]
+    () =>
+      layout.area
+        ? findOptimalGridAngle(layout.area, aspersorAtivo.espacamentoPadraoM, {
+            terrainGradientDeg: terrainGradient?.directionDeg,
+            terrainSlopePercent: terrainGradient?.slopePercent,
+          })
+        : 0,
+    [layout.area, terrainGradient, aspersorAtivo.espacamentoPadraoM]
   );
 
   // ── Resultado completo do projeto — única fonte de verdade para display ────
@@ -422,6 +432,51 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
     },
     []
   );
+
+  // TASK-080 — Altimetria: amostra o terreno (Mapbox) dentro da área e ajusta
+  // um plano para estimar a declividade média. Com declividade relevante, as
+  // LATERAIS VÃO EM NÍVEL (regra canônica) — o gradiente alimenta
+  // findOptimalGridAngle. Sem terreno carregado, segue planimetria (TASK-079).
+  useEffect(() => {
+    if (!layout.area || !layout.centroid) {
+      setTerrainGradient(null);
+      return;
+    }
+    const sample = () => {
+      const ring = layout.area!.coordinates[0];
+      let lngMin = Infinity, lngMax = -Infinity, latMin = Infinity, latMax = -Infinity;
+      for (const [lng, lat] of ring) {
+        if (lng < lngMin) lngMin = lng;
+        if (lng > lngMax) lngMax = lng;
+        if (lat < latMin) latMin = lat;
+        if (lat > latMax) latMax = lat;
+      }
+      const c = layout.centroid!;
+      const mLng = 111320 * Math.cos((c.lat * Math.PI) / 180);
+      const samples: TerrainSample[] = [];
+      const N = 6;
+      for (let i = 0; i <= N; i++) {
+        for (let j = 0; j <= N; j++) {
+          const lng = lngMin + ((lngMax - lngMin) * i) / N;
+          const lat = latMin + ((latMax - latMin) * j) / N;
+          if (!turf.booleanPointInPolygon(turf.point([lng, lat]), turf.polygon(layout.area!.coordinates))) continue;
+          const elev = queryElevation(lng, lat);
+          if (elev === undefined) continue;
+          samples.push({ xM: (lng - c.lng) * mLng, yM: (lat - c.lat) * 111320, elevM: elev });
+        }
+      }
+      if (samples.length >= MIN_TERRAIN_SAMPLES) {
+        setTerrainGradient(fitTerrainGradient(samples));
+        return true;
+      }
+      return false;
+    };
+    // Terreno do Mapbox pode ainda não estar carregado — uma re-tentativa.
+    if (!sample()) {
+      const t = setTimeout(sample, 2500);
+      return () => clearTimeout(t);
+    }
+  }, [layout.area, layout.centroid, queryElevation]);
 
   const enterPipelineMode = useCallback(() => {
     if (!layout.waterSource) return;

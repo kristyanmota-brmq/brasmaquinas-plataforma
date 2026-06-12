@@ -1,6 +1,7 @@
 import * as turf from "@turf/turf";
 
 import { TOLERANCIA_ASPERSOR_EIXO_LATERAL } from "./laterais";
+import { ALTIMETRIA_MIN_SLOPE_PCT } from "./terrain-gradient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers geométricos (frame métrico local — TASK-046)
@@ -311,9 +312,21 @@ export const PLANIMETRIA_MIN_DOMINANCE = 0.3;
  *
  * @param spacingMeters Espaçamento entre aspersores (default 12 m, padrão Brasmáquinas).
  */
+export interface GridAngleOptions {
+  /**
+   * TASK-080 — Gradiente do terreno (altimetria), quando disponível:
+   * direção da maior declividade (graus-de-leste, mod 180) e declividade (%).
+   * Com declividade ≥ ALTIMETRIA_MIN_SLOPE_PCT, laterais vão EM NÍVEL
+   * (regra canônica) e este critério comanda sobre a planimetria.
+   */
+  terrainGradientDeg?: number;
+  terrainSlopePercent?: number;
+}
+
 export function findOptimalGridAngle(
   polygon: GeoJSON.Polygon,
   spacingMeters: number = 12,
+  opts?: GridAngleOptions,
 ): number {
   const centroid = getCentroid(polygon);
   const latRad = (centroid.lat * Math.PI) / 180;
@@ -377,7 +390,24 @@ export function findOptimalGridAngle(
     };
   };
 
-  // ── TASK-079 — PLANIMETRIA PRIMEIRO: a divisa dominante comanda a orientação ──
+  // ── TASK-080 — ALTIMETRIA PRIMEIRO: laterais EM NÍVEL (curvas de nível) ──
+  // Regra canônica (Bernardo; Keller & Bliesner; NRCS): com declividade
+  // relevante, as laterais correm ao longo das curvas de nível (perpendicu-
+  // lares ao gradiente) — é o que mantém a variação de pressão na lateral
+  // dentro do limite. Colunas a θ têm azimute-de-leste θ+90; curva de nível
+  // tem azimute gradiente+90 → θ = direção do gradiente (mod 180).
+  if (
+    opts?.terrainSlopePercent != null &&
+    opts.terrainGradientDeg != null &&
+    opts.terrainSlopePercent >= ALTIMETRIA_MIN_SLOPE_PCT
+  ) {
+    const thetaNivel = ((Math.round(opts.terrainGradientDeg) % 180) + 180) % 180;
+    const ev = evaluateAngle(thetaNivel);
+    if (ev && ev.valid) return thetaNivel;
+    // Inválido no gate de desvio (raro pós-TASK-046) → cai para planimetria.
+  }
+
+  // ── TASK-079 — PLANIMETRIA: a divisa dominante comanda em terreno plano ──
   // Laterais seguem linhas de plantio; linhas de plantio seguem a divisa.
   // Dois candidatos alinhados: colunas PERPENDICULARES à divisa (θ = d) e
   // colunas PARALELAS à divisa (θ = d − 90), com d = azimute-de-leste mod 180.
