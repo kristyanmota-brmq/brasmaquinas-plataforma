@@ -362,6 +362,22 @@ function evaluateCandidate(
   // Verificar invariantes técnicas: nenhum ramal pode exceder velocidade ou perda
   // mesmo com o maior DN disponível.
   let invalidReason: string | null = null;
+
+  // TASK-080 follow-up (lição Fazenda Três Ilhas): candidato cuja principal
+  // coincide com a linha de inlets produz rede de distribuição VAZIA — BOM de
+  // secundárias R$ 0 vence por custo, violando a regra RT v12 ("nenhuma
+  // lateral conecta direto à principal") e disparando o gate de cálculo
+  // incompleto (TASK-026-B) depois de aplicado. Rede vazia ≠ rede barata.
+  if (
+    operationalSegments !== undefined &&
+    physicalColumns.length > 0 &&
+    secondaries.length === 0
+  ) {
+    invalidReason =
+      "Rede de distribuição vazia: principal coincide com a linha de inlets " +
+      "(0 secundárias para " + physicalColumns.length + " colunas) — viola a " +
+      "topologia sempre-sub-coletor (v12) e o gate de cálculo completo.";
+  }
   const violatingRamais = sizedSecondaries.filter(
     (s) => s.velocityExceeds || s.headLossExceeds,
   );

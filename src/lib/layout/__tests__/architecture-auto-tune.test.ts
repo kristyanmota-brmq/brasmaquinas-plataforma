@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tuneSectorizationForValidArchitecture, countSecondariesOutOfLimit } from "../architecture-auto-tune";
+import { tuneSectorizationForValidArchitecture, countSecondariesOutOfLimit, officialNetworkOk } from "../architecture-auto-tune";
 import { selectArchitectureByBom } from "../architecture-selector";
 import { calculateIrrigationProject } from "../irrigation-project";
 import { generatePhysicalColumns } from "../laterais";
@@ -137,6 +137,18 @@ describe("T78 — tuneSectorizationForValidArchitecture (ajuste do projetista)",
     const layoutOk = makeLayoutT78(4); // 48 m³/h/setor — dentro dos limites do DN150
     expect(selectionFor(layoutOk).decision).not.toBe("no_valid_candidate");
     expect(tuneSectorizationForValidArchitecture(layoutOk)).toBeNull();
+  });
+
+  it("T78-5 (lição Três Ilhas): nunca aceita configuração com REDE VAZIA (candidato abraçando inlets)", () => {
+    // O que quer que o tune devolva, o layout ajustado precisa passar na
+    // aceitação estrutural oficial — rede completa, nunca 0 secundárias com
+    // colunas existentes (aceitação vácua que disparava o gate TASK-026-B).
+    const tuned = tuneSectorizationForValidArchitecture(makeLayoutT78(1), { maxExtraSetores: 8 });
+    if (tuned) {
+      expect(officialNetworkOk(tuned.layoutAjustado)).toBe(true);
+    } else {
+      expect(tuned).toBeNull(); // sem solução estruturalmente íntegra → humano decide
+    }
   });
 
   it("T78-4: limite de busca esgotado ou inválido → null (decisão volta ao humano)", () => {

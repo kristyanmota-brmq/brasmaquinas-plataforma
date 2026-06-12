@@ -60,6 +60,23 @@ export function countSecondariesOutOfLimit(layout: ProjectLayout): number {
   return (r.hydraulics?.sizedSecondaries ?? []).filter((s) => s.status !== "ok").length;
 }
 
+/**
+ * Aceitação estrutural OFICIAL da rede (TASK-080 follow-up — lição da Fazenda
+ * Três Ilhas): além de 0 secundárias fora de limite, a rede precisa estar
+ * COMPLETA — HMT válida e, havendo colunas físicas, secundárias EXISTINDO.
+ * Sem isso, um candidato de borda que "abraça" os inlets passa vacuamente
+ * (0 secundárias = 0 fora de limite) e dispara o gate de cálculo incompleto
+ * do BOM (TASK-026-B) depois de aplicado.
+ */
+export function officialNetworkOk(layout: ProjectLayout): boolean {
+  const r = calculateIrrigationProject(layout);
+  const h = r.hydraulics;
+  if (!h || !Number.isFinite(h.hmt?.totalHMT) || h.hmt.totalHMT <= 0) return false;
+  const nCols = r.physical?.physicalColumns.length ?? 0;
+  if (nCols > 0 && h.sizedSecondaries.length === 0) return false;
+  return h.sizedSecondaries.every((x) => x.status === "ok");
+}
+
 function withWinnerPipeline(
   layout: ProjectLayout,
   selection: ArchitectureSelectionResult,
@@ -155,7 +172,7 @@ export function tuneSectorizationForValidArchitecture(
     // Aceitação: o SOLVER OFICIAL (com o traçado vencedor aplicado) não pode
     // ter nenhuma secundária fora de limite.
     const layoutAjustado = withWinnerPipeline(layout2, sel2);
-    if (countSecondariesOutOfLimit(layoutAjustado) !== 0) continue;
+    if (!officialNetworkOk(layoutAjustado)) continue;
     // Critério do projetista: prefere a configuração que TAMBÉM tem conjunto
     // moto-bomba homologado atendendo o ponto de operação resultante.
     const r3 = calculateIrrigationProject(layoutAjustado);
