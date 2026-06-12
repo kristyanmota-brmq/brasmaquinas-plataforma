@@ -208,6 +208,20 @@ Testes na base: **887/887** vitest · TypeScript: 0 erros · **37/37 testes tool
 
 ---
 
+### TASK-085 — Catálogo de bombas THEBE/EBARA por catálogo de fabricante
+
+**Status:** `concluída`
+**Concluída em:** 2026-06-12 · **1038/1038 testes vitest** (+6 T85; contagem global compartilhada com TASK-084 — árvore em edição concorrente) · 0 erros tsc
+**Prioridade:** P1-crítico · **Classe:** A — catálogo / domínio · **Área:** catálogo
+**Arquivo:** `tasks/TASK-085-catalogo-bombas-thebe-ebara.md`
+**Relatório:** `docs/relatorios/2026-06-12-TASK-085.md`
+**Nota de publicação:** código publicado dentro do commit `f5cca61` (TASK-084, sessão concorrente — varreu a árvore compartilhada); fechamento documental em commit próprio
+**Autorização:** ordem direta do usuário ("busque o catálogo das bombas THEBE e EBARA"; escopo reduzido aprovado: "somente THS18, R 20, RL 20B e as normalizadas da Ebara")
+
+> `BOMBAS_HOMOLOGADAS` 2 → 99 entradas com dado OFICIAL de fabricante (Ebara/Thebe = grupo EBAS; catálogos baixados em `docs/catalogos/bombas/`, PDFs gitignored com URLs no README): THEBE THS-18 ×14, R-20 ×4, RL-20B ×11 (págs. 11/13) + EBARA normalizadas GS/GSD 3500 rpm ×68 (págs. 60–65). Convenção nova no doc 12 (PENDENTE_CONFIRMACAO_RT): ponto nominal = ponto MEDIANO da tabela do fabricante (conservador p/ `validatePump` retangular); cv por rótulo do catálogo (ambíguo → menor cv com η ≤ 0,84); âncora física no shut-off para alinhamento de colunas; GSDU como validação cruzada (50/56 idênticos); envelope Q 15–200 m³/h, H 15–90 mca (1750 rpm fora). Entradas TASK-065 byte-idênticas; `selectBombaAutomatica`/tuner ganham massa real. η implícita do lote: 0,45–0,84. Fora do escopo: curva Q-H multiponto; preços de bombas (E08); demais linhas Thebe (segunda leva sob demanda).
+
+---
+
 ### TASK-084 — Revisão RT nº 1 do dossiê (6 correções ditadas em sessão)
 
 **Status:** `concluída` · 2026-06-12 · **1038/1038 testes** · 0 tsc · 37/37 tooling

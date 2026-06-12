@@ -68,3 +68,6 @@ playwright-trace/
 
 # Propostas comerciais reais e dados de clientes (PII/contratos — nunca versionar)
 docs/PROJETO/
+
+# Catálogos de fabricantes (PDFs grandes — fontes e URLs no README da pasta)
+docs/catalogos/bombas/*.pdf
