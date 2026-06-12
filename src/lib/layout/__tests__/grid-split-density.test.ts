@@ -45,16 +45,16 @@ function makeColumn(n: number, xLocal = 0): [number, number][] {
 // T40-1: caminho feliz — DN75 já atende; sem split
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("T40-1 — caminho feliz (n=20): DN75 atende; nenhum split disparado", () => {
-  it("n=20 → 1 coluna física, lateralCapacity.ok=true, splitIndex=0 (não dividida)", () => {
+describe("T40-1 — caminho feliz (n=9): lateral única DN50 atende; nenhum split (TASK-083)", () => {
+  it("n=9 → 1 coluna física, lateralCapacity.ok=true, splitIndex=0 (não dividida)", () => {
     const subset = getCatalogoLateraisHomologadas5022();
-    const positions = makeColumn(20);
+    const positions = makeColumn(9); // 13,5 m³/h — cabe em DN50 (v=2,26; hf ok)
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, subset,
     );
     expect(cols).toHaveLength(1);
     expect(cols[0].lateralCapacity.ok).toBe(true);
-    expect(cols[0].selecao.tubo.diametroMm).toBeLessThanOrEqual(75);
+    expect(cols[0].selecao.tubo.diametroMm).toBe(50); // TASK-083: lateral única DN50
     expect(cols[0].splitIndex).toBe(0);
     expect(cols[0].originalColumnIndex).toBe(0);
   });
@@ -209,17 +209,17 @@ describe("T40-8 — projeto-tipo Barreiras: sem violations após split", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T40-9: split mínimo necessário (n=21 → 2 sub-colunas, não mais)
+// T40-9: split mínimo necessário (TASK-083: n=10 → 2 sub-colunas, não mais)
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("T40-9 — split mínimo necessário", () => {
-  it("n=21 (apenas 1 aspersor acima do limite DN75) → exatamente 2 sub-colunas", () => {
+  it("n=10 (1 aspersor acima do limite DN50) → exatamente 2 sub-colunas", () => {
     const subset = getCatalogoLateraisHomologadas5022();
-    const positions = makeColumn(21);
+    const positions = makeColumn(10);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, subset,
     );
-    // Caso limítrofe: n=21 viola DN75 (hf=6.68 mca > 6); split mínimo = 2.
+    // Caso limítrofe (lateral única DN50): n=10 → 15 m³/h → v=2,508 > 2,5; split mínimo = 2.
     expect(cols).toHaveLength(2);
     for (const c of cols) {
       expect(c.lateralCapacity.ok).toBe(true);

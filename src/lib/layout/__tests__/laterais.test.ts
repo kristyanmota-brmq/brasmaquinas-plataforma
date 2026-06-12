@@ -48,7 +48,9 @@ const TEST_CATALOG: TuboCandidato[] = [
   { sku: "TEST-100", diametroMm: 100, diametroInternoMm: 92, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
 ];
 const TEST_ASPERSOR = {
-  vazao: ASPERSOR_PADRAO.vazaoM3PorHora,
+  // TASK-083: vazão sintética — testes de AGRUPAMENTO geométrico com colunas
+  // longas (18-22 aspersores) precisam caber na lateral única DN50 PN40.
+  vazao: 0.3,
   pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca,
 };
 

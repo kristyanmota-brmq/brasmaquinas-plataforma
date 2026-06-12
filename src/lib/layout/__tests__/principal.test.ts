@@ -26,7 +26,8 @@ const TEST_CATALOG: TuboCandidato[] = [
   { sku: "TEST-75",  diametroMm: 75,  diametroInternoMm: 69, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
   { sku: "TEST-100", diametroMm: 100, diametroInternoMm: 92, pressaoMca: 400, custo: 1, precoVenda: 1, coefC: 145 },
 ];
-const TEST_ASPERSOR = { vazao: 1, pressaoServico: 30 };
+// TASK-083: vazão sintética reduzida — colunas de 20 asp precisam caber na lateral única DN50
+const TEST_ASPERSOR = { vazao: 0.4, pressaoServico: 30 };
 
 function makePhysicalColumn(
   startLngLat: [number, number],

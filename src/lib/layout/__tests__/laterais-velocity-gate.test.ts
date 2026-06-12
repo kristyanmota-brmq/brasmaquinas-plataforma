@@ -37,12 +37,19 @@ function makePositions(n: number): [number, number][] {
 // ── Testes ───────────────────────────────────────────────────────────────────
 
 describe("selectLateralTube — gate de velocidade com diâmetro interno", () => {
-  it("n=10: velocidade DN50 com Dint=46mm = 2,508 m/s > 2,5 → seleciona DN75", () => {
+  it("n=10 (TASK-083): 15 m³/h não cabe em DN50 → coluna DIVIDE em 2 laterais DN50 válidas (encurta, não engorda)", () => {
     const positions = makePositions(10);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, CATALOG_2,
     );
-    expect(cols[0].selecao.tubo.sku).toBe("DN75");
+    // Lateral única DN50 PN40 (ordem do RT): sem upgrade de diâmetro — o
+    // sistema responde dividindo a coluna em laterais que cabem.
+    expect(cols.length).toBeGreaterThanOrEqual(2);
+    for (const c of cols) {
+      expect(c.selecao.tubo.sku).toBe("DN50");
+      expect(c.lateralCapacity.ok).toBe(true);
+      expect(c.selecao.velocidadeMs).toBeLessThanOrEqual(MAX_VEL_LATERAL);
+    }
   });
 
   it("n=5: Q=7,5 m³/h — DN50 Dint=46mm passa nos dois gates → DN50 permanece", () => {
@@ -54,47 +61,46 @@ describe("selectLateralTube — gate de velocidade com diâmetro interno", () =>
   });
 
   it("velocidadeMs armazenada usa Dint, não diâmetro nominal", () => {
-    const n = 10;
+    const n = 5; // TASK-083: sem split (cabe em DN50) — invariante Dint puro
     const positions = makePositions(n);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, CATALOG_2,
     );
     const col = cols[0];
-    // DN75 selecionado: Dint=69mm ≠ nominal 75mm
-    const velComDint     = velocity(col.vazaoM3h, 69);
-    const velComNominal  = velocity(col.vazaoM3h, 75);
+    // TASK-083: DN50 sempre — Dint=46mm ≠ nominal 50mm
+    const velComDint     = velocity(col.vazaoM3h, 46);
+    const velComNominal  = velocity(col.vazaoM3h, 50);
     expect(col.selecao.velocidadeMs).toBeCloseTo(velComDint, 4);
     expect(col.selecao.velocidadeMs).not.toBeCloseTo(velComNominal, 3);
   });
 
   it("perdaCargaM armazenada usa Dint, não diâmetro nominal", () => {
-    const n = 10;
+    const n = 5; // TASK-083: sem split (cabe em DN50)
     const positions = makePositions(n);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, CATALOG_2,
     );
     const col = cols[0];
-    const comprimentoM = (n - 1) * SPACING + 0.5;
-    const F = christiansenF(n);
-    const hfComDint    = headLoss(col.vazaoM3h, comprimentoM, 69, DN75.coefC) * F;
-    const hfComNominal = headLoss(col.vazaoM3h, comprimentoM, 75, DN75.coefC) * F;
-    // TASK-074: com telescopia, perdaCargaM = hf da decomposição (que usa Dint em
-    // todas as parcelas por construção); sem telescopia, igual ao cálculo Dint puro.
-    const esperado = col.selecao.telescopia?.hfTotalMca ?? hfComDint;
-    expect(col.selecao.perdaCargaM).toBeCloseTo(esperado, 4);
+    const comprimentoM = col.comprimentoM;
+    const F = christiansenF(col.sprinklerCount);
+    const hfComDint    = headLoss(col.vazaoM3h, comprimentoM, 46, DN50.coefC) * F;
+    const hfComNominal = headLoss(col.vazaoM3h, comprimentoM, 50, DN50.coefC) * F;
+    // TASK-083: telescopia revogada — perdaCargaM = cálculo Dint puro do DN50.
+    expect(col.selecao.perdaCargaM).toBeCloseTo(hfComDint, 4);
     expect(col.selecao.perdaCargaM).not.toBeCloseTo(hfComNominal, 3);
   });
 
-  it("velocidadeMs do tubo selecionado ≤ 2,5 m/s (gate passa)", () => {
-    const positions = makePositions(10);
+  it("velocidadeMs do tubo selecionado ≤ 2,5 m/s quando a lateral CABE (n=5)", () => {
+    const positions = makePositions(5);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, CATALOG_2,
     );
     expect(cols[0].selecao.velocidadeMs).toBeLessThanOrEqual(MAX_VEL_LATERAL);
   });
 
-  it("generateLateraisLegacyForDebug n=10 → mesmo tubo que generatePhysicalColumns", () => {
-    const positions = makePositions(10);
+  it("generateLateraisLegacyForDebug n=5 → mesmo tubo que generatePhysicalColumns", () => {
+    // TASK-083: n=5 cabe em DN50 sem split — caminho legacy não divide colunas.
+    const positions = makePositions(5);
     const sectorIds = positions.map(() => 0);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING, ASPERSOR_MIN, CATALOG_2,
@@ -106,8 +112,8 @@ describe("selectLateralTube — gate de velocidade com diâmetro interno", () =>
     expect(laterais[0].selecao.velocidadeMs).toBeCloseTo(cols[0].selecao.velocidadeMs, 4);
   });
 
-  it("deriveLateraisFromNetwork n=10 → mesmo tubo e mesmos valores que generatePhysicalColumns", () => {
-    const n = 10;
+  it("deriveLateraisFromNetwork n=5 → mesmo tubo e mesmos valores que generatePhysicalColumns", () => {
+    const n = 5; // TASK-083: sem split
     const positions = makePositions(n);
     const sprinklerIndices = Array.from({ length: n }, (_, i) => i);
 
@@ -149,15 +155,18 @@ describe("selectLateralTube — gate de velocidade com diâmetro interno", () =>
     expect(laterais[0].selecao.perdaCargaM).toBeCloseTo(cols[0].selecao.perdaCargaM, 4);
   });
 
-  it("com TUBOS_PVC_LF real e 5022 4.0x1.8 (1,5 m³/h): n=10 seleciona diâmetro ≥ 75mm", () => {
-    // DN50 real (Dint=46mm) → v = 2,508 m/s → rejeitado; espera DN75 ou maior
+  it("com TUBOS_PVC_LF real e 5022 4.0x1.8 (1,5 m³/h): n=10 divide e TODAS as laterais são DN50 (TASK-083)", () => {
+    // TASK-083: 15 m³/h não cabe em DN50 → divide; nenhuma lateral sobe de diâmetro.
     const positions = makePositions(10);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING,
       { vazao: ASPERSOR_5022_SD_40X18.vazaoM3PorHora, pressaoServico: ASPERSOR_5022_SD_40X18.pressaoServicoMca },
       TUBOS_PVC_LF,
     );
-    expect(cols[0].selecao.tubo.diametroMm).toBeGreaterThanOrEqual(75);
-    expect(cols[0].selecao.velocidadeMs).toBeLessThanOrEqual(MAX_VEL_LATERAL);
+    expect(cols.length).toBeGreaterThanOrEqual(2);
+    for (const c of cols) {
+      expect(c.selecao.tubo.diametroMm).toBe(50);
+      expect(c.selecao.velocidadeMs).toBeLessThanOrEqual(MAX_VEL_LATERAL);
+    }
   });
 });

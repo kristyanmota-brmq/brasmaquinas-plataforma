@@ -297,7 +297,7 @@ describe("Teste 4 — coluna fragmentada: comprimento físico ≠ soma das sub-c
     0,
     CENTROID,
     SPACING,
-    { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
+    { vazao: 0.4 /* TASK-083: coluna de 20 asp precisa caber na lateral única DN50 */, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
     TUBOS_PVC_LF,
   );
 

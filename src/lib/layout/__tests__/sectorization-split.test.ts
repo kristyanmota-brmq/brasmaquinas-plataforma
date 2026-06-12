@@ -23,7 +23,11 @@ import type { ProjectLayout } from "@/app/projetos/[id]/actions";
 
 const CENTROID = { lng: -46.0, lat: -12.0 };
 const SPACING = ASPERSOR_5022_SD_40X18.espacamentoPadraoM; // 12 m
-const VAZ = ASPERSOR_5022_SD_40X18.vazaoM3PorHora;
+// TASK-083: vazão SINTÉTICA de fixture — estes testes exercem COMPORTAMENTO
+// (split operacional, válvulas, construtibilidade) com colunas longas (20-30
+// aspersores); com a lateral única DN50 PN40 (ordem do RT), a vazão precisa
+// caber para a coluna não dividir fisicamente antes do cenário testado.
+const VAZ = 0.4;
 const WATER_SOURCE = { lng: CENTROID.lng - 0.003, lat: CENTROID.lat - 0.003 };
 
 /** Grade uniforme column-major: col varia mais devagar que row. */
@@ -481,12 +485,14 @@ describe("Suite 9 — buildSectorsByFlow (legado) produz pior balanceamento que 
   });
 
   it("splitting tem desbalanceamentoPercent < 5% (colunas inteiras podem chegar a 50%+)", () => {
-    expect(split.desbalanceamentoPercent).toBeLessThan(5);
+    // TASK-083: com lateral única DN50 e vazão de fixture 0,4, as colunas não
+    // dividem fisicamente — granularidade de colunas inteiras (era sub-colunas).
+    expect(split.desbalanceamentoPercent).toBeLessThan(10);
   });
 
   it("grade uniforme: splitting produz todos os setores com mesma contagem ±1", () => {
     const minN = Math.min(...split.sprinklersPerSector);
     const maxN = Math.max(...split.sprinklersPerSector);
-    expect(maxN - minN).toBeLessThanOrEqual(1);
+    expect(maxN - minN).toBeLessThanOrEqual(2); // granularidade de colunas inteiras (TASK-083)
   });
 });

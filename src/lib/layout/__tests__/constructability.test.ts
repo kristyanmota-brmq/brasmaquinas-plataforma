@@ -31,7 +31,11 @@ import type { ProjectLayout } from "@/app/projetos/[id]/actions";
 
 const CENTROID = { lng: -46.0, lat: -12.0 };
 const SPACING = ASPERSOR_PADRAO.espacamentoPadraoM; // 12 m
-const VAZ = ASPERSOR_PADRAO.vazaoM3PorHora;
+// TASK-083: vazão SINTÉTICA de fixture — estes testes exercem COMPORTAMENTO
+// (split operacional, válvulas, construtibilidade) com colunas longas (20-30
+// aspersores); com a lateral única DN50 PN40 (ordem do RT), a vazão precisa
+// caber para a coluna não dividir fisicamente antes do cenário testado.
+const VAZ = 0.4;
 const WATER_SOURCE = { lng: CENTROID.lng - 0.003, lat: CENTROID.lat - 0.003 };
 
 /** Grade uniforme column-major. */
@@ -184,7 +188,8 @@ describe("Suite 2 — lateral dividida em 2 setores gera 1 split point e 1 contr
 // Suite 3 — Lateral dividida em 3 setores gera 2 split points
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Suite 3 — lateral dividida em 3 setores gera 2 split points", () => {
-  const { positions, physCols } = makePhysCols(1, 30);
+  // TASK-083: 18 aspersores (3 setores de 6) — cabe na lateral única DN50
+  const { positions, physCols } = makePhysCols(1, 18);
   const { sectorIndices } = buildSectorsByFlowWithColumnSplitting(physCols, 3, VAZ, positions.length);
   const report = buildConstructabilityReport(physCols, sectorIndices, positions);
 

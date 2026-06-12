@@ -378,62 +378,55 @@ describe("T70/T73 — PN60 e margem", () => {
 // TASK-074 — Telescopia de lateral 75→50 (decisão RT: nunca abaixo de DN50)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("T74 — telescopia 75→50", () => {
-  it("T74-1: lateral longa DN75 ganha cauda DN50 com hf ≤ limite e contagens coerentes", async () => {
+describe("T74 (REVOGADA pela TASK-083) — lateral única DN50 PN40, sem telescopia", () => {
+  // Ordem do RT (2026-06-12): "não teremos mais telescopia nas linhas
+  // laterais. Será somente tubo de 50mm PN40." Estes testes protegem a regra
+  // NOVA: nenhuma lateral sobe de diâmetro, nenhuma telescopia, nenhum tê de
+  // redução 75×50 na BOM. Colunas que não cabem em DN50 são DIVIDIDAS.
+  it("T74-1 (nova regra): coluna longa divide; TODAS as laterais saem DN50 sem telescopia", async () => {
     const { generatePhysicalColumns } = await import("@/lib/layout/laterais");
     const { ASPERSOR_PADRAO, TUBOS_PVC_LF } = await import("@/lib/catalog/aspersores");
     const M = 111320, C = { lng: -45.0, lat: -12.0 };
-    const mLng = M * Math.cos((C.lat * Math.PI) / 180);
-    // 1 coluna de 20 aspersores @12 m (228 m) — vazão 30 m³/h → DN75 com cauda 50
     const positions: [number, number][] = Array.from({ length: 20 }, (_, i) =>
       [C.lng, C.lat + (i * 12) / M] as [number, number]);
     const cols = generatePhysicalColumns(positions, 0, C, 12,
-      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: 30 }, TUBOS_PVC_LF);
-    expect(cols).toHaveLength(1);
-    const sel = cols[0].selecao;
-    expect(sel.tubo.diametroMm).toBe(75);
-    expect(sel.telescopia).toBeDefined();
-    const t = sel.telescopia!;
-    expect(t.tuboCauda.diametroMm).toBe(50); // nunca < 50 (decisão RT)
-    expect(t.sprinklersCabeceira + t.sprinklersCauda).toBe(20);
-    expect(t.sprinklersCauda).toBeGreaterThanOrEqual(2);
-    expect(t.comprimentoCabeceiraM + t.comprimentoCaudaM).toBeCloseTo(cols[0].comprimentoM, 6);
-    expect(t.hfTotalMca).toBeLessThanOrEqual(30 * 0.2 + 1e-9);
-    expect(sel.perdaCargaM).toBeCloseTo(t.hfTotalMca, 9);
+      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca }, TUBOS_PVC_LF);
+    expect(cols.length).toBeGreaterThanOrEqual(1);
+    let totalAsp = 0;
+    for (const c of cols) {
+      totalAsp += c.sprinklerCount;
+      expect(c.selecao.tubo.diametroMm).toBe(50);
+      expect(c.selecao.tubo.pressaoMca).toBe(40); // PN40
+      expect(c.selecao.telescopia).toBeUndefined();
+      expect(c.lateralCapacity.ok).toBe(true);
+    }
+    expect(totalAsp).toBe(20);
   });
 
-  it("T74-2: lateral curta (DN50 integral) NÃO telescopa; BOM divide tubos + 1 tê de redução", async () => {
+  it("T74-2 (nova regra): BOM de laterais é 100% DN50 — sem DN75, sem tê de redução 75×50", async () => {
     const { generatePhysicalColumns } = await import("@/lib/layout/laterais");
     const { ASPERSOR_PADRAO, TUBOS_PVC_LF } = await import("@/lib/catalog/aspersores");
     const { buildBOM } = await import("@/lib/bom");
     const M = 111320, C = { lng: -45.0, lat: -12.0 };
-    // curta: 4 aspersores → DN50 direto, sem telescopia
-    const shortPos: [number, number][] = Array.from({ length: 4 }, (_, i) =>
-      [C.lng, C.lat + (i * 12) / M] as [number, number]);
-    const colsShort = generatePhysicalColumns(shortPos, 0, C, 12,
-      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: 30 }, TUBOS_PVC_LF);
-    expect(colsShort[0].selecao.tubo.diametroMm).toBe(50);
-    expect(colsShort[0].selecao.telescopia).toBeUndefined();
-
-    // longa: 20 aspersores → BOM com DN75 (cabeceira) + DN50 (cauda) + tê 75×50
     const longPos: [number, number][] = Array.from({ length: 20 }, (_, i) =>
       [C.lng, C.lat + (i * 12) / M] as [number, number]);
     const colsLong = generatePhysicalColumns(longPos, 0, C, 12,
-      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: 30 }, TUBOS_PVC_LF);
+      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca }, TUBOS_PVC_LF);
+    const nAsp = colsLong.reduce((t, c) => t + c.sprinklerCount, 0);
     const bom = buildBOM({
-      sprinklers: { count: 20, vazaoProjetoM3PorHora: 30, espacamentoM: 12 },
-      sectorization: { setoresCount: 1, sectorIndices: new Array(20).fill(0), vazaoPorSetorM3PorHora: 30 },
+      sprinklers: { count: nAsp, vazaoProjetoM3PorHora: nAsp * ASPERSOR_PADRAO.vazaoM3PorHora, espacamentoM: 12 },
+      sectorization: { setoresCount: 1, sectorIndices: new Array(nAsp).fill(0), vazaoPorSetorM3PorHora: nAsp * ASPERSOR_PADRAO.vazaoM3PorHora },
       mainPipeline: { lengthMeters: 12, segments: 1 },
       physicalColumns: colsLong,
       laterais: [],
       secondaries: [],
       constructability: { controlPoints: [], columnDiagnostics: [], controlPointsCount: 0, pendingControlPointsCount: 0, independentFeedRequiredCount: 0, constructabilityStatus: "ok" },
     } as never);
-    expect(bom.meta.colunasTelescopadasCount).toBe(1);
-    const skus = bom.itens.filter((i) => i.categoria === "TUBO").map((i) => i.sku);
-    expect(skus).toContain("TIGRE_LF_75_PN40");
-    expect(skus).toContain("TIGRE_LF_50_PN40");
+    expect(bom.meta.colunasTelescopadasCount ?? 0).toBe(0);
+    const skusLF = bom.itens.filter((i) => i.categoria === "TUBO" && String(i.sku).includes("LF")).map((i) => i.sku);
+    expect(skusLF).toContain("TIGRE_LF_50_PN40");
+    expect(skusLF).not.toContain("TIGRE_LF_75_PN40");
     const te = bom.itens.find((i) => i.sku === "2090612");
-    expect(te?.quantidade).toBe(1);
+    expect(te).toBeUndefined(); // tê de redução 75×50 não existe mais
   });
 });

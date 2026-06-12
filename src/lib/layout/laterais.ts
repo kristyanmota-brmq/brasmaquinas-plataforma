@@ -76,6 +76,9 @@ export interface LateralCapacityInfo {
  * F de Christiansen global aplicado às três parcelas (aproximação consistente com o
  * seletor; documentada na premissa TASK-074). Cauda mínima: 2 aspersores; cabeceira ≥ 1.
  */
+// TASK-083: REVOGADA por ordem do RT (lateral única DN50 PN40). Preservada
+// para histórico/eventual reversão — não chamada em produção.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function computeTelescopia75para50(
   selecionado: TuboCandidato,
   vazaoM3h: number,
@@ -140,7 +143,15 @@ function selectLateralTube({
 } {
   const catOrdenado = [...tubos].sort((a, b) => a.diametroMm - b.diametroMm);
 
-  for (const tubo of catOrdenado) {
+  // ── TASK-083 (ordem do RT, 2026-06-12): lateral é SEMPRE DN50 PN40 ──
+  // "Não teremos mais telescopia nas linhas laterais. Será somente tubo de
+  // 50mm PN40." Revoga a cascata 75→50 da TASK-074. Sem upgrade de diâmetro:
+  // lateral acima dos limites → capacityOk=false (o split de colunas e o gate
+  // do solver cuidam — a lateral encurta, não engorda).
+  const dn50 = catOrdenado.filter((t) => t.diametroMm === 50);
+  const candidatos = dn50.length > 0 ? dn50 : [catOrdenado[0]];
+
+  for (const tubo of candidatos) {
     const dIntMm = tubo.diametroInternoMm ?? tubo.diametroMm;
     const hf = headLoss(vazaoM3h, comprimentoM, dIntMm, tubo.coefC) * F;
     const vel = velocity(vazaoM3h, dIntMm);
@@ -149,16 +160,15 @@ function selectLateralTube({
         selecionado: tubo,
         hfFinal: hf,
         lateralCapacity: { ok: true, hfM: hf, velMs: vel },
-        telescopia: computeTelescopia75para50(tubo, vazaoM3h, comprimentoM, nSprinklers, catOrdenado, limitePerda, F),
+        // TASK-083: telescopia desativada por ordem do RT (lateral única DN50).
       };
     }
   }
 
-  // Fallback: maior tubo do subset — atende a regra "lateral 5022 ≤ DN75" mas
-  // sinaliza incapacidade hidráulica via `capacityOk: false`. O solver hidráulico
-  // continua rodando com os números do DN75; o blocker técnico é emitido em
-  // `generateProposalDiagnostics` a partir do report agregado.
-  const maior = catOrdenado[catOrdenado.length - 1];
+  // Fallback: o próprio DN50 acima dos limites — sinaliza incapacidade
+  // hidráulica via `capacityOk: false`. O solver continua com os números do
+  // DN50; o blocker técnico é emitido em `generateProposalDiagnostics`.
+  const maior = candidatos[candidatos.length - 1];
   const dMaiorMm = maior.diametroInternoMm ?? maior.diametroMm;
   const hfMaior = headLoss(vazaoM3h, comprimentoM, dMaiorMm, maior.coefC) * F;
   const velMaior = velocity(vazaoM3h, dMaiorMm);

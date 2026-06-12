@@ -209,8 +209,10 @@ describe("TAREFA 3+8 — benchmarks e testes mandatórios", () => {
     expect(critTypes).toContain("secondary");
   });
 
-  it("T8-5b (TASK-075): Projeto P (inlets uniformes) vira manifold — fishbone com spine/entry > 0 e ribs 0 (tê direto)", () => {
-    const result = completeResultP();
+  it("T8-5b (TASK-075/083): Projeto L (inlets uniformes) vira manifold — fishbone com spine/entry > 0 e ribs 0 (tê direto)", () => {
+    // TASK-083: no P as colunas de 16 dividem na lateral única DN50 (inlets
+    // escalonados → ribs > 0); o L (12 linhas) permanece uniforme.
+    const result = completeResultL();
     const fishbone = result.hydraulic!.secondaries;
     // A rede de secundárias EXISTE (spine + spine_entry com comprimento real)…
     expect(fishbone.length).toBeGreaterThan(0);

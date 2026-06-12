@@ -327,6 +327,9 @@ describe("T8.7 — snapshot projeto L: 444 asp / 14 setores", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("T8.8 — snapshot projeto P: 736 asp / 14 setores", () => {
   const COLS = 46, ROWS = 16, SECTORS = 14;
+  // TASK-083: as 46 colunas geométricas de 16 asp dividem em 2 na lateral
+  // única DN50 (12,2 m³/h → hf acima do limite em ~180 m) → 92 colunas físicas.
+  const PHYS_COLS = COLS * 2;
   const layout = makeCompleteLayout(COLS, ROWS, SECTORS);
   const result = calculateIrrigationProject(layout);
 
@@ -334,16 +337,16 @@ describe("T8.8 — snapshot projeto P: 736 asp / 14 setores", () => {
     expect(result.isComplete).toBe(true);
   });
 
-  it("physical.nColumns = 46", () => {
-    expect(result.physical!.nColumns).toBe(COLS);
+  it("physical.nColumns = 92 (TASK-083)", () => {
+    expect(result.physical!.nColumns).toBe(PHYS_COLS);
   });
 
   it("operational.nSetores = 14", () => {
     expect(result.operational!.nSetores).toBe(SECTORS);
   });
 
-  it("bom.meta.nColunasLaterais = 46", () => {
-    expect(result.bom!.meta.nColunasLaterais).toBe(COLS);
+  it("bom.meta.nColunasLaterais = 92 (TASK-083)", () => {
+    expect(result.bom!.meta.nColunasLaterais).toBe(PHYS_COLS);
   });
 
   it("sprinklersPerSector: todos os setores têm aspersores (nenhum setor vazio)", () => {
