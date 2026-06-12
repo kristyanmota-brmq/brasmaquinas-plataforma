@@ -17,7 +17,9 @@ import {
 } from "@/lib/catalog/aspersores";
 import {
   countAdutoraBends,
+  countFishboneConnections,
   countLateralBends90,
+  type FishboneConnectionFamily,
   countSecondaryLBends,
 } from "@/lib/layout/physical-connections";
 import {
@@ -67,7 +69,10 @@ export interface BOMPendingConnection {
     | "curva_90_ramal_l"
     | "curva_90_adutora"
     | "curva_45_adutora"
-    | "curva_90_lateral";
+    | "curva_90_lateral"
+    | "te_principal_spine_entry"
+    | "juncao_spine_entry_spine"
+    | "te_spine_rib";
   descricao: string;
   /** DN em mm; 0 quando indeterminado. */
   dnMm: number;
@@ -138,6 +143,14 @@ export interface BOMResult {
     kitAspersorResolvCount: number;
     /** TASK-023: aspersores em lateral com DN não homologado para kit 5022 (gera blocker). */
     kitAspersorDnNaoHomologadoCount: number;
+    /** TASK-054: tês principal→spine_entry precificados (topologia v12 fishbone). */
+    tesPrincipalSpineEntryCount: number;
+    /** TASK-054: junções spine_entry→spine precificadas (topologia v12 fishbone). */
+    juncoesSpineEntrySpineCount: number;
+    /** TASK-054: tês spine→rib precificados (topologia v12 fishbone). */
+    tesSpineRibCount: number;
+    /** TASK-054: conexões fishbone sem SKU/DN (subconjunto de conexoesFisicasPendentes). */
+    conexoesFishbonePendentesCount: number;
   };
 }
 
@@ -596,6 +609,81 @@ export function buildBOM(input: BOMInput): BOMResult {
     });
   }
 
+  // A2. TASK-054: conexões da topologia v12 espinha de peixe (fishbone).
+  // Só ativa quando há secundárias com `kind` (spine/spine_entry/rib) — caminho
+  // legado (`kind: undefined`) preservado byte-a-byte (countFishboneConnections
+  // retorna famílias vazias para secundárias legadas).
+  // DN exato no catálogo → item precificado; sem SKU exato → pendência (nunca
+  // fallback silencioso para SKU de outro DN).
+  let tesPrincipalSpineEntryCount = 0;
+  let juncoesSpineEntrySpineCount = 0;
+  let tesSpineRibCount = 0;
+  let conexoesFishbonePendentesCount = 0;
+
+  if (secondaries.some((s) => s.kind != null)) {
+    const fishbone = countFishboneConnections(secondaries, sizedSecondaries);
+
+    const emitFishboneFamily = (
+      family: FishboneConnectionFamily,
+      tipo: BOMPendingConnection["tipo"],
+      label: string,
+    ): number => {
+      let priced = 0;
+      for (const [dn, qty] of family.byDnMm.entries()) {
+        const teCat = TES_DERIVACAO_LATERAL.find((t) => t.diametroMm === dn);
+        if (teCat) {
+          priced += qty;
+          itens.push({
+            sku: teCat.sku,
+            descricao: `${teCat.descricao} (${label})`,
+            marca: teCat.marca,
+            unidade: teCat.unidade,
+            quantidade: qty,
+            precoUnitario: teCat.precoVenda,
+            total: qty * teCat.precoVenda,
+            categoria: "CONEXAO",
+          });
+        } else {
+          conexoesFishbonePendentesCount += qty;
+          conexoesFisicasPendentes.push({
+            tipo,
+            descricao: `Tê PVC Ø${dn}mm (${label})`,
+            dnMm: dn,
+            quantidade: qty,
+            motivoPendencia: "sku_nao_catalogado",
+          });
+        }
+      }
+      if (family.indeterminate > 0) {
+        conexoesFishbonePendentesCount += family.indeterminate;
+        conexoesFisicasPendentes.push({
+          tipo,
+          descricao: `Tê ${label} (DN indeterminado — sizedSecondaries ausente)`,
+          dnMm: 0,
+          quantidade: family.indeterminate,
+          motivoPendencia: "dn_indeterminado",
+        });
+      }
+      return priced;
+    };
+
+    tesPrincipalSpineEntryCount = emitFishboneFamily(
+      fishbone.tesPrincipalSpineEntry,
+      "te_principal_spine_entry",
+      "derivação principal→entrada do sub-coletor",
+    );
+    juncoesSpineEntrySpineCount = emitFishboneFamily(
+      fishbone.juncoesSpineEntrySpine,
+      "juncao_spine_entry_spine",
+      "junção entrada→sub-coletor",
+    );
+    tesSpineRibCount = emitFishboneFamily(
+      fishbone.tesSpineRib,
+      "te_spine_rib",
+      "derivação sub-coletor→rib",
+    );
+  }
+
   // B. Curvas 90° e 45° na adutora
   if (input.centroid && adutoraCoords.length >= 3) {
     const adutoraBends = countAdutoraBends(adutoraCoords, input.centroid);
@@ -776,6 +864,10 @@ export function buildBOM(input: BOMInput): BOMResult {
       curvas90LateraisSemSkuCount,
       kitAspersorResolvCount,
       kitAspersorDnNaoHomologadoCount,
+      tesPrincipalSpineEntryCount,
+      juncoesSpineEntrySpineCount,
+      tesSpineRibCount,
+      conexoesFishbonePendentesCount,
     },
   };
 }
@@ -834,8 +926,17 @@ export function generateProposalDiagnostics(
   const physCols = bom.meta.nColunasLaterais;
   const nLaterais = bom.meta.nLaterais;
 
+  // TASK-054: tês fishbone (sub-coletor) usam os mesmos SKUs TES_DERIVACAO_LATERAL
+  // mas têm semântica e contadores próprios (meta.tes*Count) — excluídos aqui para
+  // preservar a semântica original de tees50Count (tês de derivação lateral, 1/coluna)
+  // e o heurístico tees50Source (comparação com physicalColumns).
   const totalTees = bom.itens
-    .filter((i) => i.categoria === "CONEXAO" && i.descricao.toLowerCase().startsWith("tê pvc lf"))
+    .filter(
+      (i) =>
+        i.categoria === "CONEXAO" &&
+        i.descricao.toLowerCase().startsWith("tê pvc lf") &&
+        !i.descricao.includes("sub-coletor"),
+    )
     .reduce((s, i) => s + i.quantidade, 0);
 
   const tees50Source: ProposalDiagnostics["tees50Source"] =

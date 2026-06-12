@@ -5,9 +5,10 @@
  * A resolução de SKU e a emissão de pendências são responsabilidade de bom.ts.
  *
  * Conexões detectadas:
- *   - countAdutoraBends     : dobras ≈ 90° e ≈ 45° na adutora
- *   - countSecondaryLBends  : curvas 90° em ramais com rota em L (coords.length === 3)
- *   - countSprinklerTees    : derivações aspersor→lateral (1 por aspersor, por DN da lateral)
+ *   - countAdutoraBends         : dobras ≈ 90° e ≈ 45° na adutora
+ *   - countSecondaryLBends      : curvas 90° em ramais com rota em L (coords.length === 3)
+ *   - countSprinklerTees        : derivações aspersor→lateral (1 por aspersor, por DN da lateral)
+ *   - countFishboneConnections  : conexões da topologia v12 espinha de peixe (TASK-054)
  *
  * Luvas: fora do escopo — nenhum critério de contagem definido, nenhum SKU catalogado.
  */
@@ -163,6 +164,105 @@ export function countSprinklerTees(physicalColumns: PhysicalColumn[]): Sprinkler
     byDnMm.set(dn, (byDnMm.get(dn) ?? 0) + col.sprinklerCount);
   }
   return { byDnMm };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-054 — Conexões da topologia v12 espinha de peixe (fishbone)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Conexões de uma família fishbone, agrupadas por DN. Mesmo shape de SecondaryLBends. */
+export interface FishboneConnectionFamily {
+  /** DN (mm) → quantidade de conexões com DN conhecido via sizedSecondaries. */
+  byDnMm: Map<number, number>;
+  /** Conexões cujo DN não pôde ser determinado (sizedSecondaries ausente ou id não mapeado). */
+  indeterminate: number;
+}
+
+/**
+ * Conexões físicas da topologia v12 espinha de peixe (TASK-053), por família.
+ *
+ * Modelo de contagem homologado no diagnóstico 2026-05-24 §266:
+ * "1 tê principal→spine_entry + N tês spine→ribs + 1 tê por coluna na lateral".
+ * A junção spine_entry→spine é precisão física adicional (surfaçada em família
+ * própria — o RT pode zerá-la na homologação).
+ *
+ * A conexão rib→lateral NÃO é contada aqui: corresponde 1:1 aos tês de derivação
+ * lateral já emitidos por bom.ts (1 por coluna física) — recontar duplicaria.
+ */
+export interface FishboneConnections {
+  /** Tê de derivação na principal — 1 por spine_entry. DN = DN do spine_entry. */
+  tesPrincipalSpineEntry: FishboneConnectionFamily;
+  /**
+   * Junção spine_entry→spine — 1 por spine_entry cujo spine pai é não-degenerado
+   * (lengthM ≥ MIN_SEG_LEN_M). Spine degenerado (setor de 1 coluna) não tem junção
+   * física distinta. DN = DN do spine pai.
+   */
+  juncoesSpineEntrySpine: FishboneConnectionFamily;
+  /** Tê de derivação no spine — 1 por rib. DN = DN do rib. */
+  tesSpineRib: FishboneConnectionFamily;
+}
+
+function addToFamily(family: FishboneConnectionFamily, dn: number | undefined): void {
+  if (dn === undefined) {
+    family.indeterminate++;
+  } else {
+    family.byDnMm.set(dn, (family.byDnMm.get(dn) ?? 0) + 1);
+  }
+}
+
+/**
+ * Conta as conexões físicas da topologia v12 espinha de peixe, agrupadas por DN.
+ *
+ * Contagem por topologia (`kind`), não por geometria angular — a construtibilidade
+ * angular é responsabilidade de detectNetworkAngleIssues (não duplicada aqui).
+ *
+ * Limitação documentada (sobre-contagem conservadora):
+ *   - Quando a junção cai na EXTREMIDADE do spine (ribs das colunas extremas;
+ *     spine_entry com mediana coincidindo com extremo), a peça física seria uma
+ *     curva 90° em vez de tê. Contamos tê (preço ≥ curva → BOM conservadora).
+ *   - Quando rib e spine_entry compartilham o mesmo X local, a peça física seria
+ *     uma cruzeta única; contamos 2 conexões (conservador).
+ * Refinamento por posição fica para task futura se o RT julgar relevante.
+ *
+ * Secundárias legadas (`kind === undefined`) são ignoradas — retorno vazio
+ * preserva o caminho legado byte-a-byte em bom.ts.
+ */
+export function countFishboneConnections(
+  secondaries: SecondaryPipe[],
+  sizedSecondaries: SizedSecondaryPipe[] | undefined,
+): FishboneConnections {
+  const result: FishboneConnections = {
+    tesPrincipalSpineEntry: { byDnMm: new Map(), indeterminate: 0 },
+    juncoesSpineEntrySpine: { byDnMm: new Map(), indeterminate: 0 },
+    tesSpineRib: { byDnMm: new Map(), indeterminate: 0 },
+  };
+
+  const dnById = new Map<string, number>();
+  if (sizedSecondaries) {
+    for (const s of sizedSecondaries) dnById.set(s.id, s.diametroMm);
+  }
+
+  const spineById = new Map<string, SecondaryPipe>();
+  for (const s of secondaries) {
+    if (s.kind === "spine") spineById.set(s.id, s);
+  }
+
+  for (const sec of secondaries) {
+    if (sec.kind === "spine_entry") {
+      addToFamily(result.tesPrincipalSpineEntry, dnById.get(sec.id));
+
+      const spine = sec.parentSpineId ? spineById.get(sec.parentSpineId) : undefined;
+      if (spine && spine.lengthM >= MIN_SEG_LEN_M) {
+        addToFamily(result.juncoesSpineEntrySpine, dnById.get(spine.id));
+      }
+    } else if (sec.kind === "rib") {
+      addToFamily(result.tesSpineRib, dnById.get(sec.id));
+    }
+    // kind === "spine" → estrutural, junções contadas a partir de entry/ribs
+    // kind === undefined → legado, fora do escopo fishbone
+  }
+
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

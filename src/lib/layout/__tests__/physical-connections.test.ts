@@ -11,6 +11,7 @@
 import { describe, it, expect } from "vitest";
 import {
   countAdutoraBends,
+  countFishboneConnections,
   countSecondaryLBends,
   countSprinklerTees,
 } from "@/lib/layout/physical-connections";
@@ -431,5 +432,230 @@ describe("T22-m..p — buildBOM integração", () => {
     );
     expect(curvaRamal).toBeUndefined();
     expect(bom.meta.curvas90RamaisLCount).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-054 — countFishboneConnections + integração buildBOM (topologia v12)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeFishboneSet(
+  sectorId: number,
+  nRibs: number,
+  opts: { spineLengthM?: number } = {},
+): { spine: SecondaryPipe; spineEntry: SecondaryPipe; ribs: SecondaryPipe[] } {
+  const spineId = `spine-s${sectorId}`;
+  const pt: [number, number] = [CENTROID.lng, CENTROID.lat];
+  const pt2: [number, number] = [CENTROID.lng + 0.0002, CENTROID.lat];
+  const spine: SecondaryPipe = {
+    id: spineId,
+    physicalColumnId: "",
+    physicalColumnIds: [],
+    kind: "spine",
+    sectorId,
+    fromCoord: pt,
+    toCoord: pt2,
+    coords: [pt, pt2],
+    lengthM: opts.spineLengthM ?? 24,
+    source: "auto",
+  };
+  const spineEntry: SecondaryPipe = {
+    id: `spine-entry-s${sectorId}`,
+    physicalColumnId: "",
+    physicalColumnIds: [],
+    kind: "spine_entry",
+    parentSpineId: spineId,
+    sectorId,
+    fromCoord: pt,
+    toCoord: pt2,
+    coords: [pt, pt2],
+    lengthM: 6,
+    source: "auto",
+  };
+  const ribs: SecondaryPipe[] = Array.from({ length: nRibs }, (_, i) => ({
+    id: `rib-s${sectorId}-col-${i}`,
+    physicalColumnId: `col-s${sectorId}-${i}`,
+    physicalColumnIds: [`col-s${sectorId}-${i}`],
+    kind: "rib" as const,
+    parentSpineId: spineId,
+    sectorId,
+    fromCoord: pt,
+    toCoord: pt2,
+    coords: [pt, pt2],
+    lengthM: 3,
+    source: "auto",
+  }));
+  return { spine, spineEntry, ribs };
+}
+
+describe("T54-1..6 — countFishboneConnections (unidade pura)", () => {
+  it("T54-1: 1 setor com 3 ribs → 1 tê principal→entry (DN75) + 1 junção entry→spine (DN75) + 3 tês spine→rib (DN50)", () => {
+    const { spine, spineEntry, ribs } = makeFishboneSet(1, 3);
+    const secondaries = [spine, spineEntry, ...ribs];
+    const sized = [
+      makeSizedSec(spine, 75),
+      makeSizedSec(spineEntry, 75),
+      ...ribs.map((r) => makeSizedSec(r, 50)),
+    ];
+    const fish = countFishboneConnections(secondaries, sized);
+    expect(fish.tesPrincipalSpineEntry.byDnMm.get(75)).toBe(1);
+    expect(fish.tesPrincipalSpineEntry.indeterminate).toBe(0);
+    expect(fish.juncoesSpineEntrySpine.byDnMm.get(75)).toBe(1);
+    expect(fish.juncoesSpineEntrySpine.indeterminate).toBe(0);
+    expect(fish.tesSpineRib.byDnMm.get(50)).toBe(3);
+    expect(fish.tesSpineRib.indeterminate).toBe(0);
+  });
+
+  it("T54-2: 2 setores com DNs distintos → agregação por DN e por família", () => {
+    const s1 = makeFishboneSet(1, 2);
+    const s2 = makeFishboneSet(2, 3);
+    const secondaries = [s1.spine, s1.spineEntry, ...s1.ribs, s2.spine, s2.spineEntry, ...s2.ribs];
+    const sized = [
+      makeSizedSec(s1.spine, 75), makeSizedSec(s1.spineEntry, 75),
+      ...s1.ribs.map((r) => makeSizedSec(r, 50)),
+      makeSizedSec(s2.spine, 100), makeSizedSec(s2.spineEntry, 100),
+      ...s2.ribs.map((r) => makeSizedSec(r, 50)),
+    ];
+    const fish = countFishboneConnections(secondaries, sized);
+    expect(fish.tesPrincipalSpineEntry.byDnMm.get(75)).toBe(1);
+    expect(fish.tesPrincipalSpineEntry.byDnMm.get(100)).toBe(1);
+    expect(fish.juncoesSpineEntrySpine.byDnMm.get(75)).toBe(1);
+    expect(fish.juncoesSpineEntrySpine.byDnMm.get(100)).toBe(1);
+    expect(fish.tesSpineRib.byDnMm.get(50)).toBe(5);
+  });
+
+  it("T54-5: sizedSecondaries ausente → tudo em indeterminate, sem crash", () => {
+    const { spine, spineEntry, ribs } = makeFishboneSet(1, 3);
+    const fish = countFishboneConnections([spine, spineEntry, ...ribs], undefined);
+    expect(fish.tesPrincipalSpineEntry.indeterminate).toBe(1);
+    expect(fish.juncoesSpineEntrySpine.indeterminate).toBe(1);
+    expect(fish.tesSpineRib.indeterminate).toBe(3);
+    expect(fish.tesPrincipalSpineEntry.byDnMm.size).toBe(0);
+  });
+
+  it("T54-6: spine degenerado (lengthM = 0, setor de 1 coluna) → 0 junções entry→spine", () => {
+    const { spine, spineEntry, ribs } = makeFishboneSet(1, 1, { spineLengthM: 0 });
+    const sized = [makeSizedSec(spine, 75), makeSizedSec(spineEntry, 75), makeSizedSec(ribs[0], 50)];
+    const fish = countFishboneConnections([spine, spineEntry, ...ribs], sized);
+    expect(fish.juncoesSpineEntrySpine.byDnMm.size).toBe(0);
+    expect(fish.juncoesSpineEntrySpine.indeterminate).toBe(0);
+    // tê na principal e tê do rib continuam contados
+    expect(fish.tesPrincipalSpineEntry.byDnMm.get(75)).toBe(1);
+    expect(fish.tesSpineRib.byDnMm.get(50)).toBe(1);
+  });
+
+  it("T54-leg: secundárias legadas (kind undefined) → famílias vazias", () => {
+    const legacy = [makeStraight("sec-1", "col-1"), makeLShape("sec-2", "col-2")];
+    const fish = countFishboneConnections(legacy, [makeSizedSec(legacy[0], 50)]);
+    expect(fish.tesPrincipalSpineEntry.byDnMm.size).toBe(0);
+    expect(fish.tesPrincipalSpineEntry.indeterminate).toBe(0);
+    expect(fish.juncoesSpineEntrySpine.byDnMm.size).toBe(0);
+    expect(fish.tesSpineRib.byDnMm.size).toBe(0);
+  });
+});
+
+describe("T54-3..9 — buildBOM integração fishbone", () => {
+  function fishboneInput(dnEntry: number, dnSpine: number, dnRib: number) {
+    const { spine, spineEntry, ribs } = makeFishboneSet(1, 3);
+    const secondaries = [spine, spineEntry, ...ribs];
+    const sizedSecondaries = [
+      makeSizedSec(spine, dnSpine),
+      makeSizedSec(spineEntry, dnEntry),
+      ...ribs.map((r) => makeSizedSec(r, dnRib)),
+    ];
+    return makeMinimalBOMInput({ secondaries, sizedSecondaries });
+  }
+
+  it("T54-3a: DN com SKU (75/75/50) → itens CONEXAO precificados por família", () => {
+    const bom = buildBOM(fishboneInput(75, 75, 50));
+    const tePrincipal = bom.itens.find(
+      (i) => i.sku === "TIGRE_TE_75_LF" && i.descricao.includes("principal→entrada"),
+    );
+    expect(tePrincipal?.quantidade).toBe(1);
+    const juncao = bom.itens.find(
+      (i) => i.sku === "TIGRE_TE_75_LF" && i.descricao.includes("junção entrada→sub-coletor"),
+    );
+    expect(juncao?.quantidade).toBe(1);
+    const teRib = bom.itens.find(
+      (i) => i.sku === "TIGRE_TE_50_LF" && i.descricao.includes("sub-coletor→rib"),
+    );
+    expect(teRib?.quantidade).toBe(3);
+    expect(bom.meta.tesPrincipalSpineEntryCount).toBe(1);
+    expect(bom.meta.juncoesSpineEntrySpineCount).toBe(1);
+    expect(bom.meta.tesSpineRibCount).toBe(3);
+    expect(bom.meta.conexoesFishbonePendentesCount).toBe(0);
+  });
+
+  it("T54-3b: DN sem SKU exato (ribs DN32) → pendência sku_nao_catalogado, sem fallback silencioso", () => {
+    const bom = buildBOM(fishboneInput(75, 75, 32));
+    const pend = bom.meta.conexoesFisicasPendentes.filter((c) => c.tipo === "te_spine_rib");
+    expect(pend).toHaveLength(1);
+    expect(pend[0].dnMm).toBe(32);
+    expect(pend[0].quantidade).toBe(3);
+    expect(pend[0].motivoPendencia).toBe("sku_nao_catalogado");
+    expect(bom.meta.tesSpineRibCount).toBe(0);
+    expect(bom.meta.conexoesFishbonePendentesCount).toBe(3);
+    // nenhum item precificado com SKU de outro DN para os ribs
+    const ribItems = bom.itens.filter((i) => i.descricao.includes("sub-coletor→rib"));
+    expect(ribItems).toHaveLength(0);
+  });
+
+  it("T54-4: regressão legado — secundárias sem kind → zero conexões fishbone", () => {
+    const legacy = [makeStraight("sec-1", "col-1")];
+    const bom = buildBOM(makeMinimalBOMInput({
+      secondaries: legacy,
+      sizedSecondaries: [makeSizedSec(legacy[0], 50)],
+    }));
+    expect(bom.meta.tesPrincipalSpineEntryCount).toBe(0);
+    expect(bom.meta.juncoesSpineEntrySpineCount).toBe(0);
+    expect(bom.meta.tesSpineRibCount).toBe(0);
+    expect(bom.meta.conexoesFishbonePendentesCount).toBe(0);
+    expect(bom.meta.conexoesFisicasPendentes.some((c) =>
+      c.tipo === "te_principal_spine_entry" ||
+      c.tipo === "juncao_spine_entry_spine" ||
+      c.tipo === "te_spine_rib",
+    )).toBe(false);
+    expect(bom.itens.some((i) => i.descricao.includes("sub-coletor"))).toBe(false);
+  });
+
+  it("T54-5b: fishbone sem sizedSecondaries → pendências dn_indeterminado, sem crash", () => {
+    const { spine, spineEntry, ribs } = makeFishboneSet(1, 2);
+    const bom = buildBOM(makeMinimalBOMInput({
+      secondaries: [spine, spineEntry, ...ribs],
+      sizedSecondaries: undefined,
+    }));
+    const pend = bom.meta.conexoesFisicasPendentes.filter((c) =>
+      c.motivoPendencia === "dn_indeterminado" &&
+      (c.tipo === "te_principal_spine_entry" || c.tipo === "juncao_spine_entry_spine" || c.tipo === "te_spine_rib"),
+    );
+    // 1 entry + 1 junção + 2 ribs = 3 entradas de pendência (famílias), 4 conexões
+    expect(pend.reduce((s, c) => s + c.quantidade, 0)).toBe(4);
+    expect(bom.meta.conexoesFishbonePendentesCount).toBe(4);
+  });
+
+  it("T54-7: consistência — precificados + pendentes = total de conexões fishbone", () => {
+    const bom = buildBOM(fishboneInput(75, 75, 32));
+    // total fishbone = 1 (entry) + 1 (junção) + 3 (ribs) = 5
+    const priced =
+      bom.meta.tesPrincipalSpineEntryCount +
+      bom.meta.juncoesSpineEntrySpineCount +
+      bom.meta.tesSpineRibCount;
+    expect(priced + bom.meta.conexoesFishbonePendentesCount).toBe(5);
+  });
+
+  it("T54-8: sem dupla contagem — fishbone não dispara L-bends nem altera tês de derivação lateral", () => {
+    const input = fishboneInput(75, 75, 50);
+    const bom = buildBOM(input);
+    expect(bom.meta.curvas90RamaisLCount).toBe(0);
+    // tês de derivação lateral continuam 1 por coluna física (independente do fishbone)
+    const nCols = input.physicalColumns.length;
+    expect(bom.meta.nTes).toBeGreaterThanOrEqual(1);
+    expect(nCols).toBeGreaterThan(0);
+  });
+
+  it("T54-9: pendência fishbone alimenta blocker 'BOM incompleta' nos diagnósticos", () => {
+    const bom = buildBOM(fishboneInput(75, 75, 32));
+    const diag = generateProposalDiagnostics(makeMinimalLayout(), bom);
+    expect(diag.blockers.some((b) => b.includes("BOM incompleta"))).toBe(true);
   });
 });

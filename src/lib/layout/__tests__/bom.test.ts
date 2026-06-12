@@ -738,7 +738,9 @@ describe("Teste 10 — Tê: origem physicalCols (não generateLaterais)", () => 
 
   it("soma total de Tês na BOM = nColunasLaterais (physicalCols), não nLaterais", () => {
     const totalTees = bom.itens
-      .filter((i) => i.categoria === "CONEXAO" && i.descricao.toLowerCase().startsWith("tê pvc lf"))
+      .filter((i) => i.categoria === "CONEXAO" && i.descricao.toLowerCase().startsWith("tê pvc lf")
+        // TASK-054: tês fishbone (sub-coletor) têm contadores próprios — fora da invariante "1 tê de derivação lateral por coluna"
+        && !i.descricao.includes("sub-coletor"))
       .reduce((s, i) => s + i.quantidade, 0);
     expect(totalTees).toBe(bom.meta.nColunasLaterais);
     expect(totalTees).not.toBe(bom.meta.nLaterais);

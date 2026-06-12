@@ -209,7 +209,9 @@ describe("Suite 4 — physicalColumns é a fonte da BOM de tubos e Tês", () => 
 
   it("soma total de Tês na BOM = nColunasLaterais = COLS", () => {
     const totalTees = bom.itens
-      .filter((i) => i.categoria === "CONEXAO" && i.descricao.toLowerCase().startsWith("tê pvc lf"))
+      .filter((i) => i.categoria === "CONEXAO" && i.descricao.toLowerCase().startsWith("tê pvc lf")
+        // TASK-054: tês fishbone (sub-coletor) têm contadores próprios — fora da invariante "1 tê de derivação lateral por coluna"
+        && !i.descricao.includes("sub-coletor"))
       .reduce((s, i) => s + i.quantidade, 0);
     expect(totalTees).toBe(COLS);
   });
@@ -433,7 +435,9 @@ describe("Suite 8 — Tês e tubos vêm de physicalColumns mesmo com splitting i
 
   const bom = calculateIrrigationProject(layout).bom!;
   const totalTees = bom.itens
-    .filter((i) => i.categoria === "CONEXAO" && i.descricao.toLowerCase().startsWith("tê pvc lf"))
+    .filter((i) => i.categoria === "CONEXAO" && i.descricao.toLowerCase().startsWith("tê pvc lf")
+        // TASK-054: tês fishbone (sub-coletor) têm contadores próprios — fora da invariante "1 tê de derivação lateral por coluna"
+        && !i.descricao.includes("sub-coletor"))
     .reduce((s, i) => s + i.quantidade, 0);
 
   it("total de Tês = nColunasLaterais = COLS (não SECTORS nem mais)", () => {

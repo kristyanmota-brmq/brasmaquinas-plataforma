@@ -293,6 +293,10 @@ function makeMinimalBOM(): BOMResult {
       curvas90LateraisSemSkuCount: 0,
       kitAspersorResolvCount: 0,
       kitAspersorDnNaoHomologadoCount: 0,
+      tesPrincipalSpineEntryCount: 0,
+      juncoesSpineEntrySpineCount: 0,
+      tesSpineRibCount: 0,
+      conexoesFishbonePendentesCount: 0,
     },
   };
 }
