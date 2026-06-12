@@ -59,24 +59,28 @@ export function selectDiameter(
   const ordenados = [...candidatos].sort((a, b) => a.diametroMm - b.diametroMm);
   const limitePerda = pressaoReferenciaMca * maxPerdaPercentual;
 
+  // TASK-058 (ADR-002): cálculos HW e de velocidade usam o diâmetro INTERNO real
+  // quando disponível. Usar o nominal subestima hf em ~(Dn/Di)^4,871 (≈47% em DN50).
   for (const tubo of ordenados) {
-    const hf = headLoss(vazaoM3h, comprimentoM, tubo.diametroMm, tubo.coefC);
+    const dInternoMm = tubo.diametroInternoMm ?? tubo.diametroMm;
+    const hf = headLoss(vazaoM3h, comprimentoM, dInternoMm, tubo.coefC);
     if (hf <= limitePerda) {
       return {
         tubo,
         perdaCargaM: hf,
-        velocidadeMs: velocity(vazaoM3h, tubo.diametroMm),
+        velocidadeMs: velocity(vazaoM3h, dInternoMm),
         perdaCargaPercentual: hf / pressaoReferenciaMca,
       };
     }
   }
 
   const maior = ordenados[ordenados.length - 1];
-  const hf = headLoss(vazaoM3h, comprimentoM, maior.diametroMm, maior.coefC);
+  const dInternoMaiorMm = maior.diametroInternoMm ?? maior.diametroMm;
+  const hf = headLoss(vazaoM3h, comprimentoM, dInternoMaiorMm, maior.coefC);
   return {
     tubo: maior,
     perdaCargaM: hf,
-    velocidadeMs: velocity(vazaoM3h, maior.diametroMm),
+    velocidadeMs: velocity(vazaoM3h, dInternoMaiorMm),
     perdaCargaPercentual: hf / pressaoReferenciaMca,
   };
 }

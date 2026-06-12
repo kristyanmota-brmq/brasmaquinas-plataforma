@@ -1750,6 +1750,60 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
           )}
         </div>
 
+        {/* ── Feedback do gate de PDF (TASK-058) ──────────────────────────────
+            Renderizado SEMPRE que o último attempt de PDF retornou 422,
+            independente da partição rt-pending/data-block abaixo. Antes, este
+            feedback ficava aninhado no painel data-block — quando todos os
+            blockers eram rt-pending, o 422 não produzia nenhum feedback
+            visível (regressão B-05/W-08 identificada no diagnóstico
+            2026-06-11). ──────────────────────────────────────────────────── */}
+        {pdfError?.kind === "blocked" && (
+          <div className="mb-5 bg-red-50 border border-red-300 rounded-md p-3">
+            <p className="text-[11px] font-semibold text-red-700 uppercase tracking-[0.08em] mb-1">
+              PDF bloqueado pela governança
+            </p>
+            <p className="text-[10px] text-red-600/80 mb-1 leading-snug">
+              A proposta não foi gerada: há {pdfError.blockers.length} pendência(s) ativa(s).
+              Resolva os itens listados nos painéis abaixo antes de emitir.
+            </p>
+            {pdfError.invalidHydraulicSegments.length > 0 && (
+              <div className="mt-2 border-t border-red-200 pt-2">
+                <p className="text-[11px] font-semibold text-red-700 mb-1.5">
+                  Segmentos inválidos ({pdfError.invalidHydraulicSegments.length}
+                  {pdfError.invalidHydraulicSegments.length > 3 ? " — exibindo 3 primeiros" : ""}):
+                </p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {pdfError.invalidHydraulicSegments.slice(0, 3).map((seg) => (
+                    <div key={seg.id} className="bg-red-100 rounded p-1.5 font-mono text-[10px] leading-snug">
+                      <div className="font-sans font-semibold text-[10px] mb-0.5 text-red-800">
+                        {seg.type} · {REJECTION_REASON_LABEL[seg.rejectionReason] ?? seg.rejectionReason}
+                      </div>
+                      <div>
+                        DN {seg.diameterNominalMm}mm
+                        {seg.internalDiameterMm != null && ` (Øint ${seg.internalDiameterMm}mm)`}
+                        {" · "}Q {seg.flowM3h.toFixed(1)} m³/h
+                      </div>
+                      <div>
+                        v {seg.velocityMs.toFixed(2)} m/s{" > lim "}{seg.maxVelocityMs.toFixed(1)} m/s
+                      </div>
+                      <div>
+                        hf {seg.headLossMca.toFixed(2)} mca
+                        {seg.maxHeadLossMca != null && ` > lim ${seg.maxHeadLossMca.toFixed(1)} mca`}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => setPdfError(null)}
+              className="mt-2 text-[10px] text-red-400 hover:text-red-600"
+            >
+              Dispensar
+            </button>
+          </div>
+        )}
+
         {/* ── Blockers (B-05 + W-08: separados por categoria) ─────────────────
             Particiona blockers em (a) rt-pending — aguarda decisão técnica
             (RT/engenheiro) e (b) data-block — erro corrigível pelo projetista.
@@ -1779,42 +1833,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                       </li>
                     ))}
                   </ul>
-                  {/* Detalhes de segmentos inválidos do último attempt de PDF */}
-                  {pdfError?.kind === "blocked" && pdfError.invalidHydraulicSegments.length > 0 && (
-                    <div className="mt-2 border-t border-red-200 pt-2">
-                      <p className="text-[11px] font-semibold text-red-700 mb-1.5">
-                        Segmentos inválidos ({pdfError.invalidHydraulicSegments.length}
-                        {pdfError.invalidHydraulicSegments.length > 3 ? " — exibindo 3 primeiros" : ""}):
-                      </p>
-                      <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                        {pdfError.invalidHydraulicSegments.slice(0, 3).map((seg) => (
-                          <div key={seg.id} className="bg-red-100 rounded p-1.5 font-mono text-[10px] leading-snug">
-                            <div className="font-sans font-semibold text-[10px] mb-0.5 text-red-800">
-                              {seg.type} · {REJECTION_REASON_LABEL[seg.rejectionReason] ?? seg.rejectionReason}
-                            </div>
-                            <div>
-                              DN {seg.diameterNominalMm}mm
-                              {seg.internalDiameterMm != null && ` (Øint ${seg.internalDiameterMm}mm)`}
-                              {" · "}Q {seg.flowM3h.toFixed(1)} m³/h
-                            </div>
-                            <div>
-                              v {seg.velocityMs.toFixed(2)} m/s{" > lim "}{seg.maxVelocityMs.toFixed(1)} m/s
-                            </div>
-                            <div>
-                              hf {seg.headLossMca.toFixed(2)} mca
-                              {seg.maxHeadLossMca != null && ` > lim ${seg.maxHeadLossMca.toFixed(1)} mca`}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        onClick={() => setPdfError(null)}
-                        className="mt-2 text-[10px] text-red-400 hover:text-red-600"
-                      >
-                        Dispensar detalhes
-                      </button>
-                    </div>
-                  )}
+                  {/* Detalhes de segmentos inválidos do PDF: movidos para o banner
+                      "PDF bloqueado pela governança" acima (TASK-058) — renderiza
+                      mesmo quando este painel data-block está vazio. */}
                 </div>
               )}
               {rtPending.length > 0 && (

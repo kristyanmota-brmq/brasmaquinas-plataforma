@@ -383,3 +383,34 @@ describe("Teste 6 — Regressão caso real: ~6 ha, ~420 asp., 12 m, 14 setores",
     expect(positions.length).toBeLessThan(COLS * ROWS * 1.25);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-058 — selectDiameter usa diâmetro INTERNO (ADR-002)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("T58 — selectDiameter com diâmetro interno (ADR-002)", () => {
+  it("T58-1: hf calculado com Øint, não nominal — tubo de parede grossa perde mais carga", () => {
+    // Dois candidatos com MESMO nominal mas internos diferentes não existem no
+    // catálogo real; valida-se via hf absoluto: para DN50 LF (interno 46 mm),
+    // hf deve corresponder a HW com 46 mm (maior que com 50 mm nominal).
+    const dn50 = catalogoLF.find((t) => t.diametroMm === 50)!;
+    const resultado = selectDiameter(3, 100, pressaoServico, [dn50]);
+    const hfInterno = 10.67 * Math.pow(3 / 3600, 1.852) * 100 /
+      (Math.pow(dn50.coefC, 1.852) * Math.pow((dn50.diametroInternoMm ?? 50) / 1000, 4.871));
+    expect(resultado.perdaCargaM).toBeCloseTo(hfInterno, 6);
+    const hfNominal = 10.67 * Math.pow(3 / 3600, 1.852) * 100 /
+      (Math.pow(dn50.coefC, 1.852) * Math.pow(50 / 1000, 4.871));
+    expect(resultado.perdaCargaM).toBeGreaterThan(hfNominal);
+  });
+
+  it("T58-2: fallback para nominal quando diametroInternoMm ausente", () => {
+    const semInterno: TuboCandidato = {
+      sku: "T58_FAKE_50", diametroMm: 50, pressaoMca: 40,
+      custo: 0, precoVenda: 0, coefC: 145,
+    };
+    const resultado = selectDiameter(3, 100, pressaoServico, [semInterno]);
+    const hfNominal = 10.67 * Math.pow(3 / 3600, 1.852) * 100 /
+      (Math.pow(145, 1.852) * Math.pow(50 / 1000, 4.871));
+    expect(resultado.perdaCargaM).toBeCloseTo(hfNominal, 6);
+  });
+});

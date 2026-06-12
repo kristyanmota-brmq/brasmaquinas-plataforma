@@ -1,7 +1,7 @@
 # Backlog — Brasmáquinas Plataforma
 
 Última atualização: 2026-06-11
-Testes na base: **951/951** vitest · TypeScript: 0 erros · **37/37 testes tooling** · Branch `main` sincronizada com `origin/main`. **2026-06-11:** (a) branch noturna `experiment/nightly-epic-run-2026-05-25` validada via `/revisar` (APROVADO) e incorporada em bloco via merge `--no-ff` (`a1a875e`, autorização "valide antes do merge") — 9 fixes do diagnóstico 2026-05-24 + 52 testes (887 → 939); (b) **TASK-054 concluída** (BOM kind-aware para topologia fishbone v12 — resolve B-02; 939 → 951; relatório `docs/relatorios/2026-06-11-TASK-054.md`; premissa nova "Modelo de contagem de conexões fishbone" em `12-premissas-...md` com status PENDENTE_REVISAO_RT). TOOL-006B publicada anteriormente em `82d92dc`. Blocker TECH-053-01 preservado ATIVO; emissão comercial bloqueada por default. Histórico do header anterior (2026-05-24, TOOL-006A/B): ver git blame.
+Testes na base: **953/953** vitest · TypeScript: 0 erros · **37/37 testes tooling** · Branch `main` sincronizada com `origin/main`. **2026-06-11:** (a) branch noturna `experiment/nightly-epic-run-2026-05-25` validada via `/revisar` (APROVADO) e incorporada em bloco via merge `--no-ff` (`a1a875e`, autorização "valide antes do merge") — 9 fixes do diagnóstico 2026-05-24 + 52 testes (887 → 939); (b) **TASK-054 concluída** (BOM kind-aware para topologia fishbone v12 — resolve B-02; 939 → 951; relatório `docs/relatorios/2026-06-11-TASK-054.md`; premissa nova "Modelo de contagem de conexões fishbone" em `12-premissas-...md` com status PENDENTE_REVISAO_RT); (c) **diagnóstico especialista em irrigação** (auditoria visual via Chrome no projeto Fazenda do Paulo + subagent metodológico — 6 críticas ranqueadas em `docs/relatorios/2026-06-11-diagnostico-especialista-irrigacao.md`); (d) **TASK-058 concluída** (fixes #1 e #2 do diagnóstico: `selectDiameter` ADR-002 nominal→interno + banner "PDF bloqueado pela governança" independente da partição rt-pending/data-block; 951 → 953; verificação visual em browser real). TOOL-006B publicada anteriormente em `82d92dc`. Blocker TECH-053-01 preservado ATIVO; emissão comercial bloqueada por default. Histórico do header anterior (2026-05-24, TOOL-006A/B): ver git blame.
 
 <details><summary>Header anterior (2026-05-24)</summary>
 
@@ -190,6 +190,21 @@ Testes na base: **887/887** vitest · TypeScript: 0 erros · **37/37 testes tool
 **Autorização:** plano aprovado por delegação explícita do usuário ("vc decide") registrada no chat de 2026-06-11
 
 > Resolve o **B-02** ("BOM imprecisa para topologia sempre-sub-coletor" — caminho crítico para destravar emissão comercial, diagnóstico 2026-05-24 §238). `bom.ts` não referenciava `kind` em nenhuma linha — as conexões da espinha v12 eram invisíveis à BOM. Nova função pura `countFishboneConnections()` em [`physical-connections.ts`](../src/lib/layout/physical-connections.ts) (Camada A, padrão TASK-022): 3 famílias por DN — tê principal→spine_entry (1 por spine_entry), junção spine_entry→spine (1 por spine_entry com spine não-degenerado ≥ 0,01 m), tê spine→rib (1 por rib) — modelo de contagem do diagnóstico §266 com junção adicional surfaçada em família própria (RT pode zerar). Conexão rib→lateral NÃO recontada (corresponde 1:1 aos tês de derivação lateral existentes). Em `bom.ts`: bloco A2 emite itens `CONEXAO` por DN **exato** em `TES_DERIVACAO_LATERAL` ou pendência `sku_nao_catalogado`/`dn_indeterminado` — **sem fallback silencioso de DN**; union `BOMPendingConnection.tipo` +3; `meta` +4 contadores; `totalTees` dos diagnósticos exclui fishbone (preserva semântica `tees50Count`/`tees50Source`). Caminho legado (`kind: undefined`) byte-idêntico (T54-4/T54-leg). Pendências fishbone alimentam o blocker "BOM incompleta" existente (T54-9) — **nenhum blocker relaxado**. Sanidade: fixture 5 colunas/1 setor passa de 5 para 12 conexões de derivação (a subcontagem de ~7 peças/setor era o B-02). Contagem conservadora documentada (tê em extremidade ≥ curva; cruzeta contada como 2) — refinamento é decisão RT. 12 testes novos T54 em `physical-connections.test.ts`. Premissa nova "Modelo de contagem de conexões fishbone" registrada `PENDENTE_REVISAO_RT_BRASMAQUINAS`.
+
+---
+
+### TASK-058 — Correções cirúrgicas do diagnóstico especialista (ADR-002 + feedback PDF 422)
+
+**Status:** `concluída`
+**Prioridade:** P1-crítico
+**Classe:** A — hidráulica (lib pura) + UI (apresentação)
+**Área:** hidráulica / ui
+**Arquivo:** `tasks/TASK-058-fixes-diagnostico-especialista.md`
+**Concluída em:** 2026-06-11 · **953/953 testes vitest** (+2 T58) · 0 erros tsc · 37/37 testes tooling
+**Relatório:** `docs/relatorios/2026-06-11-TASK-058.md`
+**Predecessor:** diagnóstico especialista `docs/relatorios/2026-06-11-diagnostico-especialista-irrigacao.md`
+
+> Implementa as prioridades #1 e #2 do diagnóstico especialista de 2026-06-11. **Fix 1 (ADR-002):** `selectDiameter` em `hazenWilliams.ts` usava diâmetro nominal nos cálculos HW/velocidade (hf subestimado em ≈47% no DN50); agora `diametroInternoMm ?? diametroMm` nos 4 pontos. Violação latente — API pública sem consumidor de produção (`selectTubo` já correto). **Fix 2 (UX/governança):** com blockers exclusivamente rt-pending, o clique no PDF retornava 422 sem NENHUM feedback visível (regressão B-05/W-08 — painel aninhado no bloco data-block); novo banner "PDF bloqueado pela governança" independente da partição, com detalhes de segmentos inválidos migrados. Verificado ao vivo via Chrome (Fazenda do Paulo: 422 → banner visível). Críticas #3-#6 do diagnóstico (motor A0/A2/A3 no fluxo de traçado, agronomia, catálogo PN80/custos, setorização por demanda) permanecem abertas aguardando decisão RT/produto.
 
 ---
 
