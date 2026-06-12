@@ -24,6 +24,7 @@ import {
 } from "@/lib/layout/sprinkler-grid-optimizer";
 import { candidateToSprinklers } from "@/lib/layout/optimizer-integration";
 import { selectBombaAutomatica } from "@/lib/layout/pump-auto-select";
+import { tuneSectorizationForValidArchitecture } from "@/lib/layout/architecture-auto-tune";
 import {
   MousePointer2,
   Hexagon,
@@ -184,6 +185,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
   // TASK-061: resultado da seleção arquitetural A0/A2/A3 do último traçado auto
   // (transparência — null quando o traçado é manual ou ainda não gerado).
   const [archSelection, setArchSelection] = useState<ArchitectureSelectionResult | null>(null);
+  // TASK-078: nota do ajuste automático de setorização (decisão do projetista)
+  const [autoTuneNote, setAutoTuneNote] = useState<string | null>(null);
+  const autoTuneTriedRef = useRef<string | null>(null);
   // TASK-064: aspersor do projeto — pré-seleção antes da malha existir; depois,
   // a fonte de verdade é layout.sprinklers.aspersorId. Fallback: 5022 (padrão).
   const [aspersorSkuSelecionado, setAspersorSkuSelecionado] = useState<string>(
@@ -324,6 +328,61 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
       projectResult.operational?.operationalSegments,
     );
     setArchSelection(architectureSelection);
+
+    // TASK-078 — decisão do projetista automatizada: se NENHUM candidato de
+    // arquitetura valida (vazão/setor acima do que o maior sub-coletor comporta),
+    // re-setoriza com o MENOR aumento de setores que viabiliza a rede e aplica
+    // o vencedor re-avaliado. Nenhum gate é relaxado — apenas re-avaliação
+    // pelos mesmos critérios homologados. Guard evita re-tentativa em loop.
+    const officialSecsBad = (projectResult.hydraulics?.sizedSecondaries ?? []).some(
+      (x) => x.status !== "ok",
+    );
+    const tuneHmt = projectResult.hydraulics?.hmt.totalHMT;
+    const pumpGap =
+      !layout.pump &&
+      tuneHmt != null &&
+      layout.sectorization != null &&
+      selectBombaAutomatica(
+        BOMBAS_HOMOLOGADAS,
+        layout.sectorization.vazaoPorSetorM3PorHora,
+        tuneHmt,
+      ) == null;
+    if (
+      (architectureSelection?.decision === "no_valid_candidate" || officialSecsBad || pumpGap) &&
+      layout.sectorization
+    ) {
+      const tuneKey = `${layout.sprinklers?.positions.length ?? 0}:${layout.sectorization.setoresCount}`;
+      if (autoTuneTriedRef.current !== tuneKey) {
+        autoTuneTriedRef.current = tuneKey;
+        const tuned = tuneSectorizationForValidArchitecture(layout);
+        if (tuned) {
+          const w = tuned.selection.winnerCandidate;
+          const elevStart = queryElevation(w.principal[0][0], w.principal[0][1]);
+          const elevEnd = queryElevation(
+            w.principal[w.principal.length - 1][0],
+            w.principal[w.principal.length - 1][1],
+          );
+          setAutoTuneNote(
+            `Setorização ajustada automaticamente: ${tuned.setoresCountOriginal} → ${tuned.setoresCount} setores ` +
+            `(${tuned.sectorization.vazaoPorSetorM3PorHora.toFixed(0)} m³/h por setor) para a rede caber nos limites ` +
+            `hidráulicos. Arquitetura ${tuned.selection.winner} validada.` +
+            (tuned.bombaSugerida ? ` Bomba: ${tuned.bombaSugerida.modelo}.` : "") +
+            ` Ajuste manual em Configurações.`,
+          );
+          setArchSelection(tuned.selection);
+          const bombaT = tuned.bombaSugerida;
+          setLayout((l) => ({
+            ...l,
+            sectorization: tuned.sectorization,
+            mainPipeline: buildMainPipelineUpdate(w.principal, w.adutora, w.principalLengthM, elevStart, elevEnd),
+            ...(bombaT
+              ? { pump: { hmtMca: bombaT.hmtMca, vazaoMaxM3h: bombaT.vazaoMaxM3h, modelo: bombaT.modelo } }
+              : {}),
+          }));
+          return;
+        }
+      }
+    }
 
     // Adutora conecta sempre ao endpoint mais próximo da captação (nearest, via principal.ts).
     // O desnível é registrado em elevationDeltaM para dimensionamento da bomba — não muda o traçado.
@@ -2017,6 +2076,23 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
               ))}
             </ul>
           </details>
+        )}
+
+        {/* ── TASK-078: nota do ajuste automático do projetista ── */}
+        {autoTuneNote && (
+          <div className="mb-5 bg-brand-50 border border-brand-100 border-l-4 border-l-brand rounded-md p-3">
+            <p className="text-[11px] font-semibold text-brand uppercase tracking-[0.08em] mb-1 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              Ajuste automático do projetista
+            </p>
+            <p className="text-xs text-brand-700 leading-snug">{autoTuneNote}</p>
+            <button
+              onClick={() => setAutoTuneNote(null)}
+              className="mt-1.5 text-[10px] text-brand-400 hover:text-brand uppercase tracking-wider"
+            >
+              Entendi
+            </button>
+          </div>
         )}
 
         {/* ── TASK-077: Resumo essencial (tudo automático) ──────── */}
