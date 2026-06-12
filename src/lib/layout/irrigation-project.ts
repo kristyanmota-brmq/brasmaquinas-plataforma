@@ -87,7 +87,7 @@ export interface ProjectInput {
   gridAngleDegrees: number;
   vazaoPorAspersorM3h: number;
   nSetores: number;
-  jornadaHoras: 9 | 14 | 21;
+  jornadaHoras: number; // TASK-082: regimes oficiais 12/15/20; legados válidos
   laminaMm: number;
   principalLengthM: number;
   principalSegments: number;

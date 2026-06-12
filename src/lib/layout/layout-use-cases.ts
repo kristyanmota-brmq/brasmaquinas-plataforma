@@ -150,7 +150,7 @@ export function buildMainPipelineUpdate(
  */
 export function buildSectorizationAgronomica(
   physicalColumns: PhysicalColumn[],
-  jornada: 9 | 14 | 21,
+  jornada: number, // TASK-082: regimes oficiais 12/15/20; legados 9/14/21 válidos
   totalSprinklerCount: number,
   vazaoM3PorHoraPerSprinkler: number,
   espacamentoM: number,
@@ -189,7 +189,7 @@ export function buildSectorizationAgronomica(
 
 export function buildSectorizationForJornada(
   physicalColumns: PhysicalColumn[],
-  jornada: 9 | 14 | 21,
+  jornada: number, // TASK-082: regimes oficiais 12/15/20; legados 9/14/21 válidos
   totalSprinklerCount: number,
   vazaoM3PorHoraPerSprinkler: number,
   tempoPorSetorMinutos: number,

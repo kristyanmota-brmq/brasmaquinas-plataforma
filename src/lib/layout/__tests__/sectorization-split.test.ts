@@ -18,12 +18,12 @@ import {
 import { generatePhysicalColumns } from "@/lib/layout/laterais";
 import { generateProposalDiagnostics } from "@/lib/bom";
 import { calculateIrrigationProject } from "@/lib/layout/irrigation-project";
-import { ASPERSOR_PADRAO, TUBOS_PVC_LF } from "@/lib/catalog/aspersores";
+import { ASPERSOR_5022_SD_40X18, TUBOS_PVC_LF } from "@/lib/catalog/aspersores";
 import type { ProjectLayout } from "@/app/projetos/[id]/actions";
 
 const CENTROID = { lng: -46.0, lat: -12.0 };
-const SPACING = ASPERSOR_PADRAO.espacamentoPadraoM; // 12 m
-const VAZ = ASPERSOR_PADRAO.vazaoM3PorHora;
+const SPACING = ASPERSOR_5022_SD_40X18.espacamentoPadraoM; // 12 m
+const VAZ = ASPERSOR_5022_SD_40X18.vazaoM3PorHora;
 const WATER_SOURCE = { lng: CENTROID.lng - 0.003, lat: CENTROID.lat - 0.003 };
 
 /** Grade uniforme column-major: col varia mais devagar que row. */
@@ -52,7 +52,7 @@ function makePhysCols(cols: number, rows: number) {
     0,
     CENTROID,
     SPACING,
-    { vazao: VAZ, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
+    { vazao: VAZ, pressaoServico: ASPERSOR_5022_SD_40X18.pressaoServicoMca },
     TUBOS_PVC_LF,
   );
   return { positions, physCols };
@@ -170,7 +170,7 @@ describe("Suite 4 — physicalColumns é a fonte da BOM de tubos e Tês", () => 
     centroid: CENTROID,
     waterSource: WATER_SOURCE,
     sprinklers: {
-      aspersorId: ASPERSOR_PADRAO.sku,
+      aspersorId: ASPERSOR_5022_SD_40X18.sku,
       positions,
       count: positions.length,
       vazaoProjetoM3PorHora: positions.length * VAZ,
@@ -232,7 +232,7 @@ describe("Suite 5 — operationalSegments não duplicam comprimento de lateral",
     centroid: CENTROID,
     waterSource: WATER_SOURCE,
     sprinklers: {
-      aspersorId: ASPERSOR_PADRAO.sku,
+      aspersorId: ASPERSOR_5022_SD_40X18.sku,
       positions,
       count: positions.length,
       vazaoProjetoM3PorHora: positions.length * VAZ,
@@ -286,7 +286,7 @@ describe("Suite 6 — BOM.meta tem campos para PDF: físicas e trechos operacion
     centroid: CENTROID,
     waterSource: WATER_SOURCE,
     sprinklers: {
-      aspersorId: ASPERSOR_PADRAO.sku,
+      aspersorId: ASPERSOR_5022_SD_40X18.sku,
       positions,
       count: positions.length,
       vazaoProjetoM3PorHora: positions.length * VAZ,
@@ -345,7 +345,7 @@ describe("Suite 7 — generateProposalDiagnostics: aviso quando lateral física 
     centroid: CENTROID,
     waterSource: WATER_SOURCE,
     sprinklers: {
-      aspersorId: ASPERSOR_PADRAO.sku,
+      aspersorId: ASPERSOR_5022_SD_40X18.sku,
       positions,
       count: positions.length,
       vazaoProjetoM3PorHora: positions.length * VAZ,
@@ -407,7 +407,7 @@ describe("Suite 8 — Tês e tubos vêm de physicalColumns mesmo com splitting i
     centroid: CENTROID,
     waterSource: WATER_SOURCE,
     sprinklers: {
-      aspersorId: ASPERSOR_PADRAO.sku,
+      aspersorId: ASPERSOR_5022_SD_40X18.sku,
       positions,
       count: positions.length,
       vazaoProjetoM3PorHora: positions.length * VAZ,

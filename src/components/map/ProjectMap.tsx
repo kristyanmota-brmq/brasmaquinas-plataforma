@@ -27,6 +27,8 @@ import { selectBombaAutomatica } from "@/lib/layout/pump-auto-select";
 import { tuneSectorizationForValidArchitecture } from "@/lib/layout/architecture-auto-tune";
 import { fitTerrainGradient, MIN_TERRAIN_SAMPLES, type TerrainGradient, type TerrainSample } from "@/lib/layout/terrain-gradient";
 import { formatUtm } from "@/lib/layout/utm";
+import { minSetoresPorRestricoes } from "@/lib/layout/sector-constraints";
+import { buildSectorsByFlowWithColumnSplitting } from "@/lib/layout/sectorization";
 import {
   MousePointer2,
   Hexagon,
@@ -114,7 +116,9 @@ const REJECTION_REASON_LABEL: Record<string, string> = {
   multiple: "Múltiplas causas",
   unknown: "Motivo desconhecido",
 };
-type Jornada = 9 | 14 | 21;
+// TASK-082 (RT): regimes oficiais de operação. Legados 9/14/21 seguem válidos em projetos salvos.
+type Jornada = number;
+const JORNADAS_OFICIAIS: Jornada[] = [12, 15, 20];
 
 const DEFAULT_CENTER = { longitude: -45.0, latitude: -12.0, zoom: 14 };
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
@@ -478,6 +482,30 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
       return () => clearTimeout(t);
     }
   }, [layout.area, layout.centroid, queryElevation]);
+
+  // TASK-082: atualizar restrições do local e reajustar setores automaticamente.
+  const applyRestricoes = useCallback(
+    (campo: "vazaoDisponivelM3h" | "potenciaDisponivelCv", valor: number | undefined) => {
+      setLayout((l) => {
+        const restricoes = { ...l.restricoes };
+        if (valor === undefined || !Number.isFinite(valor) || valor <= 0) {
+          delete restricoes[campo];
+        } else {
+          restricoes[campo] = valor;
+        }
+        return { ...l, restricoes };
+      });
+    },
+    [],
+  );
+  const restricoesKey = `${layout.restricoes?.vazaoDisponivelM3h ?? ""}:${layout.restricoes?.potenciaDisponivelCv ?? ""}`;
+  const lastRestricoesRef = useRef<string>(restricoesKey);
+  useEffect(() => {
+    if (lastRestricoesRef.current === restricoesKey) return;
+    lastRestricoesRef.current = restricoesKey;
+    if (layout.sectorization) applyJornada(layout.sectorization.jornadaHoras);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restricoesKey]);
 
   const enterPipelineMode = useCallback(() => {
     if (!layout.waterSource) return;
@@ -1096,9 +1124,35 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
               lamina,
               cultura,
             );
-      setLayout((l) => ({ ...l, sectorization }));
+      // TASK-082 (RT): restrições do local (vazão disponível / potência) impõem
+      // um PISO de setores — a vazão simultânea precisa caber na fonte e na energia.
+      const vazaoTotalProj = layout.sprinklers.positions.length * aspersorAtivo.vazaoM3PorHora;
+      const { nMinSetores } = minSetoresPorRestricoes(
+        vazaoTotalProj,
+        layout.restricoes,
+        projectResult.hydraulics?.hmt.totalHMT,
+      );
+      let sectorizationFinal = sectorization;
+      if (nMinSetores > sectorization.setoresCount) {
+        const { sectorIndices } = buildSectorsByFlowWithColumnSplitting(
+          physicalColumns,
+          nMinSetores,
+          aspersorAtivo.vazaoM3PorHora,
+          layout.sprinklers.positions.length,
+        );
+        const aps = Math.round(layout.sprinklers.positions.length / nMinSetores);
+        sectorizationFinal = {
+          ...sectorization,
+          setoresCount: nMinSetores,
+          sectorIndices,
+          aspersoresPorSetor: aps,
+          vazaoPorSetorM3PorHora: aps * aspersorAtivo.vazaoM3PorHora,
+          tempoPorSetorMinutos: Math.round((60 * jornada) / nMinSetores),
+        };
+      }
+      setLayout((l) => ({ ...l, sectorization: sectorizationFinal }));
     },
-    [layout.sprinklers, layout.centroid, layout.sectorization, physicalColumns, tempoPorSetorMinutos, aspersorAtivo]
+    [layout.sprinklers, layout.centroid, layout.sectorization, layout.restricoes, physicalColumns, tempoPorSetorMinutos, aspersorAtivo, projectResult.hydraulics]
   );
 
   // TASK-060: lâmina/cultura são inputs do projetista — atualizam a sectorization
@@ -2986,7 +3040,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                 Jornada operacional
               </span>
               <div className="grid grid-cols-3 gap-1.5">
-                {([9, 14, 21] as Jornada[]).map((h) => {
+                {JORNADAS_OFICIAIS.map((h) => {
                   const active = layout.sectorization?.jornadaHoras === h;
                   return (
                     <button
@@ -3004,6 +3058,68 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                   );
                 })}
               </div>
+            </div>
+
+            {/* TASK-082 (RT): restrições do local — vazão disponível e potência.
+                Reajustam automaticamente o número de setores (piso). */}
+            <div className="mb-3">
+              <span className="text-[11px] uppercase tracking-[0.1em] text-ink-3 block mb-2">
+                Restrições do local
+              </span>
+              <div className="grid grid-cols-2 gap-1.5">
+                <div>
+                  <label className="text-[10px] text-ink-3 block mb-1">
+                    Vazão disponível (m³/h)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={layout.restricoes?.vazaoDisponivelM3h ?? ""}
+                    placeholder="ex.: 100"
+                    onChange={(e) =>
+                      applyRestricoes(
+                        "vazaoDisponivelM3h",
+                        e.target.value === "" ? undefined : Number(e.target.value),
+                      )
+                    }
+                    className="w-full px-2 py-1.5 rounded-sm border border-border bg-background text-xs text-ink focus:outline-none focus:border-brand"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-ink-3 block mb-1">
+                    Potência disponível (cv)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={layout.restricoes?.potenciaDisponivelCv ?? ""}
+                    placeholder="ex.: 30"
+                    onChange={(e) =>
+                      applyRestricoes(
+                        "potenciaDisponivelCv",
+                        e.target.value === "" ? undefined : Number(e.target.value),
+                      )
+                    }
+                    className="w-full px-2 py-1.5 rounded-sm border border-border bg-background text-xs text-ink focus:outline-none focus:border-brand"
+                  />
+                </div>
+              </div>
+              {(() => {
+                if (!layout.sprinklers || !layout.restricoes) return null;
+                const info = minSetoresPorRestricoes(
+                  layout.sprinklers.positions.length * aspersorAtivo.vazaoM3PorHora,
+                  layout.restricoes,
+                  projectResult.hydraulics?.hmt.totalHMT,
+                );
+                if (info.nMinSetores <= 1) return null;
+                return (
+                  <div className="mt-1.5 text-[10px] text-brand leading-snug">
+                    Mínimo de {info.nMinSetores} setores pelas restrições — {info.motivos.join("; ")}.
+                  </div>
+                );
+              })()}
             </div>
 
             {/* TASK-067: critério de setorização — agronômico (derivado) vs jornada (legado) */}

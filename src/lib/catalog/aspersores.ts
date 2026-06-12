@@ -31,9 +31,10 @@ export interface Conexao extends Produto {
 }
 
 // ============================================================
-// ASPERSOR PADRÃO — Naan 5022-SD 4.0 x 1.8 mm
+// Naan 5022-SD 4.0 x 1.8 mm — entrada PRESERVADA (catálogo read-only;
+// projetos salvos com este SKU continuam resolvendo por getAspersorBySku)
 // ============================================================
-export const ASPERSOR_PADRAO: Aspersor = {
+export const ASPERSOR_5022_SD_40X18: Aspersor = {
   sku: "101092",
   descricao: "ASPERSOR 5022-SD BOCAIS 4.0 X 1.8 MM - NAAN",
   marca: "NAAN",
@@ -44,6 +45,28 @@ export const ASPERSOR_PADRAO: Aspersor = {
   precoVenda: 32.0,
   pressaoServicoMca: 30, // V0.5-RC: Naan 5022-SD pressão de serviço = 30 mca
   vazaoM3PorHora: 1.5,
+  raioMolhadoM: 14,
+  espacamentoPadraoM: 12,
+};
+
+// ============================================================
+// ASPERSOR PADRÃO — Naan 5022-SD 3.0 x 1.8 mm (TASK-082)
+// Especificação OFICIAL ditada pelo RT da Brasmáquinas em sessão
+// (2026-06-12): "utilizamos 5022 espaçamento 12x12 bocal 3.0x1.8mm,
+// vazão 760 L/h, pressão nominal 25 mca". Custo/preço herdados da
+// entrada 4.0x1.8 (mesmo corpo de aspersor, bocal diferente).
+// ============================================================
+export const ASPERSOR_PADRAO: Aspersor = {
+  sku: "101092-3018",
+  descricao: "ASPERSOR 5022-SD BOCAIS 3.0 X 1.8 MM - NAAN",
+  marca: "NAAN",
+  modelo: "5022-SD",
+  bocal: "3.0 x 1.8 mm",
+  unidade: "UN",
+  custo: 15.06,
+  precoVenda: 32.0,
+  pressaoServicoMca: 25, // RT em sessão (2026-06-12): pressão nominal 25 mca
+  vazaoM3PorHora: 0.76, // RT em sessão: 760 L/h
   raioMolhadoM: 14,
   espacamentoPadraoM: 12,
 };
@@ -111,6 +134,7 @@ export const ASPERSOR_5035_SD_PC_45: Aspersor = {
 
 export const ASPERSORES: Aspersor[] = [
   ASPERSOR_PADRAO,
+  ASPERSOR_5022_SD_40X18,
   ASPERSOR_5035_SD_50X25,
   ASPERSOR_5035_SD_35X25,
   ASPERSOR_5035_SD_PC_45,

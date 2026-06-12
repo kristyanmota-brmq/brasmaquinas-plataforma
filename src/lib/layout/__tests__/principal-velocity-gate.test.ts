@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { velocity } from "@/lib/hydraulics/hazenWilliams";
-import { selectTubo, ASPERSOR_PADRAO, TUBOS_PVC_LF } from "@/lib/catalog/aspersores";
+import { selectTubo, ASPERSOR_5022_SD_40X18, TUBOS_PVC_LF } from "@/lib/catalog/aspersores";
 import { calculateIrrigationProject } from "@/lib/layout/irrigation-project";
 import type { ProjectLayout } from "@/app/projetos/[id]/actions";
 
@@ -8,8 +8,8 @@ import type { ProjectLayout } from "@/app/projetos/[id]/actions";
 
 const MAX_VEL_PRINCIPAL_MS = 1.5;
 const CENTROID = { lng: -46.0, lat: -12.0 };
-const SPACING = ASPERSOR_PADRAO.espacamentoPadraoM;  // 12 m
-const VAZ = ASPERSOR_PADRAO.vazaoM3PorHora;           // 1,5 m³/h
+const SPACING = ASPERSOR_5022_SD_40X18.espacamentoPadraoM;  // 12 m
+const VAZ = ASPERSOR_5022_SD_40X18.vazaoM3PorHora;           // 1,5 m³/h
 
 // Q = 23 × 1,5 = 34,5 m³/h — flow exato do caso reportado
 const N_ASP = 23;
@@ -77,7 +77,7 @@ function makeLayout34_5(): ProjectLayout {
     centroid: CENTROID,
     waterSource: { lng: waterSource[0], lat: waterSource[1] },
     sprinklers: {
-      aspersorId: ASPERSOR_PADRAO.sku,
+      aspersorId: ASPERSOR_5022_SD_40X18.sku,
       positions,
       count: N_ASP,
       vazaoProjetoM3PorHora: N_ASP * VAZ,

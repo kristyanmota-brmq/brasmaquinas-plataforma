@@ -146,10 +146,11 @@ describe("T60 — catálogo 5035 SD (homologação provisória) × agronomia", (
     expect(intensidade).toBeCloseTo(6.512, 2);
   });
 
-  it("T60-3: espaçamento 18 ≤ raio molhado × 2 (sobreposição garantida) nos 3 aspersores novos", async () => {
+  it("T60-3: espaçamento ≤ raio molhado × 2 (sobreposição garantida) nos aspersores não-padrão", async () => {
     const { ASPERSORES, ASPERSOR_PADRAO } = await import("@/lib/catalog/aspersores");
+    // TASK-082: + entrada preservada 5022 4.0x1.8 (o padrão virou o 3.0x1.8 do RT)
     const novos = ASPERSORES.filter((a) => a !== ASPERSOR_PADRAO);
-    expect(novos).toHaveLength(3);
+    expect(novos).toHaveLength(4);
     for (const a of novos) {
       expect(a.espacamentoPadraoM).toBeLessThanOrEqual(a.raioMolhadoM * 2);
       expect(a.custo).toBeGreaterThan(0);
@@ -157,12 +158,20 @@ describe("T60 — catálogo 5035 SD (homologação provisória) × agronomia", (
     }
   });
 
-  it("T60-4: ASPERSOR_PADRAO (5022) byte-idêntico — catálogo read-only preservado", async () => {
-    const { ASPERSOR_PADRAO } = await import("@/lib/catalog/aspersores");
-    expect(ASPERSOR_PADRAO.sku).toBe("101092");
-    expect(ASPERSOR_PADRAO.vazaoM3PorHora).toBe(1.5);
+  it("T60-4 (atualizado TASK-082): padrão = 5022 3.0x1.8 do RT; entrada 4.0x1.8 preservada byte-idêntica", async () => {
+    const { ASPERSOR_PADRAO, ASPERSOR_5022_SD_40X18 } = await import("@/lib/catalog/aspersores");
+    // Especificação OFICIAL ditada pelo RT em sessão (2026-06-12):
+    // 5022 12×12, bocal 3,0×1,8 mm, 760 L/h, pressão nominal 25 mca.
+    expect(ASPERSOR_PADRAO.sku).toBe("101092-3018");
+    expect(ASPERSOR_PADRAO.bocal).toBe("3.0 x 1.8 mm");
+    expect(ASPERSOR_PADRAO.vazaoM3PorHora).toBe(0.76);
+    expect(ASPERSOR_PADRAO.pressaoServicoMca).toBe(25);
     expect(ASPERSOR_PADRAO.espacamentoPadraoM).toBe(12);
-    expect(ASPERSOR_PADRAO.precoVenda).toBe(32.0);
+    // Catálogo read-only: a entrada antiga segue intacta (projetos salvos resolvem por SKU).
+    expect(ASPERSOR_5022_SD_40X18.sku).toBe("101092");
+    expect(ASPERSOR_5022_SD_40X18.vazaoM3PorHora).toBe(1.5);
+    expect(ASPERSOR_5022_SD_40X18.pressaoServicoMca).toBe(30);
+    expect(ASPERSOR_5022_SD_40X18.precoVenda).toBe(32.0);
   });
 });
 
@@ -202,8 +211,8 @@ describe("T60 — lâmina como input em buildSectorizationForJornada", () => {
 
     const result = calculateIrrigationProject({ ...layout, sectorization: sec });
     expect(result.agronomy).not.toBeNull();
-    // lâmina 6,5 com 5022@12×12 (10,42 mm/h) → tempo/setor 0,624 h → floor(9/0,624) = 14
-    expect(result.agronomy!.tempoPorSetorH).toBeCloseTo(6.5 / 10.4167, 3);
+    // lâmina 6,5 com 5022 3.0x1.8 @12×12 (5,278 mm/h) → tempo/setor 1,232 h → floor(9/0,624) = 14
+    expect(result.agronomy!.tempoPorSetorH).toBeCloseTo(6.5 / 5.2778, 3);
   });
 });
 

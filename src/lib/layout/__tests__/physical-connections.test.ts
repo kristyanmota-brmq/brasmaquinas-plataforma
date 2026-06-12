@@ -704,10 +704,10 @@ describe("T62 — fishbone DN125 resolve via família TES (PN80)", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("T64 — BOM usa o aspersor do projeto", () => {
-  it("T64-1: sem aspersorSku → item legado 5022 (101092, R$32)", () => {
+  it("T64-1 (TASK-082): sem aspersorSku → padrão oficial do RT (5022 3.0x1.8, 101092-3018, R$32)", () => {
     const bom = buildBOM(makeMinimalBOMInput());
     const item = bom.itens.find((i) => i.categoria === "ASPERSOR");
-    expect(item?.sku).toBe("101092");
+    expect(item?.sku).toBe("101092-3018");
     expect(item?.precoUnitario).toBe(32.0);
   });
 

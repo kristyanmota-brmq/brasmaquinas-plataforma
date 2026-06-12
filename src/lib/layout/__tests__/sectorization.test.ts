@@ -10,11 +10,11 @@
 
 import { describe, it, expect } from "vitest";
 import { buildSectorsByFlow } from "@/lib/layout/sectorization";
-import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
+import { ASPERSOR_5022_SD_40X18 } from "@/lib/catalog/aspersores";
 
 const CENTROID = { lng: -46.0, lat: -12.0 };
-const SPACING = ASPERSOR_PADRAO.espacamentoPadraoM; // 12 m
-const VAZ = ASPERSOR_PADRAO.vazaoM3PorHora;         // m³/h por aspersor
+const SPACING = ASPERSOR_5022_SD_40X18.espacamentoPadraoM; // 12 m
+const VAZ = ASPERSOR_5022_SD_40X18.vazaoM3PorHora;         // m³/h por aspersor
 
 /** Grade de aspersores em frame local (column-major). */
 function makeGrid(

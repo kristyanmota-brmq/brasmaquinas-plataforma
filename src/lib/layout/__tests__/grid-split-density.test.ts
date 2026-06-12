@@ -22,13 +22,13 @@ import {
   detectLateralCapacityViolations,
   getCatalogoLateraisHomologadas5022,
 } from "@/lib/layout/laterais";
-import { ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
+import { ASPERSOR_5022_SD_40X18 } from "@/lib/catalog/aspersores";
 
 const SPACING = 12;
 const CENTROID = { lng: -45, lat: -12 };
 const ASPERSOR_MIN = {
-  vazao: ASPERSOR_PADRAO.vazaoM3PorHora,
-  pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca,
+  vazao: ASPERSOR_5022_SD_40X18.vazaoM3PorHora,
+  pressaoServico: ASPERSOR_5022_SD_40X18.pressaoServicoMca,
 };
 const M_PER_LAT = 111320;
 const mPerLng = M_PER_LAT * Math.cos((CENTROID.lat * Math.PI) / 180);

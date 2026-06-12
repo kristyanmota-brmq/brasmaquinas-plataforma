@@ -62,6 +62,14 @@ export interface ProjectLayout {
   pumpLocation?: { lng: number; lat: number; elevation?: number } | null;
   pumpSeparate?: boolean;
   areaElevation?: number;
+  /**
+   * TASK-082 (RT em sessão): restrições do local — disponibilidade de vazão
+   * da fonte e potência de energia. Reajustam automaticamente o nº de setores.
+   */
+  restricoes?: {
+    vazaoDisponivelM3h?: number;
+    potenciaDisponivelCv?: number;
+  };
   geodetic?: {
     distanceSourceToAreaMeters?: number;
     elevationDeltaMeters?: number;
@@ -86,7 +94,11 @@ export interface ProjectLayout {
     angleMode: "auto" | "manual" | "optimizer";
   };
   sectorization?: {
-    jornadaHoras: 9 | 14 | 21;
+    /**
+     * TASK-082 (ordem do RT): regimes oficiais 12/15/20 h. Tipo numérico —
+     * projetos legados com 9/14/21 continuam válidos.
+     */
+    jornadaHoras: number;
     /** TASK-060: lâmina desejada (mm/dia) — input do projetista; default 10. */
     laminaMm: number;
     /** TASK-060: cultura informada pelo projetista (opcional; ex.: pastagem, capim). */

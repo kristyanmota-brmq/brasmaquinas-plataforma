@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { velocity, headLoss, type TuboCandidato } from "@/lib/hydraulics/hazenWilliams";
-import { TUBOS_PVC_LF, ASPERSOR_PADRAO } from "@/lib/catalog/aspersores";
+import { TUBOS_PVC_LF, ASPERSOR_5022_SD_40X18 } from "@/lib/catalog/aspersores";
 import {
   generatePhysicalColumns,
   generateLateraisLegacyForDebug,
@@ -12,11 +12,13 @@ import type { OperationalSegment } from "@/lib/layout/sectorization";
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
-const PRESSAO_SERVICO = ASPERSOR_PADRAO.pressaoServicoMca;  // 30 mca
+// TASK-082: fixtures de física calibradas no 5022 bocal 4.0x1.8 (1,5 m³/h)
+// — entrada PRESERVADA do catálogo; o padrão da empresa mudou para 3.0x1.8.
+const PRESSAO_SERVICO = ASPERSOR_5022_SD_40X18.pressaoServicoMca;  // 30 mca
 const MAX_VEL_LATERAL = 2.5;
 const SPACING = 12;
 const CENTROID = { lng: -46.0, lat: -12.0 };
-const ASPERSOR_MIN = { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: PRESSAO_SERVICO };
+const ASPERSOR_MIN = { vazao: ASPERSOR_5022_SD_40X18.vazaoM3PorHora, pressaoServico: PRESSAO_SERVICO };
 
 // DN50 LF: Dint=46mm — com Q=15 m³/h → v = 2,508 m/s (> 2,5 → gate rejeita)
 const DN50: TuboCandidato = { sku: "DN50", diametroMm: 50, diametroInternoMm: 46, coefC: 145, pressaoMca: 40, custo: 1, precoVenda: 1 };
@@ -147,12 +149,12 @@ describe("selectLateralTube — gate de velocidade com diâmetro interno", () =>
     expect(laterais[0].selecao.perdaCargaM).toBeCloseTo(cols[0].selecao.perdaCargaM, 4);
   });
 
-  it("com TUBOS_PVC_LF real e ASPERSOR_PADRAO: n=10 seleciona diâmetro ≥ 75mm", () => {
+  it("com TUBOS_PVC_LF real e 5022 4.0x1.8 (1,5 m³/h): n=10 seleciona diâmetro ≥ 75mm", () => {
     // DN50 real (Dint=46mm) → v = 2,508 m/s → rejeitado; espera DN75 ou maior
     const positions = makePositions(10);
     const cols = generatePhysicalColumns(
       positions, 0, CENTROID, SPACING,
-      { vazao: ASPERSOR_PADRAO.vazaoM3PorHora, pressaoServico: ASPERSOR_PADRAO.pressaoServicoMca },
+      { vazao: ASPERSOR_5022_SD_40X18.vazaoM3PorHora, pressaoServico: ASPERSOR_5022_SD_40X18.pressaoServicoMca },
       TUBOS_PVC_LF,
     );
     expect(cols[0].selecao.tubo.diametroMm).toBeGreaterThanOrEqual(75);
