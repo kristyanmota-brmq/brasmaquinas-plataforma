@@ -1876,7 +1876,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                   Segmentos inválidos ({pdfError.invalidHydraulicSegments.length}
                   {pdfError.invalidHydraulicSegments.length > 3 ? " — exibindo 3 primeiros" : ""}):
                 </p>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                <div className="space-y-1.5">
                   {pdfError.invalidHydraulicSegments.slice(0, 3).map((seg) => (
                     <div key={seg.id} className="bg-red-100 rounded p-1.5 font-mono text-[10px] leading-snug">
                       <div className="font-sans font-semibold text-[10px] mb-0.5 text-red-800">
@@ -1930,7 +1930,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                   <p className="text-[10px] text-red-600/80 mb-2 leading-snug">
                     Corrigir os dados abaixo antes de gerar a proposta.
                   </p>
-                  <ul className="space-y-1 max-h-32 overflow-y-auto">
+                  <ul className="space-y-1">
                     {dataBlock.map((b, i) => (
                       <li key={`db-${i}`} className="text-xs text-red-700 flex items-start gap-1.5">
                         <span className="flex-shrink-0 mt-0.5">·</span>
@@ -1953,7 +1953,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                     Não é erro de projeto — itens que dependem de revisão do RT, engenheiro
                     ou homologação de catálogo antes de gerar a proposta comercial.
                   </p>
-                  <ul className="space-y-2 max-h-40 overflow-y-auto">
+                  <ul className="space-y-2">
                     {rtPending.map((b, i) => (
                       <li key={`rt-${i}`} className="text-xs text-sky-800 flex items-start gap-1.5">
                         <span className="flex-shrink-0 mt-0.5">·</span>
@@ -1994,7 +1994,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
               <AlertTriangle className="w-3.5 h-3.5" />
               Avisos
             </p>
-            <ul className="space-y-1 max-h-32 overflow-y-auto">
+            <ul className="space-y-1">
               {projectResult.diagnostics!.warnings.map((w, i) => (
                 <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
                   <span className="flex-shrink-0 mt-0.5">·</span>

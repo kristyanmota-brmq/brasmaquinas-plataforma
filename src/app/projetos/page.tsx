@@ -97,8 +97,8 @@ export default async function ProjetosPage() {
             }
           />
         ) : (
-          <div className="bg-background border border-border rounded-lg shadow-card overflow-hidden">
-            <table className="w-full">
+          <div className="bg-background border border-border rounded-lg shadow-card overflow-x-auto">
+            <table className="w-full min-w-[640px]">
               <thead className="border-b border-border bg-surface">
                 <tr>
                   {["Projeto", "Cliente", "Local", "Status"].map((h) => (

@@ -79,7 +79,7 @@ export function MemorialPanel({
   }, [laterais, projectName, client, city, state, hoje]);
 
   return (
-    <div className="absolute top-16 left-4 z-20 w-[560px] max-h-[calc(100vh-120px)] flex flex-col bg-white/97 backdrop-blur-md border border-border rounded-lg shadow-overlay overflow-hidden">
+    <div className="absolute top-16 left-4 z-20 w-[min(560px,calc(100vw-2rem))] max-h-[calc(100vh-120px)] flex flex-col bg-white/97 backdrop-blur-md border border-border rounded-lg shadow-overlay overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <div>
           <h2 className="text-[11px] font-semibold text-ink uppercase tracking-[0.12em]">
