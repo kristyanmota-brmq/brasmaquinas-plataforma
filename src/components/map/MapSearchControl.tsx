@@ -87,7 +87,7 @@ export function MapSearchControl({
   }
 
   return (
-    <div className="absolute top-16 left-4 z-10 bg-white border border-border rounded-md shadow-lg w-72 flex flex-col gap-2 p-3">
+    <div className="absolute top-16 left-4 z-10 bg-white border border-border rounded-lg shadow-overlay w-72 flex flex-col gap-2 p-3">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-ink flex items-center gap-1.5">

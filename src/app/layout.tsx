@@ -14,25 +14,25 @@ export const metadata: Metadata = {
 const clerkAppearance = {
   variables: {
     colorPrimary: "#094641",
-    colorText: "#0A0A0A",
-    colorTextSecondary: "#525252",
+    colorText: "#10201C",
+    colorTextSecondary: "#3D4A46",
     colorBackground: "#FFFFFF",
     colorInputBackground: "#FFFFFF",
-    colorInputText: "#0A0A0A",
+    colorInputText: "#10201C",
     borderRadius: "0.5rem",
     fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
   },
   elements: {
-    card: "shadow-none border border-[#E5E5E5]",
-    headerTitle: "text-[#0A0A0A] font-semibold",
-    headerSubtitle: "text-[#525252]",
+    card: "shadow-[0_2px_4px_rgba(6,46,42,0.06),0_6px_16px_rgba(6,46,42,0.08)] border border-[#E3E8E6] rounded-xl",
+    headerTitle: "text-[#10201C] font-semibold",
+    headerSubtitle: "text-[#3D4A46]",
     socialButtonsBlockButton:
-      "border border-[#E5E5E5] hover:bg-[#FAFAFA] text-[#0A0A0A]",
+      "border border-[#E3E8E6] hover:bg-[#EBF5F3] text-[#10201C]",
     formButtonPrimary:
-      "bg-[#094641] hover:bg-[#073530] text-white shadow-none normal-case font-semibold",
-    footerActionLink: "text-[#094641] hover:text-[#073530]",
+      "bg-[#094641] hover:bg-[#0E594C] text-white shadow-none normal-case font-semibold",
+    footerActionLink: "text-[#094641] hover:text-[#0E594C]",
     formFieldInput:
-      "border border-[#E5E5E5] focus:border-[#094641] focus:ring-[#094641]",
+      "border border-[#E3E8E6] focus:border-[#094641] focus:ring-[#094641]",
   },
 };
 

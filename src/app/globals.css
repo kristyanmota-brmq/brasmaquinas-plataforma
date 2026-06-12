@@ -1,40 +1,86 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Design System Brasmáquinas — TASK-076
+   Identidade: verde-petróleo institucional como cor primária de ação;
+   verde vivo para sucesso; amarelo da marca como acento seletivo.
+   Linguagem: agro-tech enterprise — denso, sóbrio, autoridade técnica.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 @theme {
-  /* Cor primária UI: preto carbono */
-  --color-brand: #0A0A0A;
-  --color-brand-hover: #1F1F1F;
-  --color-brand-deep: #000000;
+  /* ── Marca: verde-petróleo (primária de ação e navegação) ── */
+  --color-brand-50: #EBF5F3;
+  --color-brand-100: #D2E8E4;
+  --color-brand-200: #A5D1C9;
+  --color-brand-300: #6FB3A8;
+  --color-brand-400: #3D9183;
+  --color-brand-500: #19705F;
+  --color-brand-600: #0E594C;
+  --color-brand-700: #094641;
+  --color-brand-800: #073530;
+  --color-brand-900: #052724;
+  --color-brand-950: #031A18;
+
+  /* Aliases usados pelo app inteiro (antes: preto carbono) */
+  --color-brand: #094641;
+  --color-brand-hover: #0E594C;
+  --color-brand-deep: #052724;
   --color-brand-foreground: #FFFFFF;
 
-  /* Cor da marca (reservada para logo e elementos institucionais) */
+  /* Cor da marca (logo e elementos institucionais) */
   --color-mark: #094641;
 
+  /* ── Acento da marca (amarelo do logo — uso seletivo, não-semântico) ── */
+  --color-accent: #EFD03A;
+  --color-accent-soft: #FBF4D5;
+  --color-accent-ink: #6B5A00;
+
+  /* ── Semânticas ── */
   --color-success: #05A835;
+  --color-success-strong: #047857;
   --color-success-soft: #ECFDF3;
   --color-warning: #C2410C;
   --color-warning-soft: #FFF7ED;
   --color-danger: #DC2626;
   --color-danger-soft: #FEF2F2;
+  --color-info: #0E7490;
+  --color-info-soft: #ECFEFF;
 
+  /* ── Superfícies ── */
   --color-background: #FFFFFF;
-  --color-surface: #FAFAFA;
-  --color-surface-2: #F5F5F5;
-  --color-border: #E5E5E5;
-  --color-border-strong: #D4D4D4;
-  --color-ink: #0A0A0A;
-  --color-ink-2: #404040;
-  --color-ink-3: #737373;
-  --color-ink-4: #A3A3A3;
+  --color-surface: #F8FAF9;
+  --color-surface-2: #EFF3F1;
+  --color-border: #E3E8E6;
+  --color-border-strong: #CBD4D0;
+
+  /* ── Tinta ── */
+  --color-ink: #10201C;
+  --color-ink-2: #3D4A46;
+  --color-ink-3: #6B7773;
+  --color-ink-4: #9CA6A2;
+
+  /* ── Navegação escura (shell petróleo) ── */
+  --color-shell: #062E2A;
+  --color-shell-2: #094641;
+  --color-shell-border: #11544D;
+  --color-shell-ink: #E8F2F0;
+  --color-shell-ink-2: #9FBFBA;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  --radius-sm: 0.125rem;
-  --radius: 0.375rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.375rem;
-  --radius-xl: 0.375rem;
+  /* ── Raios ── */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius: 0.5rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* ── Elevação ── */
+  --shadow-card: 0 1px 2px rgba(6, 46, 42, 0.05), 0 1px 3px rgba(6, 46, 42, 0.06);
+  --shadow-raised: 0 2px 4px rgba(6, 46, 42, 0.06), 0 6px 16px rgba(6, 46, 42, 0.08);
+  --shadow-overlay: 0 4px 8px rgba(6, 46, 42, 0.08), 0 16px 40px rgba(6, 46, 42, 0.16);
 }
 
 body {
@@ -51,6 +97,34 @@ body {
   background: var(--color-brand);
   color: white;
 }
+
+/* Focus ring acessível e consistente */
+:focus-visible {
+  outline: 2px solid var(--color-brand-400);
+  outline-offset: 2px;
+}
+
+/* Scrollbar discreta nos painéis técnicos */
+.panel-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 4px;
+}
+.panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-4);
+}
+
+/* Numerais tabulares para colunas técnicas */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
 .angle-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -65,19 +139,19 @@ body {
   appearance: none;
   width: 14px;
   height: 14px;
-  background: var(--color-ink);
+  background: var(--color-brand);
   border: 2px solid var(--color-background);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(6, 46, 42, 0.3);
 }
 
 .angle-slider::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  background: var(--color-ink);
+  background: var(--color-brand);
   border: 2px solid var(--color-background);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(6, 46, 42, 0.3);
 }

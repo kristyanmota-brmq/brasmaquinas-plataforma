@@ -44,6 +44,8 @@ import {
   Search,
   MapPin,
   Zap,
+  ShieldAlert,
+  AlertTriangle,
 } from "lucide-react";
 import { MapSearchControl } from "@/components/map/MapSearchControl";
 import clsx from "clsx";
@@ -1600,7 +1602,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
           />
         )}
 
-        <div className="absolute top-4 left-4 flex items-center gap-1 bg-white/95 backdrop-blur-md border border-border rounded-md p-1 shadow-lg">
+        <div className="absolute top-4 left-4 flex items-center gap-1 bg-white/95 backdrop-blur-md border border-border rounded-lg p-1 shadow-overlay">
           <ToolButton
             active={mode === "view"}
             onClick={() => {
@@ -1663,9 +1665,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
             disabled={!bom || pdfLoading}
             title={bom ? "Exportar proposta em PDF" : "Conclua a tubulação para exportar"}
             className={clsx(
-              "flex flex-col items-center gap-0.5 px-2 py-1.5 rounded text-[10px] font-medium transition-colors select-none",
+              "flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-md text-[10px] font-semibold transition-colors select-none",
               bom && !pdfLoading
-                ? "text-ink-2 hover:bg-surface-hover hover:text-ink cursor-pointer"
+                ? "text-brand hover:bg-brand-50 cursor-pointer"
                 : "text-ink-4 cursor-not-allowed opacity-40",
             )}
           >
@@ -1690,7 +1692,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
         )}
 
         {hasPolygonInProgress && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-border rounded-md shadow-lg flex items-center gap-1 p-1">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-border rounded-lg shadow-overlay flex items-center gap-1 p-1">
             <span className="px-3 text-xs text-ink-2 font-mono">
               {drawingCoords.length} vértice
               {drawingCoords.length !== 1 ? "s" : ""}
@@ -1714,7 +1716,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
         )}
 
         {isDrawingPipeline && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-border rounded-md shadow-lg flex items-center gap-1 p-1">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white border border-border rounded-lg shadow-overlay flex items-center gap-1 p-1">
             <span className="px-3 text-xs text-ink-2 font-mono">
               {drawingPipeline.length - 1} vértice
               {drawingPipeline.length - 1 !== 1 ? "s" : ""}
@@ -1773,7 +1775,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
 
         {/* Legenda técnica mínima */}
         {layout.sprinklers && (
-          <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-border rounded-md shadow-md px-3 py-2 pointer-events-none">
+          <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-border rounded-lg shadow-raised px-3 py-2 pointer-events-none">
             <div className="text-[9px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-1.5">Legenda</div>
             <div className="space-y-1">
               {layout.mainPipeline?.adutora && (
@@ -1810,7 +1812,7 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
       <aside
         id="project-layout-drawer"
         className={clsx(
-          "border-l border-border bg-surface p-6 overflow-y-auto",
+          "border-l border-border bg-background p-6 overflow-y-auto panel-scroll",
           // Mobile: drawer fixo saindo de baixo
           "fixed bottom-0 left-0 right-0 z-40 h-[60dvh]",
           "transition-transform duration-300 ease-in-out",
@@ -1820,17 +1822,17 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
         )}
       >
         {/* ── Header do projeto ────────────────────────────────── */}
-        <div className="-mx-6 -mt-6 px-6 py-4 border-b border-border mb-5">
+        <div className="-mx-6 -mt-6 px-6 py-4 border-b border-border mb-5 bg-surface">
           <Link
             href="/projetos"
-            className="text-[11px] text-ink-3 hover:text-ink-2 inline-block mb-2 transition-colors"
+            className="text-[11px] text-ink-3 hover:text-brand inline-block mb-2 transition-colors font-medium"
           >
             ← Projetos
           </Link>
           {projectName && (
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-ink leading-snug truncate">
+                <h2 className="text-[15px] font-semibold text-ink leading-snug truncate tracking-tight">
                   {projectName}
                 </h2>
                 {(client || city || state) && (
@@ -1842,7 +1844,8 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                 )}
               </div>
               {statusLabel && (
-                <span className="flex-shrink-0 inline-block px-2 py-0.5 rounded-sm text-[10px] font-medium border border-border bg-background text-ink-2 uppercase tracking-[0.08em]">
+                <span className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border border-brand-100 bg-brand-50 text-brand uppercase tracking-[0.08em]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand" />
                   {statusLabel}
                 </span>
               )}
@@ -1858,8 +1861,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
             visível (regressão B-05/W-08 identificada no diagnóstico
             2026-06-11). ──────────────────────────────────────────────────── */}
         {pdfError?.kind === "blocked" && (
-          <div className="mb-5 bg-red-50 border border-red-300 rounded-md p-3">
-            <p className="text-[11px] font-semibold text-red-700 uppercase tracking-[0.08em] mb-1">
+          <div className="mb-5 bg-red-50 border border-red-300 border-l-4 border-l-red-600 rounded-md p-3">
+            <p className="text-[11px] font-semibold text-red-700 uppercase tracking-[0.08em] mb-1 flex items-center gap-1.5">
+              <ShieldAlert className="w-3.5 h-3.5" />
               PDF bloqueado pela governança
             </p>
             <p className="text-[10px] text-red-600/80 mb-1 leading-snug">
@@ -1918,8 +1922,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
           return (
             <>
               {dataBlock.length > 0 && (
-                <div className="mb-5 bg-red-50 border border-red-200 rounded-md p-3">
-                  <p className="text-[11px] font-semibold text-red-700 uppercase tracking-[0.08em] mb-1">
+                <div className="mb-5 bg-red-50 border border-red-200 border-l-4 border-l-red-500 rounded-md p-3">
+                  <p className="text-[11px] font-semibold text-red-700 uppercase tracking-[0.08em] mb-1 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
                     Bloqueio do projeto
                   </p>
                   <p className="text-[10px] text-red-600/80 mb-2 leading-snug">
@@ -1939,8 +1944,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
                 </div>
               )}
               {rtPending.length > 0 && (
-                <div className="mb-5 bg-sky-50 border border-sky-200 rounded-md p-3">
-                  <p className="text-[11px] font-semibold text-sky-800 uppercase tracking-[0.08em] mb-1">
+                <div className="mb-5 bg-sky-50 border border-sky-200 border-l-4 border-l-sky-500 rounded-md p-3">
+                  <p className="text-[11px] font-semibold text-sky-800 uppercase tracking-[0.08em] mb-1 flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5" />
                     Aguarda decisão técnica (RT)
                   </p>
                   <p className="text-[10px] text-sky-700/80 mb-2 leading-snug">
@@ -1983,8 +1989,9 @@ export function ProjectMap({ projectId, initialLayout, projectName, statusLabel,
 
         {/* ── Warnings (derivados de projectResult.diagnostics) ── */}
         {(projectResult.diagnostics?.warnings.length ?? 0) > 0 && (
-          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-md p-3">
-            <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-[0.08em] mb-2">
+          <div className="mb-5 bg-amber-50 border border-amber-200 border-l-4 border-l-amber-500 rounded-md p-3">
+            <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-[0.08em] mb-2 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" />
               Avisos
             </p>
             <ul className="space-y-1 max-h-32 overflow-y-auto">
@@ -3159,12 +3166,12 @@ function ToolButton({
       disabled={disabled}
       title={tooltip ?? label}
       className={clsx(
-        "flex items-center gap-2 px-2.5 py-1.5 rounded-sm text-xs font-medium transition-colors",
+        "flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
         disabled
           ? "text-ink-4 cursor-not-allowed"
           : active
-            ? "bg-ink text-white"
-            : "text-ink-2 hover:bg-surface"
+            ? "bg-brand text-white shadow-card"
+            : "text-ink-2 hover:bg-brand-50 hover:text-brand"
       )}
     >
       {icon}
@@ -3216,7 +3223,7 @@ function SaveStatus({
   savedAt: Date | null;
 }) {
   return (
-    <div className="absolute top-4 right-4 text-[11px] font-mono text-ink-3 bg-white/90 backdrop-blur-md border border-border rounded-sm px-2.5 py-1 flex items-center gap-1.5">
+    <div className="absolute top-4 right-4 text-[11px] font-mono text-ink-3 bg-white/95 backdrop-blur-md border border-border rounded-full px-3 py-1.5 shadow-card flex items-center gap-1.5">
       {saving ? (
         <>
           <Loader2 className="w-3 h-3 animate-spin" />

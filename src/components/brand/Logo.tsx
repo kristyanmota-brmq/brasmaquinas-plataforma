@@ -1,10 +1,12 @@
 interface LogoProps {
   size?: number;
   withText?: boolean;
+  /** Versão para fundos escuros (shell petróleo): texto claro e B em branco. */
+  dark?: boolean;
   className?: string;
 }
 
-export function Logo({ size = 28, withText = true, className = "" }: LogoProps) {
+export function Logo({ size = 28, withText = true, dark = false, className = "" }: LogoProps) {
   return (
     <div className={`flex items-center gap-2.5 ${className}`}>
       <svg
@@ -15,10 +17,10 @@ export function Logo({ size = 28, withText = true, className = "" }: LogoProps) 
         xmlns="http://www.w3.org/2000/svg"
         aria-label="Brasmáquinas"
       >
-        {/* Esquerda (verde-petróleo, forma do B) */}
+        {/* Esquerda (verde-petróleo, forma do B) — branca em fundo escuro */}
         <path
           d="M4 4 C14 4, 18 8, 18 18 L18 22 C18 32, 14 36, 4 36 Z"
-          fill="#094641"
+          fill={dark ? "#FFFFFF" : "#094641"}
         />
         {/* Topo direito (verde) */}
         <path
@@ -32,7 +34,10 @@ export function Logo({ size = 28, withText = true, className = "" }: LogoProps) 
         />
       </svg>
       {withText && (
-        <span className="text-[15px] font-semibold tracking-tight" style={{ color: "#094641" }}>
+        <span
+          className="text-[15px] font-semibold tracking-tight"
+          style={{ color: dark ? "#FFFFFF" : "#094641" }}
+        >
           Brasmáquinas
         </span>
       )}

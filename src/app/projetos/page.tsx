@@ -2,6 +2,12 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { Header } from "@/components/brand/Header";
+import {
+  buttonClass,
+  StatCard,
+  StatusBadge,
+  EmptyState,
+} from "@/components/ui/primitives";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Rascunho",
@@ -13,15 +19,19 @@ const STATUS_LABEL: Record<string, string> = {
   LOST: "Perdida",
 };
 
-const STATUS_STYLE: Record<string, string> = {
-  DRAFT: "bg-surface-2 text-ink-2 border-border",
-  PRELIMINARY: "bg-warning-soft text-warning border-warning/20",
-  FINAL_PENDING_APPROVAL: "bg-warning-soft text-warning border-warning/20",
-  FINAL_RELEASED: "bg-success-soft text-success border-success/20",
-  SENT: "bg-surface-2 text-ink-2 border-border",
-  WON: "bg-success-soft text-success border-success/20",
-  LOST: "bg-danger-soft text-danger border-danger/20",
+/** Ponto colorido do status — semântica preservada da versão anterior. */
+const STATUS_DOT: Record<string, string> = {
+  DRAFT: "bg-ink-4",
+  PRELIMINARY: "bg-warning",
+  FINAL_PENDING_APPROVAL: "bg-warning",
+  FINAL_RELEASED: "bg-success",
+  SENT: "bg-info",
+  WON: "bg-success",
+  LOST: "bg-danger",
 };
+
+const EM_ANDAMENTO = new Set(["DRAFT", "PRELIMINARY", "FINAL_PENDING_APPROVAL"]);
+const EMITIDAS = new Set(["FINAL_RELEASED", "SENT"]);
 
 export default async function ProjetosPage() {
   const { userId } = await auth();
@@ -30,60 +40,75 @@ export default async function ProjetosPage() {
     orderBy: { updatedAt: "desc" },
   });
 
+  const emAndamento = projects.filter((p) => EM_ANDAMENTO.has(p.status)).length;
+  const emitidas = projects.filter((p) => EMITIDAS.has(p.status)).length;
+  const ganhas = projects.filter((p) => p.status === "WON").length;
+
   return (
     <main className="min-h-screen bg-surface">
       <Header />
 
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <div className="flex items-end justify-between mb-10">
+      <div className="max-w-7xl mx-auto px-5 py-10">
+        {/* ── Cabeçalho ── */}
+        <div className="flex items-end justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-ink">
+            <h1 className="text-[1.75rem] font-semibold tracking-tight text-ink">
               Projetos
             </h1>
-            <p className="text-sm text-ink-3 mt-1">
-              {projects.length === 0
-                ? "Nenhum projeto ainda."
-                : `${projects.length} ${projects.length === 1 ? "projeto" : "projetos"}`}
+            <p className="text-sm text-ink-3 mt-0.5">
+              Portfólio técnico-comercial de irrigação por aspersão
             </p>
           </div>
-          <Link
-            href="/projetos/novo"
-            className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-md font-medium text-sm transition-colors"
-          >
-            + Novo projeto
+          <Link href="/projetos/novo" className={buttonClass("primary", "md")}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Novo projeto
           </Link>
         </div>
 
-        {projects.length === 0 ? (
-          <div className="bg-background border border-border rounded-md p-16 text-center">
-            <p className="text-ink-2 mb-2">Você ainda não tem projetos.</p>
-            <p className="text-sm text-ink-3 mb-6">
-              Comece criando seu primeiro projeto técnico-comercial.
-            </p>
-            <Link
-              href="/projetos/novo"
-              className="inline-flex px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-md font-medium text-sm transition-colors"
-            >
-              Criar projeto
-            </Link>
+        {/* ── Métricas ── */}
+        {projects.length > 0 && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <StatCard label="Total" value={projects.length} />
+            <StatCard label="Em andamento" value={emAndamento} tone="brand" />
+            <StatCard label="Liberadas / enviadas" value={emitidas} tone="warning" />
+            <StatCard label="Ganhas" value={ganhas} tone="success" />
           </div>
+        )}
+
+        {/* ── Lista ── */}
+        {projects.length === 0 ? (
+          <EmptyState
+            icon={
+              <div className="w-16 h-16 rounded-xl bg-brand-50 text-brand flex items-center justify-center">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M3 21h18" /><path d="M5 21V8l7-5 7 5v13" />
+                  <path d="M9 21v-6h6v6" />
+                </svg>
+              </div>
+            }
+            title="Nenhum projeto ainda"
+            description="Crie o primeiro projeto técnico-comercial: da área no mapa à proposta em PDF, com a metodologia Brasmáquinas aplicada de ponta a ponta."
+            action={
+              <Link href="/projetos/novo" className={buttonClass("primary", "md")}>
+                Criar primeiro projeto
+              </Link>
+            }
+          />
         ) : (
-          <div className="bg-background border border-border rounded-md overflow-hidden">
+          <div className="bg-background border border-border rounded-lg shadow-card overflow-hidden">
             <table className="w-full">
               <thead className="border-b border-border bg-surface">
                 <tr>
-                  <th className="text-left text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] px-6 py-3">
-                    Projeto
-                  </th>
-                  <th className="text-left text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] px-6 py-3">
-                    Cliente
-                  </th>
-                  <th className="text-left text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] px-6 py-3">
-                    Local
-                  </th>
-                  <th className="text-left text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] px-6 py-3">
-                    Status
-                  </th>
+                  {["Projeto", "Cliente", "Local", "Status"].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] px-6 py-3"
+                    >
+                      {h}
+                    </th>
+                  ))}
                   <th className="text-right text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] px-6 py-3">
                     Atualizado
                   </th>
@@ -91,16 +116,18 @@ export default async function ProjetosPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {projects.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="hover:bg-surface transition-colors group"
-                  >
+                  <tr key={p.id} className="hover:bg-brand-50/40 transition-colors group">
                     <td className="px-6 py-4">
                       <Link
                         href={`/projetos/${p.id}`}
-                        className="font-medium text-ink group-hover:text-brand transition-colors"
+                        className="flex items-center gap-3"
                       >
-                        {p.name}
+                        <span className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 text-brand text-xs font-semibold flex items-center justify-center shrink-0">
+                          {p.name.slice(0, 2).toUpperCase()}
+                        </span>
+                        <span className="font-medium text-ink group-hover:text-brand transition-colors">
+                          {p.name}
+                        </span>
                       </Link>
                     </td>
                     <td className="px-6 py-4 text-sm text-ink-2">
@@ -110,13 +137,12 @@ export default async function ProjetosPage() {
                       {[p.city, p.state].filter(Boolean).join(" / ") || "—"}
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-sm text-[11px] font-medium border ${STATUS_STYLE[p.status]}`}
-                      >
-                        {STATUS_LABEL[p.status]}
-                      </span>
+                      <StatusBadge
+                        label={STATUS_LABEL[p.status] ?? p.status}
+                        dotClass={STATUS_DOT[p.status] ?? "bg-ink-4"}
+                      />
                     </td>
-                    <td className="px-6 py-4 text-sm text-ink-3 text-right font-mono">
+                    <td className="px-6 py-4 text-sm text-ink-3 text-right font-mono tabular">
                       {new Intl.DateTimeFormat("pt-BR", {
                         dateStyle: "short",
                       }).format(p.updatedAt)}
